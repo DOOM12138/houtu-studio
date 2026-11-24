@@ -60,6 +60,11 @@ try {
   const record = JSON.parse(await readFile(path.join(installed, 'data', 'server.json'), 'utf8'));
   assert.notEqual(record.port, blockedPort);
   const origin = `http://127.0.0.1:${record.port}`;
+  for(const route of ['/lab/','/feature-expansion.js','/prompt-contract.js','/feature-ui.js','/target-policy.js','/target-masks.js','/vision-target.html'])assert.equal((await fetch(origin+route)).status,200,route);
+  const lab=await(await fetch(origin+'/api/prompt-lab')).json();assert.equal(lab.features.length,75);assert.ok(lab.features.every(f=>f.records.length===0),'private evaluation photos must not enter the package');assert.equal(lab.trialSummary.firstRound,75);assert.equal(lab.trialSummary.targetedRevisions,4);
+  for(const [name,size]of [['face_landmarker.task',3758596],['hand_landmarker.task',7819105]])assert.equal((await stat(path.join(installed,'models',name))).size,size);
+  for(const document of ['FEATURE_PARITY.md','PROMPT_LAB.md'])assert.ok((await stat(path.join(installed,document))).size>100);
+
   const health = await (await fetch(origin + '/api/health')).json();
   assert.equal(health.instanceId, record.instanceId); assert.equal(health.version, manifest.version);
   const serverInfo=await(await fetch(origin+'/api/server/status')).json();

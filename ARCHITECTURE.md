@@ -1,6 +1,6 @@
 # 前后端与运行边界
 
-本项目是个人本机图片工作台，当前版本 1.13.1。默认一个进程在 127.0.0.1:4317 同时托管静态页面与 JSON API。它不是公网多用户服务。
+本项目是个人本机图片工作台，当前版本 1.14.0。默认一个进程在 127.0.0.1:4317 同时托管静态页面与 JSON API。它不是公网多用户服务。
 
 ## 前端
 
@@ -42,7 +42,7 @@ Git 初始基线为当前 1.7.0；更早版本 ZIP 是本机归档，不伪装�
 
 JSON备份内嵌有SHA-256校验的素材；上限140MB原始素材，上传容器上限210MB。恢复先校验所有素材与关联，再分配新ID，保留旧项目。授权目录、浏览器会话和可执行子任务不随备份迁移；历史AI输出可看，重新生成需明确开新版本。原有data格式和老工作流不迁移覆盖。
 
-## 回贴融合与诊断（1.13.1）
+## 回贴融合与诊断（1.14.0）
 
 `lib/seam.mjs`提供纯本机颜色校准与边界融合，`lib/images.mjs`供精修、保护蒙版与创作局部清理共用。外围样本需足够、多侧覆盖、非透明且不过曝；各通道具备足够方差、相关系数≥0.985、拟合残差≤4.5及受限增益/偏置才采用整体校准。结构改变、平坦上下文和证据不足时跳过全局匹配。边缘场在小网格求受限平滑修正，深处固定为零，颜色调整不扩散到内部和保护区。蒙版采用预乘RGBA替换；黑色区域与相同像素直接保留，白色内核按编辑结果替换。
 
@@ -58,3 +58,9 @@ JSON备份内嵌有SHA-256校验的素材；上限140MB原始素材，上传容�
 - Status: DONE，算法与工作流已验证；真实照片和AI画质仍需实际素材验收，不作零色差保证。
 
 理论参考：[Poisson Image Editing](https://www.cs.jhu.edu/~misha/Fall07/Papers/Perez03.pdf)与[OpenCV seamless cloning](https://docs.opencv.org/4.x/df/da0/group__photo__clone.html)。这里实现的是有限过渡带内的平滑颜色修正，不是OpenCV完整克隆算子的移植。
+
+## 1.14 提示词、部位与证据
+
+public/feature-expansion.js 定义扩充任务，prompt-contract.js 组合任务不变量；lib/prompt-registry.mjs 将75项图像和6类分析／创作流程登记标准与版本。backend/target-vision.mjs 在独立无登录浏览器运行随包MediaPipe分割、面部与手部模型，target-masks.js 输出可编辑范围；不进行身份识别。结果可手工增减。
+
+backend/feature-images.mjs 负责参考解码、扩图画布和输出尺寸。backend/prompt-lab.mjs 保存私有实图与观察，job-evidence.mjs 从不可变检查点绑定实际请求；生成尝试编号和合成尝试编号分别记录，过期审阅票据拒绝保存。外部来源标为填写者声明。data/prompt-lab 和 data/prompt-evaluations 不发布；公开的prompt-history.js只有历史文字结论。

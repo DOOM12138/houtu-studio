@@ -1,4 +1,5 @@
 // Original task instructions, informed by public feature descriptions; not vendor prompts.
+import {EXTENDED_TOOLS} from './feature-expansion.js';
 export const STYLES = [
   { id: 'anime', painting: true, name: '二次元厚涂', description: '动漫感、柔和色块与自然笔触', instruction: '二次元数字厚涂风格，保持动漫角色辨识度，用干净的色块与柔和明暗塑造体积，弱化生硬线稿，笔触顺应形体，不转为写实油画或塑料3D。' },
   { id: 'cos', painting: true, name: 'COS 质感厚涂', description: '保留真人与服装质感，细化角色妆造', instruction: 'COS人像质感厚涂，保留原图真人身份、面部结构与摄影空间感，在妆容、眼睛、假发和服装上加入细腻的二次元厚涂处理；不要把真人完全变成平面卡通，也不要过度美颜。' },
@@ -42,6 +43,7 @@ export const PRESETS = [
   {"id":"hair-lift","name":"反重力发丝","group":"场照与次元","short":"自然飘发与次元动势","description":"调整原有发梢和少量发束的动势，保留发型、发色与五官。","style":"natural","instruction":"仅为原有发丝增加合理的飘动与反重力表现。"},
   {"id":"hair-glow","name":"发丝辉光","group":"场照与次元","short":"沿光源增强发丝边缘","description":"让原有发丝边缘更通透，保持发型和瞳色，不把头发改成发光塑料。","style":"natural","instruction":"细化原发丝的边缘辉光和光源衔接。"},
   {"id":"dimension-effects","name":"次元氛围特效","group":"场照与次元","short":"轮廓光、雷电、火星与羽毛","description":"按人物与现场光线添加次元效果，程度1–10可调，可用主体保护保留原人物细节。","style":"natural","instruction":"在保留人物与现场构图的基础上加入所选次元特效。"},
+  ...EXTENDED_TOOLS,
   { id: 'custom', name: '自定义修图', group: '画面与风格', short: '直接写想修改的地方', description: '用补充描述说明修改目标；可先在原图画局部选区。', instruction: '根据用户的补充描述执行具体图像编辑，保持未要求改变的内容、构图和人物身份。' },
 ];
 

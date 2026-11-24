@@ -1,0 +1,6 @@
+This distribution includes unmodified Google MediaPipe model artifacts:
+Selfie Multiclass Image Segmenter, Face Landmarker and Hand Landmarker Full.
+Copyright Google LLC / The MediaPipe Authors. Licensed under Apache License 2.0.
+The license is preserved in LICENSE.txt; official sources, model cards and SHA-256
+digests are recorded in README.md. Models are used for local region estimation,
+not person identification. This project has not modified or retrained weights.

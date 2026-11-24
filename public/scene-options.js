@@ -1,4 +1,5 @@
-﻿export const SCENE_OPERATIONS=['remove-people','remove-equipment','clear-background','hair-lift','hair-glow','dimension-effects'];
+﻿import {EXTENDED_TOOLS} from './feature-expansion.js';
+export const SCENE_OPERATIONS=['remove-people','remove-equipment','clear-background','hair-lift','hair-glow','dimension-effects',...EXTENDED_TOOLS.filter(p=>p.scene).map(p=>p.id)];
 export const CLEANUP_OPERATIONS=['remove-people','remove-equipment','clear-background'];
 export const DIMENSION_EFFECTS=[{id:'glow',name:'氛围轮廓光',instruction:'在主体后侧与背景加入协调的轮廓辉光和少量光晕，不遮挡五官。'},{id:'lightning',name:'雷电能量',instruction:'在主体周围和背景安排有空间层次的雷电与能量光丝，避开面部，保留手持道具与轮廓。'},{id:'fire',name:'火焰与火星',instruction:'加入装饰性的幻想火焰、余烬和光照反射，不表现人物被烧伤，不改变肤色和服装设计。'},{id:'feathers',name:'飘浮羽毛',instruction:'加入少量有前后景层次、方向统一的飘浮羽毛，前景轻虚化，不遮挡人物五官或主道具。'},{id:'particles',name:'次元光粒',instruction:'加入细腻的漂浮光粒和空间光斑，疏密有序，不把人物淹没在粒子里。'}];
 export const isSceneOperation=operation=>SCENE_OPERATIONS.includes(operation);
@@ -6,7 +7,7 @@ export const isCleanupOperation=operation=>CLEANUP_OPERATIONS.includes(operation
 export function sceneOptions(input,operation){
  if(!isSceneOperation(operation))return null;
  input??={};if(typeof input!=='object'||Array.isArray(input))throw Error('场照与次元设置无效。');
- const subject=input.subject??'',people=input.people??'bystanders',tone=input.tone??'keep',effect=input.effect??'glow',intensity=input.intensity??3,protectSubject=input.protectSubject??(isCleanupOperation(operation)||operation==='dimension-effects');
+ const subject=input.subject??'',people=input.people??'bystanders',tone=input.tone??'keep',effect=input.effect??'glow',intensity=input.intensity??3,protectSubject=input.protectSubject??(EXTENDED_TOOLS.find(p=>p.id===operation)?.defaultProtect??(isCleanupOperation(operation)||operation==='dimension-effects'));
  if(typeof subject!=='string'||subject.length>500)throw Error('主体说明请控制在500字以内。');
  if(!['bystanders','selection'].includes(people))throw Error('请选择有效的路人清理范围。');
  if(!['keep','bright','dark'].includes(tone))throw Error('请选择有效的场照明暗。');

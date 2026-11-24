@@ -1,0 +1,18 @@
+// Reuses existing Cindy raw images. Never launches an AI request or consumes image quota.
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import {EventEmitter} from 'node:events';
+import sharp from 'sharp';
+import {createApp} from '../server.mjs';
+import {TARGET_POLICIES,TARGET_POLICY_VERSION,matchRepairBoundary} from '../public/target-policy.js';
+import {applyTargetRetention} from '../backend/target-vision.mjs';
+import {prepareEditImage,finishEditImage,applyProtectionMask} from '../lib/images.mjs';
+import {PRESETS} from '../public/catalog.js';
+import {normalizeEditOptions} from '../lib/painting.mjs';
+import {expandedCanvas,upscaleOutput} from '../backend/feature-images.mjs';
+class LocalOnly extends EventEmitter{async account(){return null;}async stop(){}async begin(){throw Error('This process cannot generate images.');}}
+const dir=path.resolve(process.argv[2]||'data/prompt-evaluations/2026-11-24/jobs'),app=await createApp({directory:path.resolve('tmp/prompt-vision-review'),bridge:new LocalOnly(),platform:{async close(){}}});await new Promise(r=>app.server.listen(0,'127.0.0.1',r));let done=0;
+try{const queue=JSON.parse(await fs.readFile(path.join(dir,'queue.json'),'utf8'));for(const entry of queue.jobs){const id=entry.id;if(!/^[a-z0-9-]+$/.test(id))throw Error('Invalid case ID');let receipt;try{receipt=JSON.parse(await fs.readFile(path.join(dir,id+'-result.json'),'utf8'));}catch{continue;}if(receipt.status!=='complete')continue;const job=JSON.parse(await fs.readFile(path.join(dir,id+'.json'),'utf8')),opts=normalizeEditOptions(job.options),p=await prepareEditImage(await fs.readFile(job.source.file),opts.selection);let original=p.source,region=p.region,expansionMask=null;const report={};if(job.expansion){const e=await expandedCanvas(original,opts.task);original=e.bytes;region=null;expansionMask=e.mask;}let result=await finishEditImage(await fs.readFile(receipt.raw),original,region,{report});let target=null;
+ if(TARGET_POLICIES[id]){target=await app.targetVision.analyze(original,{operation:id,areas:opts.areas,portrait:opts.portrait});if(target.found){const retention=['waist','clothes-transfer','hair-motion'].includes(TARGET_POLICIES[id])?0:['cos','anime'].includes(opts.style)?Math.max(0,100-opts.paintLevel*10):75,mask=await applyTargetRetention(target.mask,retention);result=await applyProtectionMask(result,original,mask,{report:report.target={},matchBoundary:matchRepairBoundary(PRESETS.find(t=>t.id===id))});target={...target,mask:undefined,sourceRetention:retention};}else{target={...target,mask:undefined,inputRequired:true};if(!region)result=original;}}
+ if(expansionMask)result=await applyProtectionMask(result,original,expansionMask,{report:report.expansion={}});if(opts.scene?.protectSubject&&job.source.mask)result=await applyProtectionMask(result,original,await fs.readFile(job.source.mask),{report:report.subject={},matchBoundary:matchRepairBoundary(PRESETS.find(t=>t.id===id))});if(id==='detail-upscale')result=await upscaleOutput(result,opts.task);const file=path.join(dir,id+'-scoped.png');await fs.writeFile(file,result);const m=await sharp(result).metadata();await fs.writeFile(file+'.json',JSON.stringify({policyVersion:TARGET_POLICY_VERSION,target,width:m.width,height:m.height,report},null,2));done++;console.log(JSON.stringify({id,done,target:target?.found,retention:target?.sourceRetention}));}
+}finally{await app.close();}console.log(JSON.stringify({recomposed:done,aiRequests:0}));

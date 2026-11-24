@@ -20,7 +20,7 @@ export function recipeValue(input={}){
  if(!stages.at(-1).enabled)throw Error('导出步骤不能关闭。');
  return {schemaVersion:1,name:cleanName(input.name,'我的修图配方'),description:String(input.description||'').slice(0,300),model:normalizeModel(input.model),stages};
 }
-const retouch=(name,options)=>({type:'retouch',name,options}),finish={type:'export',name:'成片导出',options:{format:'png',quality:90}};
+const retouch=(name,options)=>({type:'retouch',name,options:{task:{autoTarget:true,sourceRetention:['smooth-belly','body-shape','clothes-flow','outfit-transfer'].includes(options.operation)?0:75},...options}}),finish={type:'export',name:'成片导出',options:{format:'png',quality:90}};
 export const RECIPE_SEEDS=[
  {name:'自然人物完整精修',stages:[retouch('人物自然细化',{operation:'portrait-polish',style:'natural'}),retouch('服装褶皱整理',{operation:'outfit',style:'natural'}),{type:'local',name:'轻量清晰度',options:{sharpen:.5}},finish]},
  {name:'克制二次元厚涂',stages:[retouch('二次元厚涂2级',{operation:'full-body',style:'anime',paintLevel:2}),retouch('成品人物细化',{operation:'portrait-polish',style:'natural'}),finish]},

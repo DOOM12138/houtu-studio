@@ -10,7 +10,7 @@ import { importTemplates } from '../lib/templates.mjs';
 import { normalizePreset } from '../backend/color.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
-const ALLOWED = ['server.mjs', 'launcher.mjs', 'lib', 'public', 'frontend', 'backend', 'models', 'scripts', 'vendor-licenses', 'package.json', 'package-lock.json', 'README.md', 'DEPLOY.md', 'SOURCES.md', 'AGENTS.md', 'agent.md', 'ARCHITECTURE.md', 'GIT_WORKFLOW.md', 'FEATURES.md', 'LICENSE', '.npmrc', '开发终端.cmd', '启动网站.cmd', '停止网站.cmd', '一键部署.cmd', '启动服务器.cmd', '服务器管理.cmd', '停止服务器.cmd'];
+const ALLOWED = ['server.mjs', 'launcher.mjs', 'lib', 'public', 'frontend', 'backend', 'models', 'scripts', 'vendor-licenses', 'package.json', 'package-lock.json', 'README.md', 'DEPLOY.md', 'SOURCES.md', 'AGENTS.md', 'agent.md', 'ARCHITECTURE.md', 'GIT_WORKFLOW.md', 'FEATURES.md', 'FEATURE_PARITY.md', 'PROMPT_LAB.md', 'LICENSE', '.npmrc', '开发终端.cmd', '启动网站.cmd', '停止网站.cmd', '一键部署.cmd', '启动服务器.cmd', '服务器管理.cmd', '停止服务器.cmd'];
 export function productionDirectories(lock) {
   return Object.entries(lock.packages || {}).filter(([name, entry]) => name.startsWith('node_modules/') && !entry.dev).map(([name]) => name)
     .sort((a,b) => a.length - b.length).filter((name, i, all) => !all.slice(0, i).some(parent => name.startsWith(parent + '/')));
@@ -43,6 +43,7 @@ export async function buildPortable({ root = ROOT, output, includePrompts = fals
     progress('正在整理网站文件');
     for (const file of ALLOWED) await cp(path.join(root, file), path.join(app, file), { recursive: true, dereference: false });
     if(await hashFile(path.join(app,'models','selfie_multiclass_256x256.tflite'))!=='c6748b1253a99067ef71f7e26ca71096cd449baefa8f101900ea23016507e0e0')throw new Error('内置人物模型校验失败，已取消打包。');
+    for(const [name,expected]of Object.entries({'face_landmarker.task':'64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff','hand_landmarker.task':'fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1'}))if(await hashFile(path.join(app,'models',name))!==expected)throw Error('部位模型校验失败：'+name);
     progress('正在加入免安装运行环境');
     await mkdir(path.join(app, 'runtime'));
     await copyFile(process.execPath, path.join(app, 'runtime', 'node.exe'));

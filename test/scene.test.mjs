@@ -21,7 +21,7 @@ async function setup(t){const directory=await mkdtemp(path.join(tmpdir(),'houtu-
 async function done(origin,id){for(let i=0;i<200;i++){const job=await(await fetch(origin+'/api/jobs/'+id)).json();if(job.status==='done')return job;if(job.status==='error')throw Error(job.message);await new Promise(resolve=>setTimeout(resolve,20));}throw Error('Scene job timed out');}
 
 test('six scene tools compile distinct venue-cleanup and dimensional prompts without forcing portrait repainting',()=>{
- assert.equal(PRESETS.length,24);assert.ok(SCENE_OPERATIONS.every(id=>PRESETS.some(preset=>preset.id===id)));
+ assert.equal(PRESETS.length,75);assert.ok(SCENE_OPERATIONS.every(id=>PRESETS.some(preset=>preset.id===id)));
  for(const operation of ['remove-people','remove-equipment','clear-background']){const prompt=paintingPrompt({operation,style:'anime',paintLevel:10,strength:'rich',scene:{subject:'前景蓝发白衣主角',tone:'dark'}});assert.match(prompt,/保留/);assert.match(prompt,/蓝发白衣/);assert.match(prompt,/场馆|场地|地面/);assert.doesNotMatch(prompt,/二次元数字厚涂风格|厚涂程度10\/10|精修力度：细致/);}
  assert.match(paintingPrompt({operation:'remove-equipment'}),/长柄伞/);
  assert.match(paintingPrompt({operation:'clear-background'}),/路人.*灯架/);
