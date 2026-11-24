@@ -63,3 +63,14 @@
 - https://www.pexels.com/license/ 与 https://www.pexels.com/terms-of-service/ ：新增真人测试照片的来源许可；照片5587981（Polina Tankilevitch）、31419542（Hoàng Tiến Anh）、37206371（TBD Tuyên）、11388574（Диана Дунаева）、30175874（Alina Chernii）。测试文件、摄影师与原始链接保存在私有素材清单，不进入公开包。
 
 公开案例只证明其展示的具体结果；本项目仍需在自己的模型入口执行和审阅。图片原始标识和署名不作为去除目标。
+
+## 1.16 影调与电影色彩
+
+2026-11-25实际查看绘影／幻象的电影光影、闪光、夜景与白棚，以及像素蛋糕的夕阳和百叶窗前后对照，共六组。只参照明暗、冷暖和层次，保留本图场景；没有取得或复制商业LUT。
+
+- https://www.hueyingai.cn/ ：暗背景保留灯点、冷影暖脸、白衣高光与电影逆光的可观察关系。具体公开原图／修后链接保存在frontend/tonal-looks.js，可手动载入为参考；原始图片不随包附送。
+- https://wiki.pixcakeai.com/guide/14731.html ：夕阳与百叶窗通透风格公开教程。
+- https://wiki.pixcakeai.com/guide/9398.html ：影调、色阶、曲线、HSL和颜色分级的公开功能说明。
+- https://www.adobe.com/learn/lightroom-cc/web/adjust-photo-tone-with-color-grading ：分别控制阴影、中间调与高光的色彩关系。本站使用自有sRGB参数，与Lightroom数值不等价。
+
+实图本机对照使用原有CC0 COS样片与原创成人动漫测试图，原图及导出保存在F盘私有data/tone-evaluations。示例只证明这些素材上的实际处理，不是所有照片审美合格的保证。

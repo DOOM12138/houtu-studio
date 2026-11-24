@@ -1,11 +1,11 @@
 import https from 'node:https';
 import { lookup } from 'node:dns/promises';
 import sharp from 'sharp';
-const hosts=['xiaohongshu.com','xhslink.com','xhscdn.com','unsplash.com','pexels.com','wikimedia.org'];
+const hosts=['xiaohongshu.com','xhslink.com','xhscdn.com','unsplash.com','pexels.com','wikimedia.org','hueyingai.cn','pixcakeai.com'];
 function allowed(url){return url.protocol==='https:'&&!url.username&&!url.password&&(!url.port||url.port==='443')&&hosts.some(h=>url.hostname===h||url.hostname.endsWith('.'+h));}
 function public4(ip){const [a,b]=ip.split('.').map(Number);return a>0&&a<224&&a!==10&&a!==127&&a!==169&&!(a===172&&b>=16&&b<=31)&&!(a===192&&(b===168||b===0))&&!(a===100&&b>=64&&b<=127)&&!(a===198&&(b===18||b===19));}
 export async function publicFetch(raw,redirects=0){
-  const url=new URL(raw);if(!allowed(url))throw new Error('仅支持小红书、Unsplash、Pexels 和 Wikimedia 的公开 HTTPS 链接；其他来源请上传参考图。');
+  const url=new URL(raw);if(!allowed(url))throw new Error('仅支持小红书、Unsplash、Pexels、Wikimedia、绘影和像素蛋糕的公开 HTTPS 链接；其他来源请上传参考图。');
   const addresses=await lookup(url.hostname,{all:true,family:4});if(!addresses.length||addresses.some(a=>!public4(a.address)))throw new Error('参考地址不可访问。');const ip=addresses[0].address;
   return new Promise((resolve,reject)=>{const req=https.get(url,{headers:{'User-Agent':'HoutuStudio/1.3 (local reference image importer)','Accept':'text/html,image/*,application/json'},lookup:(_host,options,done)=>done(null,options.all?[{address:ip,family:4}]:ip,4)},res=>{
     if([301,302,303,307,308].includes(res.statusCode)){res.resume();if(redirects>=4)return reject(new Error('参考链接重定向过多，请直接上传图片。'));return publicFetch(new URL(res.headers.location,url).href,redirects+1).then(resolve,reject);}

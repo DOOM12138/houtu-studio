@@ -29,3 +29,7 @@
 #lab-preview:empty{display:none}#lab-preview img{width:100%;max-height:480px;object-fit:contain}#lab-context-fields label{display:block;margin:12px 0}#lab-context-fields textarea{display:block;width:100%;box-sizing:border-box}#lab-records pre{white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%;font-size:12px}#lab-job{max-width:100%}[hidden]{display:none!important}@media(max-width:600px){#lab-preview{grid-template-columns:1fr}.prompt-lab .studio-fields{grid-template-columns:1fr}}
 
 #lab-study-plan p{font-size:12px;line-height:1.8;margin:10px 0;color:var(--muted)}#lab-study-plan a{display:inline-block;margin-right:10px}#lab-study-plan h3{font-size:13px;margin:15px 0 5px}
+
+.tonal-library{margin:16px 0 22px}.library h3{font-size:13px;margin:12px 0 8px}.tone-families{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.tone-families button{font-size:12px;padding:7px 3px;min-height:38px}.tone-families [aria-pressed=true]{background:var(--soft);border-color:var(--accent);color:var(--accent)}#tone-looks{margin:10px -6px}#tone-amount{width:100%;accent-color:var(--accent)}#tone-sources p{font-size:12px;line-height:1.7;margin:9px 0}#tone-sources a{display:inline-block;margin-right:8px}.tonal-library details{margin-top:10px}
+
+#tone-sources .tone-reference-use{display:block;min-height:34px;margin-top:7px;font-size:12px}

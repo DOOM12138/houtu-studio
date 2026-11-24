@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { readFile,writeFile,rename,mkdir } from 'node:fs/promises';
+import {normalizeToneState} from '../frontend/tonal-looks.js';
 import { settings,clamp } from '../frontend/engine.js';
 const TYPES=new Set(['person','background','hair','skin','face','clothes','accessories','brush','luminance','color','linear','radial']);
 export function normalizePreset(input) {
@@ -14,7 +15,7 @@ export function normalizePreset(input) {
     // Brush paths/raster/photographs are image-specific and never included in shared presets.
     strokes:[],
   })).filter(l=>l.type!=='brush');
-  return {name,description,settings:settings(input.settings),layers};
+  return {name,description,tone:normalizeToneState(input.tone,input.settings),settings:settings(input.settings),layers};
 }
 export class ColorStore {
   constructor(directory,defaults=path.join(directory,'no-default-color-presets.json')){this.file=path.join(directory,'color-presets.json');this.defaults=defaults;this.entries=[];this.queue=Promise.resolve();}

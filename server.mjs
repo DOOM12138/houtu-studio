@@ -23,6 +23,7 @@ import { DEFAULT_PROMPT, paintingPrompt, decodeImage, normalizeEditOptions } fro
 import { prepareEditImage, finishEditImage, applyProtectionMask, orientedDimensions } from './lib/images.mjs';
 import {TargetVision,applyTargetRetention,normalizedTargetMask,TARGET_POLICY_VERSION} from './backend/target-vision.mjs';
 import {TARGET_POLICIES,matchRepairBoundary} from './public/target-policy.js';
+import {toneChoice,toneAdvicePrompt} from './frontend/tonal-looks.js';
 import {suggestedHeadScope} from './backend/edit-scope.mjs';
 import {PromptLab} from './backend/prompt-lab.mjs';
 import {jobEvidence,saveJobEvidence} from './backend/job-evidence.mjs';
@@ -181,7 +182,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     } else throw new Error('客户端没有返回可下载的图片，请升级客户端后重试。');
     if(job.runId!==runId)throw new Error('这次执行已过期。');
     const raw=await workflows.putAsset(job.workflowId,bytes,item.result?.startsWith('data:image/jpeg')?'image/jpeg':'image/png');if(job.runId!==runId)throw new Error('这次执行已过期。');job.rawAsset=raw.id;
-    await doneJobStep(job,{rawAsset:raw.id,generationRunId:runId,reportedImageEngine:typeof item.model==='string'?item.model:null,sentInputs:job.sentInputs||null,account:accountSnapshot(job.account),appVersion:'1.15.0',promptVersion:job.promptVersion||PROMPT_VERSION,compiledPrompt:job.actualPrompt||paintingPrompt(job),model:job.model||null,resolvedModel:job.resolvedModel||null},[{id:raw.id,label:'AI返回的原始出图（合成前）',type:'image'}],'原始生成图已保存，后续合成无需再次生成',runId);
+    await doneJobStep(job,{rawAsset:raw.id,generationRunId:runId,reportedImageEngine:typeof item.model==='string'?item.model:null,sentInputs:job.sentInputs||null,account:accountSnapshot(job.account),appVersion:'1.16.0',promptVersion:job.promptVersion||PROMPT_VERSION,compiledPrompt:job.actualPrompt||paintingPrompt(job),model:job.model||null,resolvedModel:job.resolvedModel||null},[{id:raw.id,label:'AI返回的原始出图（合成前）',type:'image'}],'原始生成图已保存，后续合成无需再次生成',runId);
     await composeOutput(job,bytes,runId);
   };
 
@@ -306,7 +307,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       }
       const studioDownload=/^\/api\/studio\/downloads\/([a-f0-9-]{36})$/.exec(route);
       if(studioDownload&&req.method==='GET'){const receipt=JSON.parse(await readFile(path.join(studio.directory,'exports',studioDownload[1]+'.json'),'utf8')),file=path.join(studio.directory,'exports',studioDownload[1]+(receipt.kind==='backup'?'.jsondata':'.zip'));res.writeHead(200,{'Content-Type':receipt.kind==='backup'?'application/json':'application/zip','Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(receipt.name)}`,'Content-Length':(await stat(file)).size});await pipeline(createReadStream(file),res);return;}
-      if (route === '/api/health' && req.method === 'GET') return json(res, 200, { app: 'houtu-studio', version: '1.15.0', instanceId, csrf });
+      if (route === '/api/health' && req.method === 'GET') return json(res, 200, { app: 'houtu-studio', version: '1.16.0', instanceId, csrf });
       if(route==='/api/portrait/source'&&req.method==='GET'){
         const auditId=url.searchParams.get('audit');if(auditId){const w=await workflows.get(auditId);if(w.kind!=='portrait-audit')throw new Error('不是人物检查工作流。');const assetId=w.steps[0].output?.imageAsset;if(!assetId)throw new Error('检查原图尚未保存。');return json(res,200,{workflowId:w.id,assetId,url:`/api/workflows/${w.id}/assets/${assetId}`,name:w.name,auditId:w.id,diagnosis:w.steps.find(n=>n.id==='diagnose').status==='done'?w.steps.find(n=>n.id==='diagnose').output:null});}
         const id=url.searchParams.get('workflow'),assetId=url.searchParams.get('asset');await resolvePicture({source:{kind:'workflow',workflowId:id,assetId}},{jobs,workflows});const w=await workflows.get(id);return json(res,200,{workflowId:id,assetId,url:`/api/workflows/${id}/assets/${assetId}`,name:w.name});
@@ -390,10 +391,10 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
             if(analysisAttempt){const previous=(await workflows.get(analysisAttempt.id)).steps.find(n=>n.id==='analysis')?.output;control.account=accountSnapshot(previous?.account);if(normalizeModel(previous?.model)===model)control.resolvedModel=normalizeModel(previous?.resolvedModel);}
             bridge.capture(control);
             if(analysisAttempt){const record=async resolvedModel=>{await workflows.mutate(analysisAttempt.id,w=>{const n=w.steps.find(n=>n.id==='analysis');if(n.token!==analysisAttempt.token)throw Error('审美步骤已过期。');n.output={...n.output,model,resolvedModel,account:accountSnapshot(control.account)};Object.assign(n.attempts.at(-1),{output:n.output});return {};});};await record(control.resolvedModel||null);control.onModelSelected=record;}
-            const promptSpec=requireAnalysisSpec('color.advice'),result=await bridge.critique(imagePath,referencePath,null,[],control);
+            const requestedTone=toneChoice(input.tone),promptSpec=requireAnalysisSpec('color.advice'),instructions=requestedTone?toneAdvicePrompt(requestedTone,{hasReference:Boolean(referencePath)}):null,result=await bridge.critique(imagePath,referencePath,instructions,[],control);
             const preset=normalizePreset({name:'ChatGPT 审美方案',settings:result.settings,layers:result.layers});
-            const response={promptVersion:promptSpec.version,compiledPrompt:control.analysisPrompt||null,account:accountSnapshot(control.account),model,resolvedModel:control.resolvedModel||null,summary:String(result.summary||'').slice(0,600),query:String(result.query||'').slice(0,120),preset};
-            if(analysisAttempt)response.workflow=(await workflows.complete(analysisAttempt.id,'analysis',analysisAttempt.token,{state:{promptVersion:promptSpec.version,compiledPrompt:control.analysisPrompt||null,aiPlan:preset,account:accountSnapshot(control.account),model,resolvedModel:control.resolvedModel||null,summary:response.summary,query:response.query},message:'审美方案已保存，关闭页面后仍可恢复'})).workflow;
+            const response={requestedTone,promptVersion:promptSpec.version,compiledPrompt:control.analysisPrompt||null,account:accountSnapshot(control.account),model,resolvedModel:control.resolvedModel||null,summary:String(result.summary||'').slice(0,600),query:String(result.query||'').slice(0,120),preset};
+            if(analysisAttempt)response.workflow=(await workflows.complete(analysisAttempt.id,'analysis',analysisAttempt.token,{state:{requestedTone,promptVersion:promptSpec.version,compiledPrompt:control.analysisPrompt||null,aiPlan:preset,account:accountSnapshot(control.account),model,resolvedModel:control.resolvedModel||null,summary:response.summary,query:response.query},message:'审美方案已保存，关闭页面后仍可恢复'})).workflow;
             return json(res,200,response);
           }catch(e){if(analysisAttempt)await workflows.fail(analysisAttempt.id,'analysis',analysisAttempt.token,friendlyError(e.message)).catch(()=>{});throw e;}finally{critiqueActive=false;await rm(dir,{recursive:true,force:true});}
         }
@@ -414,7 +415,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
         try{await bridge.account();}catch{}
         const images=await library.refresh(jobs,workflows);
         const records=accounts.records().map(account=>({...account,images:images.filter(image=>image.account?.email.toLowerCase()===account.email.toLowerCase()).length}));
-        return json(res,200,{serverId:accounts.state.serverId,startedAt,created:accounts.state.created,machine:os.hostname(),version:'1.15.0',projectRoot:ROOT,dataRoot:path.resolve(directory),loginRoot:path.join(path.resolve(directory),'codex'),scope:'local',current:accounts.current(),accounts:records,images:images.length});
+        return json(res,200,{serverId:accounts.state.serverId,startedAt,created:accounts.state.created,machine:os.hostname(),version:'1.16.0',projectRoot:ROOT,dataRoot:path.resolve(directory),loginRoot:path.join(path.resolve(directory),'codex'),scope:'local',current:accounts.current(),accounts:records,images:images.length});
       }
       if(route==='/api/server/images'&&req.method==='GET'){await library.refresh(jobs,workflows);return json(res,200,library.list(url.searchParams,accounts.records()));}
       const thumbnail=/^\/api\/server\/thumbnails\/([a-f0-9]{64})$/.exec(route);
@@ -531,7 +532,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
         file=path.join(ROOT,'frontend','workflows.html');
       } else if(req.method==='GET'&&(route==='/creative'||route==='/creative/')){
         file=path.join(ROOT,'frontend','creative.html');
-      } else if (req.method === 'GET' && /^\/color\/(app\.js|engine\.js|worker\.js|masks\.js|workflow-client\.js|workflows\.js|effects\.js|creative\.js|creative-multi\.js|server\.js|studio\.js|lab\.js|style\.css)$/.test(route)) {
+      } else if (req.method === 'GET' && /^\/color\/(app\.js|engine\.js|worker\.js|masks\.js|workflow-client\.js|workflows\.js|effects\.js|creative\.js|creative-multi\.js|server\.js|studio\.js|lab\.js|tonal-looks\.js|tone-controls\.js|style\.css)$/.test(route)) {
         file=path.join(ROOT,'frontend',path.basename(route));
       } else if (req.method === 'GET' && /^\/vision\/(vision_bundle\.mjs|wasm\/vision_wasm_(?:nosimd_)?internal\.(?:js|wasm))$/.test(route)) {
         file=path.join(ROOT,'node_modules','@mediapipe','tasks-vision',route.slice('/vision/'.length));

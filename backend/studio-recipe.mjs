@@ -1,4 +1,5 @@
-﻿import {normalizeEditOptions} from '../lib/painting.mjs';
+﻿import {toneChoice} from '../frontend/tonal-looks.js';
+import {normalizeEditOptions} from '../lib/painting.mjs';
 import {normalizeModel} from '../public/model-options.js';
 import {localOptions,exportOptions} from './local-image.mjs';
 import {settings,BUILTINS} from '../frontend/engine.js';
@@ -11,7 +12,7 @@ export function recipeValue(input={}){
   if(!stage||typeof stage!=='object')throw Error('流程步骤无效。');const type=stage.type;let options;
   if(type==='retouch'){options=normalizeEditOptions({...stage.options,model:null,parentId:null});if(stage.enabled!==false&&isSceneOperation(options.operation)&&options.scene.protectSubject&&enabled>0)throw Error('使用主体保护的场照步骤请放在第一步，后续图像变动后需重新确认蒙版。');}
   else if(type==='local')options=localOptions(stage.options);
-  else if(type==='grade'){if(stage.options?.layers?.length)throw Error('流程全局调色不自动重算照片专属蒙版，请进入调色工作台使用局部图层。');options={settings:settings(stage.options?.settings||stage.options||{})};}
+  else if(type==='grade'){if(stage.options?.layers?.length)throw Error('流程全局调色不自动重算照片专属蒙版，请进入调色工作台使用局部图层。');options={settings:settings(stage.options?.settings||stage.options||{}),look:toneChoice(stage.options?.look)};}
   else if(type==='export')options=exportOptions(stage.options);
   else throw Error('不支持的流程步骤。');
   if(stage.enabled!==false)enabled++;return {id:type==='export'&&index===input.stages.length-1?'deliver':'stage'+(index+1),name:cleanName(stage.name,{retouch:'AI精修',local:'本机图像处理',grade:'全局调色',export:'导出成片'}[type]),type,enabled:stage.enabled!==false,options};
@@ -29,5 +30,8 @@ export const RECIPE_SEEDS=[
  {name:'平滑瘦腹与服装整理',stages:[retouch('自然平滑收腹',{operation:'smooth-belly',belly:{level:2,fabric:'auto',transition:'wide'}}),retouch('服装顺势整理',{operation:'outfit',style:'natural'}),finish]},
  {name:'全本机整理与导出',stages:[{type:'local',name:'方向、尺寸与清晰度',options:{rotate:0,maxEdge:2400,sharpen:.3}},{type:'grade',name:'自然通透全局色彩',options:{settings:BUILTINS[0]?.settings||{}}},{...finish,options:{format:'jpeg',quality:92}}]},
  {name:'真人COS参考厚涂6级',stages:[retouch('眼妆、体积与发束',{operation:'cos-paint',style:'cos',paintLevel:6,strength:'balanced'}),finish]},
+ {name:'暗调本机调色',stages:[{type:'grade',name:'清冷暗调70%',options:{look:{id:'dark-clean',amount:70}}},finish]},
+ {name:'亮调本机调色',stages:[{type:'grade',name:'清透亮调70%',options:{look:{id:'bright-air',amount:70}}},finish]},
+ {name:'电影质感本机调色',stages:[{type:'grade',name:'冷暖电影70%',options:{look:{id:'cinema-teal',amount:70}}},finish]},
 ].map((input,index)=>({id:'builtin-'+(index+1),builtin:true,...recipeValue(input)}));
 export const recipeReport=recipe=>({steps:recipe.stages.length,aiSteps:recipe.stages.filter(stage=>stage.enabled&&stage.type==='retouch').length,localSteps:recipe.stages.filter(stage=>stage.enabled&&stage.type!=='retouch').length,requiresSubjectMask:recipe.stages.some(stage=>stage.enabled&&stage.type==='retouch'&&stage.options.scene?.protectSubject),freeWebsite:true});
