@@ -21,6 +21,13 @@ import { stat, unlink } from 'node:fs/promises';
 import { CodexBridge } from './lib/codex.mjs';
 import { DEFAULT_PROMPT, paintingPrompt, decodeImage, normalizeEditOptions } from './lib/painting.mjs';
 import { prepareEditImage, finishEditImage, applyProtectionMask, orientedDimensions } from './lib/images.mjs';
+import {TargetVision,applyTargetRetention,normalizedTargetMask,TARGET_POLICY_VERSION} from './backend/target-vision.mjs';
+import {TARGET_POLICIES,matchRepairBoundary} from './public/target-policy.js';
+import {PromptLab} from './backend/prompt-lab.mjs';
+import {jobEvidence,saveJobEvidence} from './backend/job-evidence.mjs';
+import {referenceInputs,expandedCanvas,upscaleOutput} from './backend/feature-images.mjs';
+import {requireAnalysisSpec} from './lib/prompt-registry.mjs';
+import {PROMPT_VERSION} from './public/prompt-contract.js';
 import { PRESETS, normalizePaintLevel } from './public/catalog.js';
 import { TemplateStore } from './lib/templates.mjs';
 import { buildPortable } from './scripts/build-portable.mjs';
@@ -43,19 +50,19 @@ const publicJob = j => ({ requestKey:j.requestKey||null,pipelineParentId:j.pipel
   parentId: j.parentId || null, imageWidth: j.imageWidth, imageHeight: j.imageHeight,
   promptMode: j.promptMode || 'guided',
   workflowId:j.workflowId||null, workflowStep:j.workflowStep||null, workflowToken:j.workflowToken||null, runId:j.runId||null,
-  region:j.region||null,rawAsset:j.rawAsset||null,composition:j.composition||null,
+  targetMaskAsset:j.targetMaskAsset||null,targetMaskOverride:Boolean(j.targetMaskOverride),compositionTargetMaskAsset:j.compositionTargetMaskAsset||null,featureReferences:j.featureReferences||[],task:j.task||null,promptVersion:j.promptVersion||null,region:j.region||null,rawAsset:j.rawAsset||null,composition:j.composition||null,
   belly:j.belly||null,scene:j.scene||null,compositionMaskOverride:Boolean(j.compositionMaskOverride),compositionMaskAsset:j.compositionMaskAsset||null,portrait:j.portrait||null,maskAsset:j.maskAsset||null,round:j.round||1,sourceWorkflowId:j.sourceWorkflowId||null,sourceAsset:j.sourceAsset||null,sourceStep:j.sourceStep||null,portraitAuditId:j.portraitAuditId||null,
   created: j.created, message: j.message, sourceUrl: `/images/${j.id}/source.${j.extension}`,
   outputUrl: j.output ? `/images/${j.id}/${j.output}` : null });
 
-export async function createApp({ directory = path.join(ROOT, 'data'), bridge: suppliedBridge, packageBuilder = buildPortable, composeImage = finishEditImage, platform: suppliedPlatform } = {}) {
+export async function createApp({ directory = path.join(ROOT, 'data'), bridge: suppliedBridge, packageBuilder = buildPortable, composeImage = finishEditImage, platform: suppliedPlatform,targetAnalyzer:suppliedTargetAnalyzer } = {}) {
   const home = path.join(directory, 'codex');
   const jobsDirectory = path.join(directory, 'jobs');
   await mkdir(jobsDirectory, { recursive: true });await mkdir(home,{recursive:true});
   const accounts=new AccountLedger(directory);await accounts.load();
   const library=new ImageLibrary(directory);await library.load();
   const bridge = trackedBridge(suppliedBridge || new CodexBridge(home),accounts);
-  const startedAt=Date.now();let studio;
+  const startedAt=Date.now();let studio;const targetVision=new TargetVision(()=>{const address=server.address();if(!address)throw Error('服务尚未启动。');return 'http://127.0.0.1:'+address.port;});
   const csrf = randomBytes(32).toString('hex');
   const jobs = new Map();
   const instanceId = randomUUID();
@@ -63,7 +70,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
   await templates.load();
   const colors = new ColorStore(directory, path.join(ROOT, 'defaults', 'color-presets.json'));
   await colors.load();
-  const workflows=new WorkflowStore(directory);await workflows.load();
+  const workflows=new WorkflowStore(directory);await workflows.load();const promptLab=new PromptLab(directory);await promptLab.load();
   const packages = new Map();
   let activePackage = null, latestPackage = null;
   const packageView = value => value && ({ id: value.id, status: value.status, message: value.message, bytes: value.bytes, sha256: value.sha256, downloadUrl: value.status === 'done' ? `/downloads/package/${value.id}` : null });
@@ -104,6 +111,8 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
 
   const startJobStep=async(job,step,runId=job.runId)=>{if(job.runId!==runId||!isRunning(job))throw new Error('这次执行已过期。');const attempt=await workflows.begin(job.workflowId,step);if(job.runId!==runId||!isRunning(job))throw new Error('这次执行已过期。');job.workflowStep=step;job.workflowToken=attempt.token;await persist(job);};
   const doneJobStep=async(job,state,artifacts,message,runId=job.runId)=>{const step=job.workflowStep,token=job.workflowToken;if(job.runId!==runId)throw new Error('这次执行已过期。');await workflows.complete(job.workflowId,step,token,{state,artifacts,message});if(job.runId!==runId)throw new Error('这次执行已过期。');job.workflowToken=null;await persist(job);};
+  const checkedTargetMask=async(input,bytes)=>{const decoded=decodeImage(input.targetMask);if(decoded.extension!=='png')throw Error('范围需要PNG格式。');if(input.targetSourceSignature&&input.targetSourceSignature!==await pictureSignature(bytes))throw Error('范围来自另一张图片，请重新分析。');return normalizedTargetMask(decoded.bytes,await orientedDimensions(bytes));};
+  const targetControl=async(job,bytes,snapshot,composition=false)=>{const w=await workflows.get(job.workflowId),source=w.steps[0].output,task=composition?job.task:source?.options?.task,manual=composition&&job.targetMaskOverride?job.compositionTargetMaskAsset:source?.targetMaskAsset;if(manual)return {found:true,origin:'manual',maskAsset:manual,sourceRetention:task?.sourceRetention??0,version:TARGET_POLICY_VERSION};if(!task?.autoTarget||!TARGET_POLICIES[job.operation])return null;if(snapshot?.maskAsset&&snapshot.origin!=='manual'&&snapshot.version===TARGET_POLICY_VERSION)return {...snapshot,sourceRetention:task.sourceRetention};let result;try{result=await(suppliedTargetAnalyzer?suppliedTargetAnalyzer(bytes,job):targetVision.analyze(bytes,{operation:job.operation,areas:job.areas,portrait:job.portrait}));}catch(error){if(!job.selection)throw error;return {found:false,fallback:'manual-selection',note:error.message};}if(!result.found){if(job.selection)return {...result,mask:undefined,fallback:'manual-selection'};throw Error('未可靠识别要修改的部位，请手动框选，或关闭自动部位保护。');}const asset=await workflows.putAsset(job.workflowId,result.mask,'image/png');return {...result,mask:undefined,maskAsset:asset.id,sourceRetention:task.sourceRetention};};
   const composeOutput=async(job,bytes,runId)=>{
     if(job.runId!==runId)throw new Error('这次执行已过期。');
     await startJobStep(job,'compose',runId);
@@ -116,15 +125,18 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     let output=await composeImage(bytes,original,prepared.region||null,{report:localReport});
     const sourceState=workflow.steps.find(n=>n.id==='source')?.output;
     const effectiveMask=job.compositionMaskOverride?job.compositionMaskAsset:sourceState?.maskAsset;
-    if(effectiveMask){const mask=await workflows.asset(job.workflowId,effectiveMask);output=await applyProtectionMask(output,original,await readFile(mask.file),{report:maskReport});}
+    const currentTarget=await targetControl(job,original,prepared.autoTarget,true);job.targetMaskAsset=currentTarget?.maskAsset||null;if(currentTarget?.maskAsset){const mask=await workflows.asset(job.workflowId,currentTarget.maskAsset),retained=await applyTargetRetention(await readFile(mask.file),currentTarget.sourceRetention),targetReport={};output=await applyProtectionMask(output,original,retained,{report:targetReport,matchBoundary:matchRepairBoundary(PRESETS.find(t=>t.id===job.operation))});localReport.targetProtection={...currentTarget,statistics:targetReport};localReport.needsReview=Boolean(localReport.needsReview||targetReport.needsReview);}
+    if(prepared.expansion){const mask=await workflows.asset(job.workflowId,prepared.expansion.maskAsset);output=await applyProtectionMask(output,original,await readFile(mask.file),{report:maskReport,matchBoundary:matchRepairBoundary(PRESETS.find(t=>t.id===job.operation))});}
+    if(effectiveMask){const mask=await workflows.asset(job.workflowId,effectiveMask);output=await applyProtectionMask(output,original,await readFile(mask.file),{report:maskReport,matchBoundary:matchRepairBoundary(PRESETS.find(t=>t.id===job.operation))});}
     if(job.runId!==runId)throw new Error('这次执行已过期。');
+    if(job.operation==='detail-upscale')output=await upscaleOutput(output,job.task);
     const asset=await workflows.putAsset(job.workflowId,output,'image/png');
     if(job.runId!==runId)throw new Error('这次执行已过期。');
     const filename=`result-${runId}.png`;await writeFile(path.join(job.directory,filename),output);
     if(job.runId!==runId)throw new Error('这次执行已过期。');job.output=filename;
     job.composition={method:localReport.method||maskReport.method||'custom-compositor',stages:[{scope:'selection',...localReport},...(effectiveMask?[{scope:'protection',...maskReport}]:[])],needsReview:Boolean(localReport.needsReview||maskReport.needsReview)};
     const generation=workflow.steps.find(n=>n.id==='generate')?.output;
-    await doneJobStep(job,{imageAsset:asset.id,jobId:job.id,composition:job.composition,account:accountSnapshot(generation?.account),maskAsset:effectiveMask||null,model:generation?.model||null,resolvedModel:generation?.resolvedModel||null},[{id:asset.id,label:'完整精修成品',type:'image'}],'合成完成，完整图片已保存',runId);
+    await doneJobStep(job,{imageAsset:asset.id,jobId:job.id,task:job.task,composition:job.composition,account:accountSnapshot(generation?.account),maskAsset:effectiveMask||null,model:generation?.model||null,resolvedModel:generation?.resolvedModel||null},[{id:asset.id,label:'完整精修成品',type:'image'}],'合成完成，完整图片已保存',runId);
   };
   const generateJob=async(job)=>{if(isClosing||job.cancelled)throw new Error('网站正在停止，本轮可从当前步骤继续。');
     await startJobStep(job,'generate');
@@ -140,13 +152,14 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     const sourcePath=path.join(runDirectory,'source.png'),editPath=path.join(runDirectory,'input.png');
     await writeFile(sourcePath,await readFile(source.file));await writeFile(editPath,await readFile(input.file));
     if(job.runId!==runId)throw new Error('这次执行已过期。');
-    const identityPaths=[];for(const [i,id]of (workflow.steps[0].output.referenceAssets||[]).entries()){const asset=await workflows.asset(job.workflowId,id),file=path.join(runDirectory,'identity-'+i+'.png');await writeFile(file,(await prepareEditImage(await readFile(asset.file),null)).source);identityPaths.push(file);}const identityHint=identityPaths.length?'\n附加原始图片／人设参考只用于保留人物身份、服装与配饰，不照搬其中的旧背景、旧调色或旧构图。当前图1成品是编辑目标。':'';bridge.begin(job,paintingPrompt(job)+identityHint,editPath,job.region?sourcePath:null,identityPaths).catch(error=>finish(job,'error',friendlyError(error.message),runId)).catch(()=>{});
+    const sentInputs=[{assetId:prepared.inputAsset,role:'edit-target',title:'图1实际编辑输入'}];if(job.region)sentInputs.push({assetId:prepared.sourceAsset,role:'full-context',title:'完整上下文原图'});const identityPaths=[];for(const [i,id]of (workflow.steps[0].output.referenceAssets||[]).entries()){const asset=await workflows.asset(job.workflowId,id),file=path.join(runDirectory,'identity-'+i+'.png');const bytes=(await prepareEditImage(await readFile(asset.file),null)).source;await writeFile(file,bytes);sentInputs.push({assetId:(await workflows.putAsset(job.workflowId,bytes,'image/png')).id,role:'identity',title:'身份参考'});identityPaths.push(file);}const identityHint=identityPaths.length?'\n附加原始图片／人设参考只用于保留人物身份、服装与配饰，不照搬其中的旧背景、旧调色或旧构图。当前图1成品是编辑目标。':'';const featurePaths=[],roles=[];for(const [i,ref]of (workflow.steps[0].output.featureReferences||[]).entries()){const asset=await workflows.asset(job.workflowId,ref.assetId),file=path.join(runDirectory,'feature-reference-'+i+'.png');await writeFile(file,await readFile(asset.file));featurePaths.push(file);sentInputs.push({assetId:ref.assetId,role:ref.role,title:ref.title});roles.push('图'+(2+(job.region?1:0)+identityPaths.length+i)+'：功能参考 '+ref.role+' · '+ref.title+'；只借用本功能需要的特征，不替换目标人物身份。');}job.sentInputs=sentInputs.map((r,index)=>({...r,index:index+1}));job.actualPrompt=(prepared.compiledPrompt||paintingPrompt(job))+identityHint+'\n'+roles.join('\n');job.promptVersion=prepared.promptVersion||PROMPT_VERSION;await persist(job);bridge.begin(job,job.actualPrompt,editPath,job.region?sourcePath:null,[...identityPaths,...featurePaths]).catch(error=>finish(job,'error',friendlyError(error.message),runId)).catch(()=>{});
   };
   const prepareJob=async(job,bytes)=>{
-    await startJobStep(job,'prepare');const prepared=await prepareEditImage(bytes,job.selection,isBellyOperation(job.operation)?bellyRegionOptions(job.belly):undefined);job.region=prepared.region;job.imageWidth=prepared.width;job.imageHeight=prepared.height;if(job.maskAsset){const mask=await workflows.asset(job.workflowId,job.maskAsset);if(Math.abs(mask.width/mask.height-prepared.width/prepared.height)>.025)throw new Error('人物蒙版与本轮图片比例不符，请上传对应蒙版。');const stats=await (await import('sharp')).default(mask.file).flatten({background:'#000000'}).greyscale().stats();if(stats.channels[0].max===0)throw new Error('人物蒙版没有选中可编辑区域，请先修正。');}
+    await startJobStep(job,'prepare');let prepared=await prepareEditImage(bytes,job.selection,isBellyOperation(job.operation)?bellyRegionOptions(job.belly):undefined);let expansion=null;if(job.operation==='outpaint'){expansion=await expandedCanvas(prepared.source,job.task);const mask=await workflows.putAsset(job.workflowId,expansion.mask,'image/png');prepared={source:expansion.bytes,width:expansion.layout.width,height:expansion.layout.height,editImage:null,region:null};expansion={...expansion.layout,maskAsset:mask.id};}job.region=prepared.region;job.imageWidth=prepared.width;job.imageHeight=prepared.height;if(job.maskAsset){const mask=await workflows.asset(job.workflowId,job.maskAsset);if(Math.abs(mask.width/mask.height-prepared.width/prepared.height)>.025)throw new Error('人物蒙版与本轮图片比例不符，请上传对应蒙版。');const stats=await (await import('sharp')).default(mask.file).flatten({background:'#000000'}).greyscale().stats();if(stats.channels[0].max===0)throw new Error('人物蒙版没有选中可编辑区域，请先修正。');}
+    const autoTarget=await targetControl(job,prepared.source,null);if(autoTarget?.maskAsset)job.targetMaskAsset=autoTarget.maskAsset;
     await writeFile(path.join(job.directory,'source.png'),prepared.source);if(prepared.editImage)await writeFile(path.join(job.directory,'input.png'),prepared.editImage);
     const source=await workflows.putAsset(job.workflowId,prepared.source,'image/png'),edit=prepared.editImage?await workflows.putAsset(job.workflowId,prepared.editImage,'image/png'):source;
-    await doneJobStep(job,{sourceAsset:source.id,inputAsset:edit.id,region:prepared.region,width:prepared.width,height:prepared.height},[{id:source.id,label:'标准化完整原图',type:'image'},...(prepared.editImage?[{id:edit.id,label:'发送给模型的局部裁片',type:'image'}]:[])],'编辑输入已保存');
+    await doneJobStep(job,{sourceAsset:source.id,inputAsset:edit.id,region:prepared.region,width:prepared.width,height:prepared.height,expansion,autoTarget,promptVersion:PRESETS.find(t=>t.id===job.operation)?.promptRevision||PROMPT_VERSION,compiledPrompt:paintingPrompt({...job,expansion})},[{id:source.id,label:'标准化完整原图',type:'image'},...(prepared.editImage?[{id:edit.id,label:'发送给模型的局部裁片',type:'image'}]:[])],'编辑输入已保存');
   };
 
   const storeOutput = async (job, item) => {
@@ -166,7 +179,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     } else throw new Error('客户端没有返回可下载的图片，请升级客户端后重试。');
     if(job.runId!==runId)throw new Error('这次执行已过期。');
     const raw=await workflows.putAsset(job.workflowId,bytes,item.result?.startsWith('data:image/jpeg')?'image/jpeg':'image/png');if(job.runId!==runId)throw new Error('这次执行已过期。');job.rawAsset=raw.id;
-    await doneJobStep(job,{rawAsset:raw.id,account:accountSnapshot(job.account),appVersion:'1.13.1',model:job.model||null,resolvedModel:job.resolvedModel||null},[{id:raw.id,label:'AI返回的原始出图（合成前）',type:'image'}],'原始生成图已保存，后续合成无需再次生成',runId);
+    await doneJobStep(job,{rawAsset:raw.id,generationRunId:runId,sentInputs:job.sentInputs||null,account:accountSnapshot(job.account),appVersion:'1.14.0',promptVersion:job.promptVersion||PROMPT_VERSION,compiledPrompt:job.actualPrompt||paintingPrompt(job),model:job.model||null,resolvedModel:job.resolvedModel||null},[{id:raw.id,label:'AI返回的原始出图（合成前）',type:'image'}],'原始生成图已保存，后续合成无需再次生成',runId);
     await composeOutput(job,bytes,runId);
   };
 
@@ -221,13 +234,13 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     if(requestKey){if(!/^[a-f0-9]{64}$/.test(requestKey))throw Error('流程请求标识无效。');const existing=findRequest(requestKey);if(existing)return publicJob(existing);}
     if(active||activePackage||critiqueActive||(studio?.active||studio?.archiving)&&!managed)throw Object.assign(Error('工作台已有任务，请先暂停或等待完成。'),{status:409});
     active='reserved';let job;try{
-          const options = normalizeEditOptions(input);
+          const options = normalizeEditOptions(input),tool=PRESETS.find(p=>p.id===options.operation),references=referenceInputs(input.references);if(tool.output==='outpaint'&&input.protectionMask)throw Error('扩图使用原图全区域保护，不需要额外人物蒙版。');if(tool.referenceRole&&references.some(r=>r.role!=='any'&&r.role!==tool.referenceRole))throw Error('参考图角色与当前功能不一致，请重新选择。');if(tool.referenceRole&&!references.length)throw Error('此功能需要参考图，请先添加1–5张功能参考图。');if(tool.needsTarget&&!options.selection&&!options.task.target.trim())throw Error('请指定要转换的部位，或先框选编辑区域。');
           if(isSceneOperation(options.operation)&&!options.scene.protectSubject&&input.protectionMask)throw Error('关闭主体像素保护时请不要提交保护蒙版。');
           if(isSceneOperation(options.operation)&&options.scene.protectSubject&&!input.protectionMask)throw Error('请先分析主体保护或上传蒙版，也可关闭像素保护后按AI语义清理。');
           if(options.operation==='remove-people'&&options.scene.people==='selection'&&!options.selection)throw Error('请先画出需要清除路人的编辑选区。');
           if (options.parentId && !jobs.has(options.parentId)) throw new Error('上一版作品不存在，请重新打开作品。');
           const prompt = paintingPrompt(options);
-          const resolved=await resolvePicture(input,{jobs,workflows}),image={bytes:resolved.bytes};if(resolved.parentJobId)options.parentId=resolved.parentJobId;
+          const resolved=await resolvePicture(input,{jobs,workflows}),image={bytes:resolved.bytes};if(options.operation==='detail-upscale'){const m=await orientedDimensions(image.bytes);if(options.task.longEdge**2*Math.min(m.width,m.height)/Math.max(m.width,m.height)>40000000)throw Error('此比例放大后超过4000万像素，请选择较小输出尺寸。');}if(resolved.parentJobId)options.parentId=resolved.parentJobId;
           if (!await bridge.account()) throw Object.assign(Error('请先使用 ChatGPT 账号登录。'),{status:401});
           const owner={account:expectedAccount};bridge.capture(owner);
           const id = randomUUID();
@@ -235,12 +248,13 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
           if(pipelineParentId)await workflows.mutate(workflow.id,w=>{w.pipelineParentId=pipelineParentId;return {};});
           job = { id,requestKey,pipelineParentId,account:owner.account, directory: path.join(jobsDirectory, id), extension: 'png', output: null,
             created: Date.now(), status: 'preparing', message: '正在准备原图…', prompt: input.prompt,
-            ...options,workflowId:workflow.id,runId:randomUUID(),region:null,sourceWorkflowId:resolved.parentWorkflowId,sourceAsset:resolved.sourceAsset,sourceStep:resolved.sourceStep,round:options.parentId?(jobs.get(options.parentId)?.round||1)+1:1,portraitAuditId:input.portraitAuditId||null };
+            ...options,promptVersion:tool.promptRevision||PROMPT_VERSION,workflowId:workflow.id,runId:randomUUID(),region:null,sourceWorkflowId:resolved.parentWorkflowId,sourceAsset:resolved.sourceAsset,sourceStep:resolved.sourceStep,round:options.parentId?(jobs.get(options.parentId)?.round||1)+1:1,portraitAuditId:input.portraitAuditId||null };
           await mkdir(job.directory);
           jobs.set(id, job); active = id; await persist(job);
           await startJobStep(job,'source');
-          const source=await workflows.putAsset(workflow.id,image.bytes,'image/png');
-          let maskAsset=null;if(input.protectionMask){const mask=decodeImage(input.protectionMask);if(isSceneOperation(options.operation)&&mask.extension!=='png')throw Error('主体保护蒙版需要PNG格式。');const stored=await workflows.putAsset(workflow.id,mask.bytes,'image/png'),displayShape=isSceneOperation(options.operation)?await orientedDimensions(image.bytes):source;if(isSceneOperation(options.operation)&&Math.abs(stored.width/stored.height-displayShape.width/displayShape.height)>.025)throw Error('主体保护蒙版与原图长宽比不一致，请重新分析。');maskAsset=stored.id;}job.maskAsset=maskAsset;const referenceAssets=[];for(const ref of resolved.identity){const asset=await workflows.asset(ref.workflowId,ref.assetId);referenceAssets.push((await workflows.putAsset(workflow.id,await readFile(asset.file),'image/png')).id);}if(input.portraitAuditId){const audit=await workflows.get(input.portraitAuditId);if(audit.kind!=='portrait-audit')throw new Error('人物检查记录无效。');const audited=await workflows.asset(audit.id,audit.steps[0].output.imageAsset);if((audit.steps[0].output.pixelSignature||await pictureSignature(await readFile(audited.file)))!==await pictureSignature(image.bytes))throw new Error('这份检查针对其他图片，请重新检查。');}await doneJobStep(job,{imageAsset:source.id,options,maskAsset,referenceAssets,sourceWorkflowId:resolved.parentWorkflowId,sourceStep:resolved.sourceStep,sourceAsset:resolved.sourceAsset},[{id:source.id,label:'本轮实际人物成品输入',type:'image'},...(maskAsset?[{id:maskAsset,label:isSceneOperation(options.operation)?'主体保护蒙版：黑色保留、白色可修改':'本轮背景保护蒙版',type:'image'}]:[])],'原图、细化参数与保护蒙版已保存');
+          const featureReferences=[];for(const ref of references){const normalized=await prepareEditImage(ref.bytes,null),asset=await workflows.putAsset(workflow.id,normalized.source,'image/png');featureReferences.push({assetId:asset.id,title:ref.title,role:ref.role==='any'?(tool.referenceRole||'any'):ref.role});}
+          job.featureReferences=featureReferences;const source=await workflows.putAsset(workflow.id,image.bytes,'image/png');let targetMaskAsset=null;if(input.targetMask){if(tool.fullFrame)throw Error('独立输出、扩图和放大不使用原位编辑蒙版。');targetMaskAsset=(await workflows.putAsset(workflow.id,await checkedTargetMask(input,image.bytes),'image/png')).id;job.targetMaskAsset=targetMaskAsset;}
+          let maskAsset=null;if(input.protectionMask){const mask=decodeImage(input.protectionMask);if(isSceneOperation(options.operation)&&mask.extension!=='png')throw Error('主体保护蒙版需要PNG格式。');const stored=await workflows.putAsset(workflow.id,mask.bytes,'image/png'),displayShape=isSceneOperation(options.operation)?await orientedDimensions(image.bytes):source;if(isSceneOperation(options.operation)&&Math.abs(stored.width/stored.height-displayShape.width/displayShape.height)>.025)throw Error('主体保护蒙版与原图长宽比不一致，请重新分析。');maskAsset=stored.id;}job.maskAsset=maskAsset;const referenceAssets=[];for(const ref of resolved.identity){const asset=await workflows.asset(ref.workflowId,ref.assetId);referenceAssets.push((await workflows.putAsset(workflow.id,await readFile(asset.file),'image/png')).id);}if(input.portraitAuditId){const audit=await workflows.get(input.portraitAuditId);if(audit.kind!=='portrait-audit')throw new Error('人物检查记录无效。');const audited=await workflows.asset(audit.id,audit.steps[0].output.imageAsset);if((audit.steps[0].output.pixelSignature||await pictureSignature(await readFile(audited.file)))!==await pictureSignature(image.bytes))throw new Error('这份检查针对其他图片，请重新检查。');}await doneJobStep(job,{imageAsset:source.id,options,maskAsset,targetMaskAsset,referenceAssets,featureReferences,promptVersion:tool.promptRevision||PROMPT_VERSION,sourceWorkflowId:resolved.parentWorkflowId,sourceStep:resolved.sourceStep,sourceAsset:resolved.sourceAsset},[{id:source.id,label:'本轮实际人物成品输入',type:'image'},...(maskAsset?[{id:maskAsset,label:isSceneOperation(options.operation)?'主体保护蒙版：黑色保留、白色可修改':'本轮背景保护蒙版',type:'image'}]:[])],'原图、细化参数与保护蒙版已保存');
           await prepareJob(job,image.bytes);await generateJob(job);
 
       return publicJob(job);
@@ -250,7 +264,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     if(active||activePackage||critiqueActive)throw Object.assign(Error('工作台正忙，请稍后恢复。'),{status:409});active='reserved';let job;
     try{job=jobs.get(view.id);const w=await workflows.get(job.workflowId),generated=w.steps.find(n=>n.id==='generate');if(generated?.status!=='done'||!generated.output?.rawAsset)throw Error('原始出图尚未保存，请在子工作流确认生成状态。');await workflows.restart(w.id,'compose',w.revision);Object.assign(job,{runId:randomUUID(),status:'preparing',message:'复用AI原始图重新合成',output:null,workflowToken:null,threadId:null,turnId:null,saving:null});active=job.id;await persist(job);const runId=job.runId;Promise.resolve().then(async()=>{const raw=await workflows.asset(w.id,generated.output.rawAsset);await composeOutput(job,await readFile(raw.file),runId);await finish(job,'done','已复用原始出图完成合成',runId);}).catch(error=>finish(job,'error',friendlyError(error.message),runId)).catch(()=>{});return publicJob(job);}finally{if(active==='reserved')active=null;}
   };
-  studio=new StudioService({directory,workflows,adapter:{isBusy:()=>Boolean(active||activePackage||critiqueActive),startRetouch,findRequest:key=>{const job=findRequest(key);return job?publicJob(job):null;},getJob:id=>publicJob(jobs.get(id)),recompose:recomposeManaged,authorize:async expected=>{if(!await bridge.account())throw Error('请先登录本站ChatGPT账号。');const control={account:expected};bridge.capture(control);return control.account;}}});await studio.load();
+  studio=new StudioService({directory,workflows,adapter:{isBusy:()=>Boolean(active||activePackage||critiqueActive),startRetouch,findRequest:key=>{const job=findRequest(key);return job?publicJob(job):null;},getJob:id=>jobs.has(id)?publicJob(jobs.get(id)):null,recompose:recomposeManaged,authorize:async expected=>{if(!await bridge.account())throw Error('请先登录本站ChatGPT账号。');const control={account:expected};bridge.capture(control);return control.account;}}});await studio.load();
 
   const server = http.createServer(async (req, res) => {
     const host = req.headers.host || '';
@@ -267,26 +281,30 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       if (req.method === 'POST') {
         if (req.headers.origin !== `http://${host}` || req.headers['x-paint-csrf'] !== csrf) return json(res, 403, { error: '请从本站页面发起操作。' });
       }
+      if(route==='/api/targets/analyze'&&req.method==='POST'){const input=await body(req),resolved=await resolvePicture(input,{jobs,workflows}),options=normalizeEditOptions(input),result=await targetVision.analyze(resolved.bytes,{operation:options.operation,areas:options.areas,portrait:options.portrait});return json(res,200,{...result,mask:result.mask?'data:image/png;base64,'+result.mask.toString('base64'):null,sourceSignature:await pictureSignature(resolved.bytes)});}
+      const labJob=/^\/api\/prompt-lab\/jobs\/([a-f0-9-]{36})$/.exec(route);if(labJob){const job=jobs.get(labJob[1]);if(req.method==='GET')return json(res,200,await jobEvidence(job,workflows));if(req.method==='POST')return json(res,201,await saveJobEvidence(job,workflows,promptLab,await body(req,20000)));}
+      if(route==='/api/prompt-lab'&&req.method==='GET')return json(res,200,await promptLab.list());if(route==='/api/prompt-lab/records'&&req.method==='POST')return json(res,201,await promptLab.save(await body(req,110*1024*1024)));const labImage=/^\/api\/prompt-lab\/images\/([a-f0-9-]{36})\/(source|result|input|raw|ref-\d{1,2})$/.exec(route);if(labImage&&req.method==='GET'){const file=await promptLab.image(labImage[1],labImage[2]);res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'no-store'});await pipeline(createReadStream(file),res);return;}
       if(route==='/api/studio/projects'&&req.method==='GET')return json(res,200,{projects:studio.list(),active:studio.active?{projectId:studio.active.projectId,currentPhoto:studio.active.currentPhoto,currentStep:studio.active.currentStep}:null});
       if(route==='/api/studio/projects'&&req.method==='POST')return json(res,201,await studio.create(await body(req,1000000)));
       if(route==='/api/studio/recipes'&&req.method==='GET')return json(res,200,{recipes:studio.recipeList()});
       if(route==='/api/studio/recipes'&&req.method==='POST')return json(res,201,await studio.saveRecipe(await body(req,1000000)));
       if(route==='/api/studio/validate'&&req.method==='POST'){const recipe=recipeValue(await body(req,1000000));return json(res,200,{recipe,report:recipeReport(recipe)});}
       if(route==='/api/studio/restore'&&req.method==='POST')return json(res,201,await restoreProject(studio,await body(req,210*1024*1024)));
-      const studioRoute=/^\/api\/studio\/projects\/([a-f0-9-]{36})(?:\/(recipe|run|pause|delivery|backup|photos)(?:\/([a-f0-9-]{36})(?:\/(mask|fork|thumbnail))?)?)?$/.exec(route);
+      const studioRoute=/^\/api\/studio\/projects\/([a-f0-9-]{36})(?:\/(recipe|run|pause|delivery|backup|photos)(?:\/([a-f0-9-]{36})(?:\/(mask|references|fork|thumbnail))?)?)?$/.exec(route);
       if(studioRoute){const [,id,action,photoId,photoAction]=studioRoute;
         if(req.method==='GET'&&!action)return json(res,200,await studio.view(id));
         if(req.method==='GET'&&photoId&&!photoAction)return json(res,200,await studio.photo(id,photoId));
         if(req.method==='GET'&&photoAction==='thumbnail'){const detail=await studio.photo(id,photoId),asset=await workflows.asset(detail.photo.originalWorkflowId,detail.photo.originalAsset);const bytes=await sharp(asset.file,{limitInputPixels:40000000}).rotate().resize({width:360,height:360,fit:'inside',withoutEnlargement:true}).webp({quality:75}).toBuffer();res.writeHead(200,{'Content-Type':'image/webp','Content-Length':bytes.length});res.end(bytes);return;}
         if(req.method==='POST'){
           if(action==='photos'&&!photoId){const chunks=[];let length=0;for await(const chunk of req){length+=chunk.length;if(length>30*1024*1024)throw Object.assign(Error('照片超过30 MB。'),{status:413});chunks.push(chunk);}return json(res,201,await studio.addPhoto(id,Buffer.concat(chunks),url.searchParams.get('name')||'photo'));}
+          if(photoAction==='references')return json(res,200,await studio.attachReferences(id,photoId,referenceInputs((await body(req,70*1024*1024)).references)));
           if(photoAction==='mask'){const input=await body(req,20*1024*1024),decoded=decodeImage(input.mask);if(decoded.extension!=='png')throw Error('保护蒙版需要PNG格式。');return json(res,200,await studio.attachMask(id,photoId,decoded.bytes));}
           const input=await body(req,1000000);if(action==='backup')return json(res,200,await backupProject(studio,id));if(action==='delivery')return json(res,200,await exportProjectPhotos(studio,id,input.photoIds));if(action==='recipe')return json(res,200,await studio.setRecipe(id,input));if(action==='run')return json(res,202,await studio.run(id,input));if(action==='pause')return json(res,200,await studio.pause(id));if(photoAction==='fork')return json(res,200,await studio.forkPhoto(id,photoId,input));if(photoId)return json(res,200,await studio.updatePhoto(id,photoId,input));
         }
       }
       const studioDownload=/^\/api\/studio\/downloads\/([a-f0-9-]{36})$/.exec(route);
       if(studioDownload&&req.method==='GET'){const receipt=JSON.parse(await readFile(path.join(studio.directory,'exports',studioDownload[1]+'.json'),'utf8')),file=path.join(studio.directory,'exports',studioDownload[1]+(receipt.kind==='backup'?'.jsondata':'.zip'));res.writeHead(200,{'Content-Type':receipt.kind==='backup'?'application/json':'application/zip','Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(receipt.name)}`,'Content-Length':(await stat(file)).size});await pipeline(createReadStream(file),res);return;}
-      if (route === '/api/health' && req.method === 'GET') return json(res, 200, { app: 'houtu-studio', version: '1.13.1', instanceId, csrf });
+      if (route === '/api/health' && req.method === 'GET') return json(res, 200, { app: 'houtu-studio', version: '1.14.0', instanceId, csrf });
       if(route==='/api/portrait/source'&&req.method==='GET'){
         const auditId=url.searchParams.get('audit');if(auditId){const w=await workflows.get(auditId);if(w.kind!=='portrait-audit')throw new Error('不是人物检查工作流。');const assetId=w.steps[0].output?.imageAsset;if(!assetId)throw new Error('检查原图尚未保存。');return json(res,200,{workflowId:w.id,assetId,url:`/api/workflows/${w.id}/assets/${assetId}`,name:w.name,auditId:w.id,diagnosis:w.steps.find(n=>n.id==='diagnose').status==='done'?w.steps.find(n=>n.id==='diagnose').output:null});}
         const id=url.searchParams.get('workflow'),assetId=url.searchParams.get('asset');await resolvePicture({source:{kind:'workflow',workflowId:id,assetId}},{jobs,workflows});const w=await workflows.get(id);return json(res,200,{workflowId:id,assetId,url:`/api/workflows/${id}/assets/${assetId}`,name:w.name});
@@ -338,12 +356,12 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
               if(!['prepare','generate','compose'].includes(input.step))throw new Error('请选择裁片、生成或合成步骤。');
               const dependency={prepare:'source',generate:'prepare',compose:'generate'}[input.step],upstream=w.steps.find(n=>n.id===dependency);if(upstream?.status!=='done')throw new Error('前置步骤尚未完成，请先从前面的失败步骤继续。');
               if(input.step!=='compose'&&!await bridge.account())return json(res,401,{error:'请先登录 ChatGPT，合成步骤本身不需要重新生成。'});
-              let maskUpdate=null;if(input.replaceProtection===true){
+              let taskUpdate=null;if(input.outputLongEdge!==undefined){if(input.step!=='compose'||job.operation!=='detail-upscale'||![1024,2048,4096,8192].includes(input.outputLongEdge))throw Error('只有细节放大的合成步骤可以调整输出尺寸。');taskUpdate={...job.task,longEdge:input.outputLongEdge};}if(input.targetSettings!==undefined){const t=input.targetSettings;if(input.step!=='compose'||PRESETS.find(p=>p.id===job.operation)?.fullFrame||typeof t.autoTarget!=='boolean'||!Number.isInteger(t.sourceRetention)||t.sourceRetention<0||t.sourceRetention>95)throw Error('部位保护与原图融合设置无效。');taskUpdate={...job.task,autoTarget:t.autoTarget,sourceRetention:t.sourceRetention};}let targetUpdate=null;if(input.replaceTargetMask===true){if(input.step!=='compose'||PRESETS.find(t=>t.id===job.operation)?.fullFrame)throw Error('此步骤不使用原位编辑范围。');let id=null;if(input.targetMask){const prepared=w.steps.find(n=>n.id==='prepare')?.output,original=await readFile((await workflows.asset(w.id,prepared.sourceAsset)).file);id=(await workflows.putAsset(job.workflowId,await checkedTargetMask(input,original),'image/png')).id;}targetUpdate={targetMaskOverride:true,compositionTargetMaskAsset:id,targetMaskAsset:id};}let maskUpdate=null;if(input.replaceProtection===true){
                 if(input.step!=='compose'||!isSceneOperation(job.operation))throw Error('只有场照与次元的重合成可以替换主体保护。');
                 let mask=null;if(input.protectionMask){const decoded=decodeImage(input.protectionMask);if(decoded.extension!=='png')throw Error('主体保护蒙版需要PNG格式。');mask=(await workflows.putAsset(id,decoded.bytes,'image/png')).id;}
                 maskUpdate={compositionMaskOverride:true,compositionMaskAsset:mask};
               }
-              await workflows.restart(id,input.step,input.revision);if(maskUpdate)Object.assign(job,maskUpdate);Object.assign(job,{runId:randomUUID(),status:'preparing',message:'从所选步骤继续执行…',output:null,workflowToken:null,threadId:null,turnId:null,saving:null});active=job.id;await persist(job);const runId=job.runId;
+              await workflows.restart(id,input.step,input.revision);if(input.step!=='compose'){job.task={...w.steps[0].output.options.task};job.targetMaskOverride=false;job.compositionTargetMaskAsset=null;job.compositionMaskOverride=false;job.compositionMaskAsset=null;}if(taskUpdate)job.task=taskUpdate;if(targetUpdate)Object.assign(job,targetUpdate);if(maskUpdate)Object.assign(job,maskUpdate);Object.assign(job,{runId:randomUUID(),status:'preparing',message:'从所选步骤继续执行…',output:null,workflowToken:null,threadId:null,turnId:null,saving:null});active=job.id;await persist(job);const runId=job.runId;
               Promise.resolve().then(async()=>{if(input.step==='compose'){const asset=await workflows.asset(id,upstream.output.rawAsset);await composeOutput(job,await readFile(asset.file),runId);await finish(job,'done','已复用原始出图完成合成，没有再次调用AI。',runId);}else{if(input.step==='prepare'){const asset=await workflows.asset(id,upstream.output.imageAsset);await prepareJob(job,await readFile(asset.file));}await generateJob(job);}}).catch(e=>finish(job,'error',friendlyError(e.message),runId)).catch(()=>{});
               return json(res,202,publicJob(job));
             }finally{if(active==='reserved')active=null;}
@@ -370,10 +388,10 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
             if(analysisAttempt){const previous=(await workflows.get(analysisAttempt.id)).steps.find(n=>n.id==='analysis')?.output;control.account=accountSnapshot(previous?.account);if(normalizeModel(previous?.model)===model)control.resolvedModel=normalizeModel(previous?.resolvedModel);}
             bridge.capture(control);
             if(analysisAttempt){const record=async resolvedModel=>{await workflows.mutate(analysisAttempt.id,w=>{const n=w.steps.find(n=>n.id==='analysis');if(n.token!==analysisAttempt.token)throw Error('审美步骤已过期。');n.output={...n.output,model,resolvedModel,account:accountSnapshot(control.account)};Object.assign(n.attempts.at(-1),{output:n.output});return {};});};await record(control.resolvedModel||null);control.onModelSelected=record;}
-            const result=await bridge.critique(imagePath,referencePath,null,[],control);
+            const promptSpec=requireAnalysisSpec('color.advice'),result=await bridge.critique(imagePath,referencePath,null,[],control);
             const preset=normalizePreset({name:'ChatGPT 审美方案',settings:result.settings,layers:result.layers});
-            const response={account:accountSnapshot(control.account),model,resolvedModel:control.resolvedModel||null,summary:String(result.summary||'').slice(0,600),query:String(result.query||'').slice(0,120),preset};
-            if(analysisAttempt)response.workflow=(await workflows.complete(analysisAttempt.id,'analysis',analysisAttempt.token,{state:{aiPlan:preset,account:accountSnapshot(control.account),model,resolvedModel:control.resolvedModel||null,summary:response.summary,query:response.query},message:'审美方案已保存，关闭页面后仍可恢复'})).workflow;
+            const response={promptVersion:promptSpec.version,compiledPrompt:control.analysisPrompt||null,account:accountSnapshot(control.account),model,resolvedModel:control.resolvedModel||null,summary:String(result.summary||'').slice(0,600),query:String(result.query||'').slice(0,120),preset};
+            if(analysisAttempt)response.workflow=(await workflows.complete(analysisAttempt.id,'analysis',analysisAttempt.token,{state:{promptVersion:promptSpec.version,compiledPrompt:control.analysisPrompt||null,aiPlan:preset,account:accountSnapshot(control.account),model,resolvedModel:control.resolvedModel||null,summary:response.summary,query:response.query},message:'审美方案已保存，关闭页面后仍可恢复'})).workflow;
             return json(res,200,response);
           }catch(e){if(analysisAttempt)await workflows.fail(analysisAttempt.id,'analysis',analysisAttempt.token,friendlyError(e.message)).catch(()=>{});throw e;}finally{critiqueActive=false;await rm(dir,{recursive:true,force:true});}
         }
@@ -394,7 +412,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
         try{await bridge.account();}catch{}
         const images=await library.refresh(jobs,workflows);
         const records=accounts.records().map(account=>({...account,images:images.filter(image=>image.account?.email.toLowerCase()===account.email.toLowerCase()).length}));
-        return json(res,200,{serverId:accounts.state.serverId,startedAt,created:accounts.state.created,machine:os.hostname(),version:'1.13.1',projectRoot:ROOT,dataRoot:path.resolve(directory),loginRoot:path.join(path.resolve(directory),'codex'),scope:'local',current:accounts.current(),accounts:records,images:images.length});
+        return json(res,200,{serverId:accounts.state.serverId,startedAt,created:accounts.state.created,machine:os.hostname(),version:'1.14.0',projectRoot:ROOT,dataRoot:path.resolve(directory),loginRoot:path.join(path.resolve(directory),'codex'),scope:'local',current:accounts.current(),accounts:records,images:images.length});
       }
       if(route==='/api/server/images'&&req.method==='GET'){await library.refresh(jobs,workflows);return json(res,200,library.list(url.searchParams,accounts.records()));}
       const thumbnail=/^\/api\/server\/thumbnails\/([a-f0-9]{64})$/.exec(route);
@@ -478,7 +496,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       if (route === '/api/prompt' && req.method === 'POST') {
         return json(res, 200, { prompt: paintingPrompt(await body(req)) });
       }
-      if(route==='/api/jobs'&&req.method==='POST'){return json(res,202,await startRetouch(await body(req)));}
+      if(route==='/api/jobs'&&req.method==='POST'){return json(res,202,await startRetouch(await body(req,70*1024*1024)));}
       const jobMatch = /^\/api\/jobs\/([a-f0-9-]{36})(\/cancel)?$/.exec(route);
       if (jobMatch) {
         const job = jobs.get(jobMatch[1]);
@@ -504,20 +522,21 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
         file=path.join(ROOT,'frontend','index.html');
       } else if(req.method==='GET'&&(route==='/studio'||route==='/studio/')){
         file=path.join(ROOT,'frontend','studio.html');
+      } else if(req.method==='GET'&&(route==='/lab'||route==='/lab/')){file=path.join(ROOT,'frontend','lab.html');
       } else if(req.method==='GET'&&(route==='/features'||route==='/features/')){
         file=path.join(ROOT,'frontend','features.html');
       } else if(req.method==='GET'&&(route==='/workflows'||route==='/workflows/')){
         file=path.join(ROOT,'frontend','workflows.html');
       } else if(req.method==='GET'&&(route==='/creative'||route==='/creative/')){
         file=path.join(ROOT,'frontend','creative.html');
-      } else if (req.method === 'GET' && /^\/color\/(app\.js|engine\.js|worker\.js|masks\.js|workflow-client\.js|workflows\.js|effects\.js|creative\.js|creative-multi\.js|server\.js|studio\.js|style\.css)$/.test(route)) {
+      } else if (req.method === 'GET' && /^\/color\/(app\.js|engine\.js|worker\.js|masks\.js|workflow-client\.js|workflows\.js|effects\.js|creative\.js|creative-multi\.js|server\.js|studio\.js|lab\.js|style\.css)$/.test(route)) {
         file=path.join(ROOT,'frontend',path.basename(route));
       } else if (req.method === 'GET' && /^\/vision\/(vision_bundle\.mjs|wasm\/vision_wasm_(?:nosimd_)?internal\.(?:js|wasm))$/.test(route)) {
         file=path.join(ROOT,'node_modules','@mediapipe','tasks-vision',route.slice('/vision/'.length));
-      } else if (req.method === 'GET' && route === '/models/selfie_multiclass_256x256.tflite') {
-        file=path.join(ROOT,'models','selfie_multiclass_256x256.tflite');
+      } else if (req.method === 'GET' && /^\/models\/(selfie_multiclass_256x256\.tflite|face_landmarker\.task|hand_landmarker\.task)$/.test(route)) {
+        file=path.join(ROOT,'models',path.basename(route));
       } else {
-        const files = { '/': 'index.html', '/app.js': 'app.js', '/catalog.js': 'catalog.js', '/style.css': 'style.css', '/favicon.svg': 'favicon.svg','/portrait-options.js':'portrait-options.js','/portrait-ui.js':'portrait-ui.js','/model-picker.js':'model-picker.js','/model-options.js':'model-options.js','/scene-options.js':'scene-options.js','/belly-options.js':'belly-options.js','/scene-ui.js':'scene-ui.js','/subject-mask.js':'subject-mask.js' };
+        const files = { '/feature-expansion.js':'feature-expansion.js','/prompt-contract.js':'prompt-contract.js','/feature-ui.js':'feature-ui.js','/target-policy.js':'target-policy.js','/target-masks.js':'target-masks.js','/vision-target.html':'vision-target.html', '/': 'index.html', '/app.js': 'app.js', '/catalog.js': 'catalog.js', '/style.css': 'style.css', '/favicon.svg': 'favicon.svg','/portrait-options.js':'portrait-options.js','/portrait-ui.js':'portrait-ui.js','/model-picker.js':'model-picker.js','/model-options.js':'model-options.js','/scene-options.js':'scene-options.js','/belly-options.js':'belly-options.js','/scene-ui.js':'scene-ui.js','/subject-mask.js':'subject-mask.js' };
         if (!Object.hasOwn(files, route) || req.method !== 'GET') return json(res, 404, { error: '页面不存在。' });
         file = path.join(ROOT, 'public', files[route]);
       }
@@ -534,13 +553,13 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     for(const state of creative.running.values())state.stop=true;
     await platform.close();
     await bridge.stop(); for (const j of jobs.values()) clearTimeout(j.deadline);
-    await creative.drain();await studio.drain();if(portraitAuditTask)await Promise.allSettled([portraitAuditTask]);
+    await creative.drain();await studio.drain();await targetVision.close();if(portraitAuditTask)await Promise.allSettled([portraitAuditTask]);
     await Promise.allSettled([...jobWrites.values()]);
     await Promise.allSettled([accounts.queue,library.queue,...library.pendingThumbs.values()]);
     server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
     try { const record = JSON.parse(await readFile(path.join(directory, 'server.json'), 'utf8')); if (record.instanceId === instanceId) await unlink(path.join(directory, 'server.json')); } catch {}
   })();
-  return { server, bridge, studio, instanceId, close };
+  return { server, bridge, studio, targetVision, instanceId, close };
 }
 
 export function friendlyError(message = '') {
