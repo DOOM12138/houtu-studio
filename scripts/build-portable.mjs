@@ -10,7 +10,7 @@ import { importTemplates } from '../lib/templates.mjs';
 import { normalizePreset } from '../backend/color.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
-const ALLOWED = ['server.mjs', 'launcher.mjs', 'lib', 'public', 'frontend', 'backend', 'models', 'scripts', 'vendor-licenses', 'package.json', 'package-lock.json', 'README.md', 'DEPLOY.md', 'SOURCES.md', 'AGENTS.md', 'agent.md', 'ARCHITECTURE.md', 'GIT_WORKFLOW.md', 'LICENSE', '.npmrc', '开发终端.cmd', '启动网站.cmd', '停止网站.cmd', '一键部署.cmd', '启动服务器.cmd', '服务器管理.cmd', '停止服务器.cmd'];
+const ALLOWED = ['server.mjs', 'launcher.mjs', 'lib', 'public', 'frontend', 'backend', 'models', 'scripts', 'vendor-licenses', 'package.json', 'package-lock.json', 'README.md', 'DEPLOY.md', 'SOURCES.md', 'AGENTS.md', 'agent.md', 'ARCHITECTURE.md', 'GIT_WORKFLOW.md', 'FEATURES.md', 'LICENSE', '.npmrc', '开发终端.cmd', '启动网站.cmd', '停止网站.cmd', '一键部署.cmd', '启动服务器.cmd', '服务器管理.cmd', '停止服务器.cmd'];
 export function productionDirectories(lock) {
   return Object.entries(lock.packages || {}).filter(([name, entry]) => name.startsWith('node_modules/') && !entry.dev).map(([name]) => name)
     .sort((a,b) => a.length - b.length).filter((name, i, all) => !all.slice(0, i).some(parent => name.startsWith(parent + '/')));

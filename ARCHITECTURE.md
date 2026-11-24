@@ -1,6 +1,6 @@
 # 前后端与运行边界
 
-本项目是个人本机图片工作台，当前版本 1.12.0。默认一个进程在 127.0.0.1:4317 同时托管静态页面与 JSON API。它不是公网多用户服务。
+本项目是个人本机图片工作台，当前版本 1.13.0。默认一个进程在 127.0.0.1:4317 同时托管静态页面与 JSON API。它不是公网多用户服务。
 
 ## 前端
 
@@ -33,3 +33,11 @@ Git 初始基线为当前 1.7.0；更早版本 ZIP 是本机归档，不伪装�
 场照与次元：public/scene-options.js提供经过校验的任务参数与自研指令，scene-ui.js管理设置，subject-mask.js处理最大居中连通主体估计、原尺寸蒙版与增减画笔。用户预览为白色保留，发送后台时反色为黑色保留，以复用lib/images.mjs保护合成。compose-only替换保存为独立compositionMaskAsset覆盖，不修改source的原始蒙版或重放AI调用。
 
 平滑瘦腹：public/belly-options.js校验独立力度、衣料与过渡参数，生成衣褶／轮廓／背景几何约束。局部prepare使用任务特定的上下文比例并把smoothing曲线保存到region；finishEditImage读取已保存的曲线执行宽smoothstep羽化。其他工具未设置smoothing时保持原行为。
+
+## 照片项目与配方（1.13）
+
+`backend/studio.mjs`管理选片、项目与持久队列；`studio-recipe.mjs`验证最多12个有序步骤；`local-image.mjs`执行确定性图像处理；`studio-archive.mjs`生成成片包和私有项目备份。`frontend/studio.html`与`studio.js`通过`/api/studio/`交互。pipeline节点依次依赖前一步，每个AI节点通过进程内适配器调用独立retouch子工作流，保存稳定请求键、子任务编号、账号和实际模型。全局互斥覆盖AI、流程和档案操作。
+
+项目在`data/studio/projects/`，配方库在`data/studio/recipes.json`，下载文件在`data/studio/exports/`。运行状态重启后转为中断，不自行继续；匹配的已完成子任务直接取回。新配方版本复用相同的已完成前缀。PNG/JPEG/WebP导出和本机中值滤波、锐化、全局色彩不调用AI。
+
+JSON备份内嵌有SHA-256校验的素材；上限140MB原始素材，上传容器上限210MB。恢复先校验所有素材与关联，再分配新ID，保留旧项目。授权目录、浏览器会话和可执行子任务不随备份迁移；历史AI输出可看，重新生成需明确开新版本。原有data格式和老工作流不迁移覆盖。

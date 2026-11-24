@@ -4,6 +4,7 @@ import {randomUUID,createHash} from 'node:crypto';
 import sharp from 'sharp';
 import {replaceFile} from '../lib/files.mjs';
 export const FLOW_STEPS={
+ pipeline:[['source','项目照片原图',[]]],
   'portrait-audit':[['source','本轮人物成品',[]],['diagnose','画面检查与细化建议',['source']]],
   creative:[['source','原图与人设参考',[]],['subject','人物蒙版',['source']],['brief','人物背景分析与检索规划',['source']],['materials','多图参考与素材采集',['source','brief']],['layout','多图分析与反推提示词',['source','subject','brief','materials']],['render','特效／合成／3D质感出图',['layout']],['deliver','成品与素材来源',['render']]],
   color:[['source','原图',[]],['reference','参考图',['source']],['analysis','审美方案',['source','reference']],['masks','人物与手绘蒙版',['source']],['grade','全局与局部调色',['source','reference','analysis','masks']],['export','成品导出',['grade']]],

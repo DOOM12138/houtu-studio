@@ -1,0 +1,51 @@
+﻿import path from 'node:path';
+import {spawn} from 'node:child_process';
+import {randomUUID,createHash} from 'node:crypto';
+import {mkdir,readFile,writeFile,copyFile,rm,stat,readdir} from 'node:fs/promises';
+import {createReadStream} from 'node:fs';
+import {fileURLToPath} from 'node:url';
+import {powershell} from '../lib/platform.mjs';
+import {safeName} from './local-image.mjs';
+import {recipeValue} from './studio-recipe.mjs';
+import {FLOW_STEPS} from './workflows.mjs';
+import sharp from 'sharp';
+const ROOT=fileURLToPath(new URL('../',import.meta.url));
+export async function hashFile(file){const hash=createHash('sha256');for await(const bytes of createReadStream(file))hash.update(bytes);return hash.digest('hex');}
+export async function archiveFolder(source,target){await new Promise((resolve,reject)=>{const child=spawn(powershell(),['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.join(ROOT,'scripts','archive.ps1'),'-Source',source,'-Destination',target],{cwd:ROOT,windowsHide:true,stdio:['ignore','ignore','pipe']});child.stderr.resume();child.on('error',reject);child.on('exit',code=>code===0?resolve():reject(Error('项目压缩失败，请检查目录和磁盘空间。')));});}
+async function exportProjectPhotosInternal(studio,id,photoIds){
+ const project=await studio.get(id),selected=photoIds||project.photos.filter(photo=>photo.selected&&photo.flag!=='reject').map(photo=>photo.id);if(!Array.isArray(selected)||!selected.length||selected.some(value=>!project.photos.some(photo=>photo.id===value)))throw Error('请选择需要导出的照片。');
+ const archiveId=randomUUID(),temporary=path.join(ROOT,'tmp','studio-delivery-'+archiveId),output=path.join(studio.directory,'exports',archiveId+'.zip');await mkdir(temporary,{recursive:true});const names=new Set();let count=0;
+ try{for(const photoId of selected){const {photo,workflow}=await studio.photo(id,photoId),node=workflow.steps.find(node=>node.id==='deliver');if(node?.status!=='done'||!node.output?.imageAsset)continue;const asset=await studio.workflows.asset(workflow.id,node.output.imageAsset);let name=safeName(node.output.fileName||photo.name);const original=name;let suffix=1;while(names.has(name.toLocaleLowerCase('en-US')))name=path.parse(original).name+'-'+String(++suffix).padStart(3,'0')+path.extname(original);names.add(name.toLocaleLowerCase('en-US'));await copyFile(asset.file,path.join(temporary,name));count++;}if(!count)throw Error('选中照片还没有已完成的成片，请先运行流程。');await archiveFolder(temporary,output);const receipt={id:archiveId,name:safeName(project.name)+'-成片.zip',count,skipped:selected.length-count,bytes:(await stat(output)).size,sha256:await hashFile(output),created:Date.now(),kind:'delivery'};await writeFile(path.join(studio.directory,'exports',archiveId+'.json'),JSON.stringify(receipt));return {...receipt,downloadUrl:'/api/studio/downloads/'+archiveId};}
+ finally{const relative=path.relative(path.join(ROOT,'tmp'),temporary);if(!relative||relative.startsWith('..')||path.isAbsolute(relative)||!/^studio-delivery-[a-f0-9-]+$/.test(relative))throw Error('导出临时目录校验失败。');await rm(temporary,{recursive:true,force:true,maxRetries:5,retryDelay:100});}
+}
+const UUID=/^[a-f0-9-]{36}$/,HASH=/^[a-f0-9]{64}$/,sha=bytes=>createHash('sha256').update(bytes).digest('hex');
+// A bounded JSON container avoids archive paths and never reads native login or browser folders.
+async function backupProjectInternal(studio,id){
+ const project=await studio.get(id),pending=new Set(project.photos.flatMap(photo=>[photo.originalWorkflowId,...photo.versions])),records=[],seen=new Set();let total=0;
+ for(const workflowId of pending){if(seen.has(workflowId))continue;seen.add(workflowId);if(seen.size>2500)throw Error('项目历史过多，请分项目备份。');const workflow=await studio.workflows.get(workflowId),folder=path.join(studio.workflows.folder(workflowId),'assets'),assets=[];
+  for(const name of await readdir(folder)){if(!HASH.test(name))continue;const asset=await studio.workflows.asset(workflowId,name),bytes=await readFile(asset.file);total+=bytes.length;if(total>140*1024*1024)throw Error('此项目备份超过140 MB原始素材限制，请分为较小项目，或停止服务器后备份整个data目录。');assets.push({id:name,type:asset.type,sha256:sha(bytes),data:bytes.toString('base64')});}
+  for(const node of workflow.steps)for(const output of [node.output,...node.attempts.map(a=>a.output)])if(UUID.test(output?.childWorkflowId||''))pending.add(output.childWorkflowId);
+  records.push({workflow,assets});
+ }
+ const payload={project,records},backup={format:'houtu-project',schemaVersion:1,created:Date.now(),sha256:sha(JSON.stringify(payload)),payload},archiveId=randomUUID(),file=path.join(studio.directory,'exports',archiveId+'.jsondata');await writeFile(file,JSON.stringify(backup));const receipt={id:archiveId,name:safeName(project.name)+'-项目备份.json',kind:'backup',extension:'.jsondata',bytes:(await stat(file)).size,sha256:await hashFile(file)};await writeFile(path.join(studio.directory,'exports',archiveId+'.json'),JSON.stringify(receipt));return {...receipt,downloadUrl:'/api/studio/downloads/'+archiveId};
+}
+async function restoreProjectInternal(studio,backup){
+ if(studio.active||studio.adapter.isBusy())throw Error('请先暂停正在运行的任务，再恢复项目。');
+ if(backup?.format!=='houtu-project'||backup.schemaVersion!==1||!HASH.test(backup.sha256||'')||sha(JSON.stringify(backup.payload))!==backup.sha256)throw Error('备份格式或校验值不正确，请保留原文件。');
+ const {project,records}=backup.payload||{};if(!project||project.schemaVersion!==1||!UUID.test(project.id||'')||!Array.isArray(project.photos)||project.photos.length>200||!Array.isArray(records)||(!records.length&&project.photos.length>0)||records.length>2500)throw Error('项目备份结构无效。');const recipe=recipeValue(project.recipe),ids=new Map(),assetIds=new Map(),validated=[];let total=0;
+ for(const record of records){const w=record.workflow;if(!UUID.test(w?.id||'')||ids.has(w.id)||!FLOW_STEPS[w.kind]||!['pipeline','retouch'].includes(w.kind)||!Array.isArray(w.steps)||w.steps.length>13||!Array.isArray(record.assets))throw Error('工作流备份无效。');ids.set(w.id,randomUUID());if(w.kind==='pipeline')recipeValue(w.recipe);const known=new Set();for(const n of w.steps){if(!/^[a-z0-9-]{1,40}$/.test(n.id)||known.has(n.id)||!Array.isArray(n.deps)||n.deps.some(d=>!known.has(d))||!Array.isArray(n.attempts)||n.attempts.length>10000||!Array.isArray(n.artifacts))throw Error('工作流步骤结构无效。');known.add(n.id);}
+  const assets=[];for(const a of record.assets){if(!HASH.test(a.id||'')||!HASH.test(a.sha256||'')||!['image/png','image/jpeg','image/webp','application/octet-stream'].includes(a.type)||typeof a.data!=='string'||!/^[A-Za-z0-9+/]*={0,2}$/.test(a.data))throw Error('备份素材格式无效。');const bytes=Buffer.from(a.data,'base64');total+=bytes.length;if(total>140*1024*1024||bytes.length>110*1024*1024||sha(bytes)!==a.sha256)throw Error('备份素材不完整或超过大小限制。');if(a.type.startsWith('image/')){const meta=await sharp(bytes,{limitInputPixels:40000000,failOn:'error'}).metadata();if(!['png','jpeg','webp'].includes(meta.format))throw Error('备份图片无效。');}else if(bytes.length>32*1024*1024)throw Error('备份文件过大。');const newHash=createHash('sha256').update(a.type).update(bytes).digest('hex');if(assetIds.has(a.id)&&assetIds.get(a.id)!==newHash)throw Error('备份素材编号冲突。');assetIds.set(a.id,newHash);assets.push({...a,bytes});}validated.push({workflow:w,assets});
+ }
+ for(const p of project.photos){if(!UUID.test(p.id||'')||!ids.has(p.workflowId)||!ids.has(p.originalWorkflowId)||!Array.isArray(p.versions)||p.versions.some(id=>!ids.has(id))||!HASH.test(p.originalAsset||''))throw Error('照片与工作流关联不完整。');const original=validated.find(r=>r.workflow.id===p.originalWorkflowId);if(!original.assets.some(a=>a.id===p.originalAsset))throw Error('备份缺少原图。');}
+ // Validate all output/artifact references before creating any files.
+ for(const {workflow:w,assets}of validated){const owned=new Set(assets.map(a=>a.id));for(const n of w.steps)for(const a of [n,...n.attempts]){for(const artifact of a.artifacts||[])if(!owned.has(artifact.id))throw Error('备份缺少历史产物。');for(const key of ['imageAsset','rawAsset','maskAsset'])if(a.output?.[key]&&!owned.has(a.output[key]))throw Error('备份缺少步骤图片。');}}
+ const newProjectId=randomUUID(),remap=value=>{if(typeof value==='string')return ids.get(value)||assetIds.get(value)||(value===project.id?newProjectId:value);if(Array.isArray(value))return value.map(remap);if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).map(([k,v])=>[k,remap(v)]));return value;},created=[];
+ try{for(const item of validated){const w=remap(item.workflow);w.jobId=null;w.restoredBackup=true;w.revision=0;w.updated=Date.now();for(const n of w.steps){n.token=null;if(n.status==='running')n.status='interrupted';for(const a of n.attempts)if(a.status==='running')a.status='interrupted';}await studio.workflows.write(w);created.push(w.id);for(const a of item.assets)await studio.workflows.putAsset(w.id,a.bytes,a.type);}
+  const restored=remap(project);restored.id=newProjectId;restored.name=safeName(project.name+' · 恢复');restored.recipe=recipe;restored.revision=0;restored.updated=Date.now();restored.queue={state:'paused',message:'备份已恢复，已完成产物保留，AI不会自动运行。历史AI子任务仅作档案；需重新生成时请建立新流程版本。'};await studio.write(restored);return restored;
+ }catch(error){for(const id of created){studio.workflows.committed.delete(id);await rm(studio.workflows.folder(id),{recursive:true,force:true,maxRetries:3}).catch(()=>{});}throw error;}
+}
+
+async function withArchive(studio,action){if(studio.active||studio.archiving||studio.adapter.isBusy()||studio.queues.size||studio.closing)throw Error('有任务正在运行，请先完成并暂停，再操作项目档案。');studio.archiving=true;const task=Promise.resolve().then(action);studio.archiveTask=task;try{return await task;}finally{studio.archiving=false;studio.archiveTask=null;}}
+export const exportProjectPhotos=(studio,...args)=>withArchive(studio,()=>exportProjectPhotosInternal(studio,...args));
+export const backupProject=(studio,...args)=>withArchive(studio,()=>backupProjectInternal(studio,...args));
+export const restoreProject=(studio,...args)=>withArchive(studio,()=>restoreProjectInternal(studio,...args));

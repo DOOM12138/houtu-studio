@@ -13,7 +13,7 @@ if ($installRoot -ne $sourceRoot) {
     if ($LASTEXITCODE -ne 0) { throw 'Please stop the existing website before updating.' }
   }
   New-Item -ItemType Directory -Path $installRoot -Force | Out-Null
-  $items = @('server.mjs','launcher.mjs','lib','public','frontend','backend','models','scripts','vendor-licenses','runtime','node_modules','package.json','package-lock.json','README.md','DEPLOY.md','SOURCES.md','AGENTS.md','agent.md','ARCHITECTURE.md','GIT_WORKFLOW.md','LICENSE','.npmrc','开发终端.cmd','THIRD-PARTY-NOTICES.txt','portable-manifest.json','启动网站.cmd','停止网站.cmd','一键部署.cmd','启动服务器.cmd','服务器管理.cmd','停止服务器.cmd')
+  $items = @('server.mjs','launcher.mjs','lib','public','frontend','backend','models','scripts','vendor-licenses','runtime','node_modules','package.json','package-lock.json','README.md','DEPLOY.md','SOURCES.md','AGENTS.md','agent.md','ARCHITECTURE.md','GIT_WORKFLOW.md', 'FEATURES.md','LICENSE','.npmrc','开发终端.cmd','THIRD-PARTY-NOTICES.txt','portable-manifest.json','启动网站.cmd','停止网站.cmd','一键部署.cmd','启动服务器.cmd','服务器管理.cmd','停止服务器.cmd')
   if (Test-Path -LiteralPath (Join-Path $sourceRoot 'defaults')) { $items += 'defaults' }
   foreach ($item in $items) { Copy-Item -LiteralPath (Join-Path $sourceRoot $item) -Destination $installRoot -Recurse -Force -ErrorAction Stop }
 }

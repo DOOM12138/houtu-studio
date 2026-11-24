@@ -15,7 +15,8 @@ export class ImageLibrary{
  async refresh(jobs,workflows){const next=this.queue.catch(()=>{}).then(async()=>{
   const all=await workflows.all(),images=[],covered=new Set();
   for(const w of all){
-   const steps=w.kind==='retouch'?['compose']:w.kind==='color'?['export']:w.kind==='creative'?['deliver','render']:[];
+   if(w.pipelineParentId){if(w.jobId)covered.add(w.jobId);continue;}
+   const steps=w.kind==='pipeline'?['deliver']:w.kind==='retouch'?['compose']:w.kind==='color'?['export']:w.kind==='creative'?['deliver','render']:[];
    const delivered=new Set(),legacyDelivered=new Set();if(w.kind==='creative')for(const a of w.steps.find(n=>n.id==='deliver')?.attempts||[])if(a.status==='done'&&a.output?.imageAsset){const input=a.inputs?.find(n=>n.step==='render')?.attempt;if(input)delivered.add(input);else legacyDelivered.add(a.output.imageAsset);}
    for(const step of steps){const n=w.steps.find(n=>n.id===step);if(!n)continue;
     const attempts=n.attempts.length?n.attempts:(n.status==='done'?[{id:'legacy',status:'done',output:n.output,ended:w.updated}]:[]);
@@ -41,7 +42,7 @@ export class ImageLibrary{
  });this.queue=next;return next;}
  list(params,accounts=[]){const query=String(params.get('q')||'').trim().slice(0,200).toLowerCase(),kind=params.get('kind'),account=params.get('account'),accountEmail=accounts.find(a=>a.id===account)?.email.toLowerCase(),page=Math.max(1,Math.min(100000,Math.floor(Number(params.get('page')))||1)),size=24;
   const all=[...this.records.values()],filtered=all.filter(r=>(!kind||r.kind===kind)&&(!account||(account==='unknown'?!r.account:r.account?.id===account||Boolean(accountEmail&&r.account?.email.toLowerCase()===accountEmail)))&&(!query||[r.name,r.account?.email,r.model,r.jobId,r.workflowId].some(v=>String(v||'').toLowerCase().includes(query))));
-  return {images:filtered.slice((page-1)*size,page*size),total:filtered.length,page,pageSize:size,totalAll:all.length,counts:Object.fromEntries(['retouch','color','creative'].map(kind=>[kind,all.filter(r=>r.kind===kind).length]))};
+  return {images:filtered.slice((page-1)*size,page*size),total:filtered.length,page,pageSize:size,totalAll:all.length,counts:Object.fromEntries(['retouch','color','creative','pipeline'].map(kind=>[kind,all.filter(r=>r.kind===kind).length]))};
  }
  async thumbnail(id,jobs,workflows){
   if(!HASH.test(id))throw Error('图片记录编号无效。');const record=this.records.get(id);if(!record)throw Object.assign(Error('图片记录不存在，请刷新图库。'),{status:404});

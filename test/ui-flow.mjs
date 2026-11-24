@@ -72,8 +72,8 @@ try {
   assert.equal(bridge.last.contextPath, null);
   await page.waitForFunction(() => document.querySelectorAll('.history-item').length === 2);
   await page.locator('.history-item').last().click();
-  await page.waitForFunction(() => document.querySelector('#operation-title').textContent === '厚涂眼睛');
-  assert.equal(await page.locator('#operation-title').textContent(), '厚涂眼睛');
+  await page.waitForFunction(() => document.querySelector('#operation-title').textContent === '眼睛精修');
+  assert.equal(await page.locator('#operation-title').textContent(), '眼睛精修');
   assert.equal(await page.locator('#edit-style').inputValue(), 'cos');
   assert.match(await page.locator('#region-note').textContent(), /局部/);
   // A legal JPEG can normalize to a PNG larger than the external-upload limit.

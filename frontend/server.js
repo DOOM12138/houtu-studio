@@ -1,6 +1,6 @@
 ﻿const $=id=>document.getElementById(id);
 let page=1,total=0,requestId=0,timer;
-const names={retouch:'人物精修',color:'调色成品',creative:'特效与合成'};
+const names={pipeline:'照片配方',retouch:'人物精修',color:'调色成品',creative:'特效与合成'};
 const date=value=>value?new Date(value).toLocaleString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'尚未记录';
 async function get(url){const response=await fetch(url,{signal:AbortSignal.timeout(15000)});const data=await response.json();if(!response.ok)throw Error(data.error||'记录暂时无法读取，请重试。');return data;}
 function notice(text,error=false){$('server-notice').textContent=text;$('server-notice').classList.toggle('error',error);}
