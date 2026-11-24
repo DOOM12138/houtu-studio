@@ -2,7 +2,7 @@
 import {EXTENDED_TOOLS} from './feature-expansion.js';
 export const STYLES = [
   { id: 'anime', painting: true, name: '二次元厚涂', description: '动漫感、柔和色块与自然笔触', instruction: '二次元数字厚涂风格，保持动漫角色辨识度，用干净的色块与柔和明暗塑造体积，弱化生硬线稿，笔触顺应形体，不转为写实油画或塑料3D。' },
-  { id: 'cos', painting: true, name: 'COS 质感厚涂', description: '保留真人与服装质感，细化角色妆造', instruction: 'COS人像质感厚涂，保留原图真人身份、面部结构与摄影空间感，在妆容、眼睛、假发和服装上加入细腻的二次元厚涂处理；不要把真人完全变成平面卡通，也不要过度美颜。' },
+  { id: 'cos', painting: true, name: 'COS 质感厚涂', description: '可辨的二次元眼妆、面部体积与发束，保留真人摄影感', instruction: 'COS人像质感厚涂，保留原图真人身份、面部结构与摄影空间感，在妆容、眼睛、假发和服装上加入细腻的二次元厚涂处理；不要把真人完全变成平面卡通，也不要过度美颜。' },
   { id: 'natural', painting: false, name: '保留原画风（非厚涂）', description: '照片保留照片感，插画保留原有画风，不加厚涂', instruction: '非厚涂模式：保留原图既有媒介、真实程度、线条和画风，只修整本次选择的细节。不增加绘画笔触、厚涂色块或油画肌理，不将照片卡通化，不重绘已有插画风格。' },
   { id: 'photo', painting: false, name: '自然摄影精修（非厚涂）', description: '保留摄影光感和真实纹理，适合真人与 COS 照片', instruction: '非厚涂摄影精修：保持原照片的真人身份、镜头透视、真实肤质、发丝和织物纹理，克制整理瑕疵、妆面与光影，不增加绘画笔触或厚涂色块，不做卡通化、插画化或塑料磨皮。' },
 ];

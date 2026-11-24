@@ -27,7 +27,7 @@ try {
     if (!await page.locator('#prompt-workshop').evaluate(el => el.open)) await page.locator('#prompt-workshop>summary').click();
     await page.locator('#prompt').fill('保留角色，轻度二次元厚涂。');
     await page.locator('#reset-prompt').click();
-    assert.match(await page.locator('#prompt').inputValue(), /只修明确问题/);
+    assert.match(await page.locator('#prompt').inputValue(), /所选档位/);
     await page.locator('#prompt-workshop>summary').click();
     await page.locator('#file').setInputFiles({ name: 'unsupported.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg/>') });
     await page.waitForFunction(() => !document.querySelector('#feedback').hidden);

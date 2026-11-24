@@ -1,4 +1,5 @@
-import {featureDefault} from './prompt-contract.js';
+import {COS_PAINT_LEVELS,PAINT_EDIT_BRIEF} from './paint-profile.js';
+import {featureDefault,DEFAULT_EDIT_BRIEF} from './prompt-contract.js';
 import {createFeatureTools} from './feature-ui.js';
 import {isBellyOperation,bellyOptions} from './belly-options.js';
 import {createSceneTools} from './scene-ui.js';
@@ -44,6 +45,7 @@ function renderTools() {
   $('no-tools').hidden = Boolean(visible.length);
 }
 
+function syncDefaultBrief(){const value=$('prompt').value;if(![DEFAULT_EDIT_BRIEF,PAINT_EDIT_BRIEF].includes(value))return;$('prompt').value=STYLES.find(s=>s.id===$('edit-style').value)?.painting?PAINT_EDIT_BRIEF:DEFAULT_EDIT_BRIEF;}
 function setOperation(id, { autoStyle = true } = {}) {
   const previousOperation=operation;
   const tool = PRESETS.find(item => item.id === id) || PRESETS[0];
@@ -52,7 +54,7 @@ function setOperation(id, { autoStyle = true } = {}) {
   $('operation-title').textContent = tool.name; $('active-tool-name').textContent = tool.name;
   $('operation-description').textContent = tool.description;featureTools.refresh();
   $('areas-details').hidden = operation !== 'full-body';$('portrait-panel').hidden=operation!=='portrait-polish';
-  if (autoStyle && tool.style) $('edit-style').value = tool.style;
+  if (autoStyle && tool.style) $('edit-style').value = tool.style;if(autoStyle)syncDefaultBrief();
   $('style-help').textContent = STYLES.find(style => style.id === $('edit-style').value).description;
   if(autoStyle&&isBellyOperation(operation)&&previousOperation!==operation)hydrateBelly(undefined,operation);
   if(autoStyle&&previousOperation!==operation){featureTools.hydrate();featureTools.resetTarget();}featureTools.refresh();
@@ -72,11 +74,14 @@ $('tool-filters').addEventListener('click', event => {
   $('tool-filters').querySelectorAll('button').forEach(el => el.setAttribute('aria-pressed', String(el === button)));
   renderTools();
 });
-$('edit-style').addEventListener('change', () => { $('style-help').textContent = STYLES.find(s => s.id === $('edit-style').value).description; optionsChanged(); });
+$('edit-style').addEventListener('change', () => {syncDefaultBrief(); $('style-help').textContent = STYLES.find(s => s.id === $('edit-style').value).description; optionsChanged(); });
 $('area-options').addEventListener('change', optionsChanged);
 $('paint-level').addEventListener('input', optionsChanged);
+$('cos-reference-start').onclick=()=>{$('edit-style').value='cos';$('paint-level').value='6';syncDefaultBrief();$('style-help').textContent=STYLES.find(s=>s.id==='cos').description;optionsChanged();feedback('已设为参考妆感：通过眼妆、面部体积和发束做可辨厚涂；原图融合比例可单独调整，保护区仍保留原图。');};
 document.querySelectorAll('[name="strength"]').forEach(el => el.addEventListener('change', optionsChanged));
 $('preserve').addEventListener('change', optionsChanged);
+$('cos-head-scope').onclick=async()=>{if(busy||!hasSource())return;const sourceToken=sourceReference||sourceData;busy=true;updateControls();try{const data=await api('/api/targets/analyze',{...(sourceReference?{source:sourceReference}:{image:sourceData}),operation:'face'});if((sourceReference||sourceData)!==sourceToken)throw Error('图片已更换，请重新定位。');if(!data.found||!data.selectionSuggestion)throw Error('未可靠定位面部，请手动框选包含头发、脸和上下衔接的范围。未调用图片生成。');selection=data.selectionSuggestion;updateRegion();feedback('已给出本机估算范围，请检查发型、兽耳与下颌是否完整，可拖动修正；生成时发送局部裁片＋完整原图，不会自动出图。');}catch(e){feedback(e.message);}finally{busy=false;updateControls();optionsChanged();}};
+
 if (matchMedia('(max-width:1100px)').matches) $('tools-panel').open = false;
 
 function optionsChanged() {
@@ -87,16 +92,16 @@ function optionsChanged() {
   $('prompt-length').textContent = `${$('prompt').value.length} / 6000`;
   const style = STYLES.find(s => s.id === $('edit-style').value);
   const paintLevel = Number($('paint-level').value);featureTools.refresh();
-  const paint = PAINT_LEVELS[paintLevel-1];
-  const cleanup=isCleanupOperation(operation),belly=isBellyOperation(operation);
+  const paint = (style.id==='cos'?COS_PAINT_LEVELS:PAINT_LEVELS)[paintLevel-1];
+  const cleanup=isCleanupOperation(operation),belly=isBellyOperation(operation),medium=PRESETS.find(p=>p.id===operation)?.changes?.includes('medium');
   $('belly-panel').hidden=custom||!belly;
   $('belly-level-value').value=$('belly-level').value+' / 10';
   $('scene-panel').hidden=custom||!isSceneOperation(operation);
-  $('edit-style').closest('.style-field').hidden=(cleanup||belly)&&!custom;
-  $('paint-field').hidden = custom || cleanup || belly || !style.painting;
-  $('nonpaint-help').hidden = custom || cleanup || belly || style.painting;
+  $('edit-style').closest('.style-field').hidden=(cleanup||belly||medium)&&!custom;
+  $('paint-field').hidden = custom || cleanup || belly || medium || !style.painting;
+  $('nonpaint-help').hidden = custom || cleanup || belly || medium || style.painting;
   $('paint-value').value = `${paintLevel} / 10`;
-  $('paint-help').textContent = `${paint.name}：${paint.description}`;
+  $('cos-head-scope').hidden=custom||style.id!=='cos';$('cos-head-scope').disabled=busy||portraitChecking||running(currentJob?.status)||!hasSource();$('paint-help').textContent = `${paint.name}：${paint.description}`;
   $('paint-level').setAttribute('aria-valuetext', `${paintLevel}/10，${paint.name}`);
   updateControls();
   if ($('prompt-preview').open && state.csrf) refreshPrompt();
@@ -162,7 +167,7 @@ function updateControls() {
   $('clear-region').disabled = !selection || working;
   document.querySelectorAll('.region-number-fields input').forEach(el => { el.disabled = working; });
   $('selection-canvas').classList.toggle('selecting', selecting && !working);
-  $('review-result').hidden=!currentJob?.outputUrl;$('review-result').href='/lab/?job='+encodeURIComponent(currentJob?.id||'');$('reuse-result').hidden = !currentJob?.outputUrl || working;$('portrait-rollback').hidden=!currentJob?.sourceUrl||working;$('portrait-panel').inert=working;$('task-panel').inert=working||custom;$('target-panel').inert=working||custom;$('target-recompose').disabled=working||!currentJob?.rawAsset;$('task-recompose').disabled=working||!currentJob?.rawAsset||currentJob.operation!=='detail-upscale';
+  $('review-result').hidden=!currentJob?.outputUrl;$('review-result').href='/lab/?job='+encodeURIComponent(currentJob?.id||'');$('reuse-result').hidden = !currentJob?.outputUrl || working;$('portrait-rollback').hidden=!currentJob?.sourceUrl||working;$('portrait-panel').inert=working;$('task-panel').inert=working||custom;$('target-panel').inert=working||custom;$('cos-head-scope').disabled=working||!hasSource();$('target-recompose').disabled=working||!currentJob?.rawAsset;$('task-recompose').disabled=working||!currentJob?.rawAsset||currentJob.operation!=='detail-upscale';
   document.querySelector('.studio').classList.toggle('busy', working);
   $('action-hint').textContent = packing ? '正在打包便携版，完成后可以继续精修。' : working ? '请保持网站与本机服务运行。' : !hasSource() ? '先上传完整人物原图。' : !state.account ? '登录 ChatGPT 后即可开始。' : selection ? '只重绘选区，选区外保留原图。' : !custom && operation === 'full-body' && !selectedAreas().length ? '请至少选择一个精修部位。' : '按所选功能精修，保留原图取景。';
 }
@@ -181,7 +186,7 @@ async function refreshState() {
     const note = state.serviceError || state.loginError;
     if (note) showConnection(note);
     else if (!state.loginPending) $('connection').hidden = true;
-    if (!promptInitialized) { $('prompt').value = state.defaultPrompt; promptInitialized = true; optionsChanged(); }
+    if (!promptInitialized) { $('prompt').value = state.defaultPrompt; promptInitialized = true;syncDefaultBrief(); optionsChanged(); }
     if (state.package && !packageJob) { renderPackage(state.package); if (state.package.status === 'building') watchPackage(); }
     if (!currentJob && state.activeJob) await restoreJob(state.activeJob);
     updateControls();
@@ -293,7 +298,7 @@ document.querySelector('.source-pane').addEventListener('drop', event => { event
 document.addEventListener('dragover', event => event.preventDefault());
 document.addEventListener('drop', event => event.preventDefault());
 $('prompt').addEventListener('input', optionsChanged);
-$('reset-prompt').addEventListener('click', () => { $('prompt').value = state.defaultPrompt; optionsChanged(); });
+$('reset-prompt').addEventListener('click', () => { $('prompt').value = state.defaultPrompt;syncDefaultBrief(); optionsChanged(); });
 
 function updateRegion() {
   $('region-note').textContent = selection && sourceMeta

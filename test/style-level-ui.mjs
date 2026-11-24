@@ -25,7 +25,8 @@ page.setDefaultTimeout(15000);
 const out=path.resolve('.impeccable/review/style-levels');await mkdir(out,{recursive:true});
 async function level(value){await page.locator('#paint-level').evaluate((input,n)=>{input.value=n;input.dispatchEvent(new Event('input',{bubbles:true}));},String(value));await page.waitForFunction(n=>document.querySelector('#compiled-prompt').textContent.includes('厚涂程度'+n+'/10'),value);assert.equal(await page.locator('#paint-value').textContent(),value+' / 10');}
 try{
-  await page.goto(origin);await page.waitForFunction(()=>document.querySelector('#prompt').value.length>0);
+  await page.goto(origin);await page.locator('#target-auto').uncheck(); // Uniform fixture is not a detectable person; scope mechanics are tested separately.
+await page.waitForFunction(()=>document.querySelector('#prompt').value.length>0);
   assert.equal(await page.locator('#edit-style option').count(),4);
   assert.equal(await page.locator('#edit-style').inputValue(),'anime');
   await page.locator('#prompt-preview').evaluate(e=>{e.open=true;});
@@ -64,6 +65,19 @@ try{
   await page.waitForSelector('#reuse-result:not([hidden])');assert.match(bridge.prompt,/厚涂程度9\/10/);
   await page.goto(origin+'/?job='+job.id);await page.waitForFunction(()=>document.querySelector('#paint-level').value==='9');
   assert.equal(await page.locator('#edit-style').inputValue(),'cos');
+  // Hidden preset inputs must not follow a complete custom request.
+  await page.locator('#task-references').setInputFiles({name:'visible-guide.png',mimeType:'image/png',buffer:picture});
+  await page.waitForFunction(()=>document.querySelector('#task-reference-list').textContent.includes('visible-guide'));
+  await page.locator('#target-editor').evaluate(e=>e.open=true);
+  const mask=await sharp({create:{width:240,height:320,channels:3,background:'white'}}).png().toBuffer();
+  await page.locator('#target-mask-file').setInputFiles({name:'manual.png',mimeType:'image/png',buffer:mask});
+  await page.locator('#target-mask-canvas').waitFor({state:'visible'});
+  await page.locator('#prompt-mode').selectOption('custom');await page.locator('#prompt').fill('Only clean the original clothing edge.');
+  assert.equal(await page.locator('#task-panel').isVisible(),false);assert.equal(await page.locator('#target-panel').isVisible(),false);
+  const customRequest=page.waitForRequest(r=>r.url().endsWith('/api/jobs')&&r.method()==='POST');await page.locator('#generate').click();
+  const sent=(await customRequest).postDataJSON();assert.deepEqual(sent.references,[]);assert.equal('targetMask' in sent,false);
+  await page.waitForSelector('#reuse-result:not([hidden])');assert.doesNotMatch(bridge.prompt,/效果参考只约束|当前为非厚涂任务|厚涂表现执行/);
+  await page.goto(origin+'/?job='+job.id);await page.waitForFunction(()=>document.querySelector('#paint-level').value==='9');
   for(const [width,theme] of [[1440,'light'],[390,'light'],[320,'dark']]){
     await page.setViewportSize({width,height:1000});await page.evaluate(t=>{document.documentElement.dataset.theme=t;},theme);
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));

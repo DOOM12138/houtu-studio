@@ -53,3 +53,13 @@
 - 官方工具箱：https://www.pixcakeai.com/guide/230427 。可确认场照清场、消除灯架、飘发、发丝与光影特效等公开功能，以及细节保护层／效果层的高层操作方向。未获得商业私有模型、完整提示词、内部参数或源码；本站为自研实现，不宣称同效果复刻。
 - 官方COS工具集合：https://wiki.pixcakeai.com/ai-toolbox/huanxiang-cos 。用于确认功能范围。
 - 场馆灯阵实景观察：https://www.jfdaily.com/news/detail?id=958292 ，图片 https://images.shobserver.com/img/2025/08/03/l_CB20250803150913010083.jpg 。仅作为场照背景人群、柔光箱、摄影支架与地面杂物的研究参考，未放入源码或软件包，也未作为虚构AI效果展示。
+
+## 1.15 真人COS前后对照研究
+
+- 用户提供的白发COS原图／修后截图，仅作本机目标说明；不随源码和便携包分发。
+- https://www.hueyingai.cn/ ：实际研究厚涂眼睛与皮肤、发束、场馆清场和体态前后对照。只学习可观察效果，不取得商业提示词、权重或引擎。
+- https://wiki.pixcakeai.com/guide/9403.html ：实际对照祛瑕、眼袋／卧蚕。https://wiki.pixcakeai.com/guide/9416.html ：衣褶与重力褶皱对照。
+- https://vip.yao-ai.top/?collab=KVAJNEC2J9 ：厚涂、服装迁移和连续水流前后示例，用于识别本项目低变化、断续光带等问题。
+- https://www.pexels.com/license/ 与 https://www.pexels.com/terms-of-service/ ：新增真人测试照片的来源许可；照片5587981（Polina Tankilevitch）、31419542（Hoàng Tiến Anh）、37206371（TBD Tuyên）、11388574（Диана Дунаева）、30175874（Alina Chernii）。测试文件、摄影师与原始链接保存在私有素材清单，不进入公开包。
+
+公开案例只证明其展示的具体结果；本项目仍需在自己的模型入口执行和审阅。图片原始标识和署名不作为去除目标。

@@ -20,12 +20,14 @@ export function recipeValue(input={}){
  if(!stages.at(-1).enabled)throw Error('导出步骤不能关闭。');
  return {schemaVersion:1,name:cleanName(input.name,'我的修图配方'),description:String(input.description||'').slice(0,300),model:normalizeModel(input.model),stages};
 }
-const retouch=(name,options)=>({type:'retouch',name,options:{task:{autoTarget:true,sourceRetention:['smooth-belly','body-shape','clothes-flow','outfit-transfer'].includes(options.operation)?0:75},...options}}),finish={type:'export',name:'成片导出',options:{format:'png',quality:90}};
+const retouch=(name,options)=>({type:'retouch',name,options:{task:{autoTarget:true,sourceRetention:0},...options}}),finish={type:'export',name:'成片导出',options:{format:'png',quality:90}};
+// Append new builtins; stored builtin IDs must never change a local recipe into AI work.
 export const RECIPE_SEEDS=[
  {name:'自然人物完整精修',stages:[retouch('人物自然细化',{operation:'portrait-polish',style:'natural'}),retouch('服装褶皱整理',{operation:'outfit',style:'natural'}),{type:'local',name:'轻量清晰度',options:{sharpen:.5}},finish]},
  {name:'克制二次元厚涂',stages:[retouch('二次元厚涂2级',{operation:'full-body',style:'anime',paintLevel:2}),retouch('成品人物细化',{operation:'portrait-polish',style:'natural'}),finish]},
  {name:'场照净场与人物细化',stages:[retouch('保留主体净场',{operation:'clear-background',scene:{protectSubject:true}}),retouch('人物与衣料细化',{operation:'portrait-polish',style:'natural'}),finish]},
  {name:'平滑瘦腹与服装整理',stages:[retouch('自然平滑收腹',{operation:'smooth-belly',belly:{level:2,fabric:'auto',transition:'wide'}}),retouch('服装顺势整理',{operation:'outfit',style:'natural'}),finish]},
  {name:'全本机整理与导出',stages:[{type:'local',name:'方向、尺寸与清晰度',options:{rotate:0,maxEdge:2400,sharpen:.3}},{type:'grade',name:'自然通透全局色彩',options:{settings:BUILTINS[0]?.settings||{}}},{...finish,options:{format:'jpeg',quality:92}}]},
+ {name:'真人COS参考厚涂6级',stages:[retouch('眼妆、体积与发束',{operation:'cos-paint',style:'cos',paintLevel:6,strength:'balanced'}),finish]},
 ].map((input,index)=>({id:'builtin-'+(index+1),builtin:true,...recipeValue(input)}));
 export const recipeReport=recipe=>({steps:recipe.stages.length,aiSteps:recipe.stages.filter(stage=>stage.enabled&&stage.type==='retouch').length,localSteps:recipe.stages.filter(stage=>stage.enabled&&stage.type!=='retouch').length,requiresSubjectMask:recipe.stages.some(stage=>stage.enabled&&stage.type==='retouch'&&stage.options.scene?.protectSubject),freeWebsite:true});
