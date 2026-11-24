@@ -1,0 +1,9 @@
+export const PORTRAIT_AREAS=[['face','五官衔接'],['eyes','眼神与虹膜'],['skin','皮肤与肤色'],['hair','发丝与假发'],['hands','手指与肢体'],['outfit','服装纹理'],['accessories','饰品材质'],['light','人物光影']];
+export const PORTRAIT_PROFILES={
+ gentle:{name:'保守细化',levels:Object.fromEntries(PORTRAIT_AREAS.map(([id])=>[id,1])),texture:85,faceLock:true},
+ texture:{name:'质感细化',levels:{face:1,eyes:1,skin:2,hair:2,hands:1,outfit:2,accessories:2,light:1},texture:90,faceLock:true},
+ faceHair:{name:'五官与发丝',levels:{face:2,eyes:2,skin:1,hair:2,hands:0,outfit:0,accessories:0,light:1},texture:85,faceLock:true},
+ handsOutfit:{name:'手部与服装',levels:{face:0,eyes:0,skin:0,hair:0,hands:2,outfit:2,accessories:1,light:1},texture:90,faceLock:true},
+};
+export function portraitOptions(input={}){const base=PORTRAIT_PROFILES.gentle;if(!input||typeof input!=='object'||Array.isArray(input))throw Error('人物细化参数无效。');const levels={};for(const [id]of PORTRAIT_AREAS){const n=input.levels?.[id]??base.levels[id];if(!Number.isInteger(n)||n<0||n>3)throw Error('部位细化等级应为0至3。');levels[id]=n;}const texture=input.texture??85;if(typeof texture!=='number'||!Number.isFinite(texture)||texture<0||texture>100)throw Error('质感保留应为0至100。');const faceLock=input.faceLock??true;if(typeof faceLock!=='boolean')throw Error('五官锁定设置无效。');return {levels,texture,faceLock,notes:String(input.notes||'').slice(0,2000)};}
+export function portraitInstructions(input,areas){const p=portraitOptions(input),names=['不修改','轻度整理，尽量贴近本轮输入','适度细化，只修正明确瑕疵','针对明显问题重点修整，仍不重新设计'];return ['这是成品上的第二轮或后续人物精修，不重做已经完成的背景、构图、合成、调色或特效。','保留本轮输入的原有媒介与风格；手办、3D质感、真人和二次元都沿用原有表现，不擅自转风格。',p.faceLock?'锁定脸型骨相、五官相对位置、神态、瞳色和人物身份，不瘦脸、不换脸、不扩大眼睛。':'仅在用户明确要求的范围内微调结构，仍保持人物辨识度。',`皮肤/原画纹理保留倾向 ${p.texture} / 100；这是给模型的编辑偏好，不是逐像素滤镜强度。避免磨成塑料，保留合理毛孔、笔触和服装细纹。`,...PORTRAIT_AREAS.filter(([id])=>areas.includes(id)).map(([id,name])=>`${name}：${names[p.levels[id]]}。`),'仅细化选择的部位，不增加肢体、首饰、文字、水印或改变服装覆盖范围。',p.notes?'本轮已确认的画面检查建议：'+p.notes:''].filter(Boolean).join('\n');}

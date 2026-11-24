@@ -1,0 +1,104 @@
+import { chromium } from 'playwright-core';
+import assert from 'node:assert/strict';
+import { mkdir } from 'node:fs/promises';
+import path from 'node:path';
+
+const out = path.resolve('.impeccable/review/v3');
+const site = process.env.TEST_SITE_URL || 'http://127.0.0.1:4317';
+await mkdir(out, { recursive: true });
+// Disposable headless test browser: the Cindy webview cannot capture full-page/mobile viewports.
+// This separate profile never signs in or accesses the user's regular browser profile.
+const browser = await chromium.launch({ executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true });
+try {
+  for (const [name, width, height] of [['desktop',1440,1000],['mobile',390,844],['small-mobile',320,760]]) {
+    const context = await browser.newContext({ viewport: { width, height }, colorScheme: 'light', reducedMotion: 'reduce' });
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto(site, { waitUntil: 'networkidle' });
+    await page.waitForFunction(() => document.querySelector('#prompt').value.length > 0);
+    assert.equal(await page.locator('#generate').isDisabled(), true);
+    assert.equal(await page.locator('#tool-list button').count(), 17);
+    const initial = await page.evaluate(() => ({ viewport: innerWidth, scroll: document.documentElement.scrollWidth }));
+    assert.ok(initial.scroll <= initial.viewport, `${name} horizontal overflow: ${JSON.stringify(initial)}`);
+    await page.screenshot({ path: path.join(out, `${name}.png`), fullPage: true });
+    await page.locator('.strength-options label').filter({has:page.locator('[name="strength"][value="balanced"]')}).click();
+    assert.equal(await page.locator('[name="strength"][value="balanced"]').isChecked(), true);
+    if (!await page.locator('#prompt-workshop').evaluate(el => el.open)) await page.locator('#prompt-workshop>summary').click();
+    await page.locator('#prompt').fill('保留角色，轻度二次元厚涂。');
+    await page.locator('#reset-prompt').click();
+    assert.match(await page.locator('#prompt').inputValue(), /保留角色特征/);
+    await page.locator('#prompt-workshop>summary').click();
+    await page.locator('#file').setInputFiles({ name: 'unsupported.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg/>') });
+    await page.waitForFunction(() => !document.querySelector('#feedback').hidden);
+    assert.match(await page.locator('#feedback').textContent(), /PNG/);
+    const png = await page.evaluate(() => {
+      const c = document.createElement('canvas'); c.width = 640; c.height = 800;
+      const g = c.getContext('2d'); g.fillStyle = '#e0ddd3'; g.fillRect(0,0,640,800);
+      g.fillStyle = '#a44e31'; g.fillRect(80,80,200,320); g.fillStyle = '#526754'; g.fillRect(320,400,220,250);
+      g.fillStyle = '#302e29'; g.font = '24px sans-serif'; g.fillText('UPLOAD TEST / NOT AI OUTPUT',80,740);
+      return c.toDataURL('image/png').split(',')[1];
+    });
+    await page.locator('#file').setInputFiles({ name: '上传测试.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
+    await page.waitForFunction(() => !document.querySelector('#source-frame').hidden);
+    assert.equal(await page.locator('#generate').isDisabled(), true); // Upload cannot bypass login.
+    assert.match(await page.locator('#image-info').textContent(), /640 × 800/);
+    if (!await page.locator('#tools-panel').evaluate(el => el.open)) await page.locator('#tools-panel>summary').click();
+    await page.locator('#tool-search').fill('眼睛');
+    assert.equal(await page.locator('#tool-list button').count(), 1);
+    await page.locator('[data-operation="eyes"]').click();
+    assert.equal(await page.locator('#operation-title').textContent(), '厚涂眼睛');
+    await page.locator('#edit-style').selectOption('cos');
+    assert.match(await page.locator('#style-help').textContent(), /真人/);
+    await page.locator('#tool-search').fill('');
+    await page.locator('[data-operation="full-body"]').click();
+    await page.locator('[name="area"][value="hands"]').uncheck();
+    assert.equal(await page.locator('#areas-count').textContent(), '7 项已选');
+    await page.locator('[name="area"][value="hands"]').check();
+    if (width <= 1100) await page.locator('#tools-panel>summary').click();
+    await page.locator('#select-region').click();
+    const canvas = await page.locator('#selection-canvas').boundingBox();
+    assert.ok(canvas && canvas.width > 0);
+    await page.mouse.move(canvas.x + canvas.width * .2, canvas.y + canvas.height * .2);
+    await page.mouse.down();
+    await page.mouse.move(canvas.x + canvas.width * .7, canvas.y + canvas.height * .7, { steps: 6 });
+    await page.mouse.up();
+    assert.match(await page.locator('#region-note').textContent(), /局部/);
+    if (!await page.locator('#prompt-workshop').evaluate(el => el.open)) await page.locator('#prompt-workshop>summary').click();
+    await page.locator('#prompt-preview>summary').click();
+    await page.waitForFunction(() => document.querySelector('#compiled-prompt').textContent.includes('当前功能：'));
+    assert.match(await page.locator('#compiled-prompt').textContent(), /整个人物精修/);
+    assert.match(await page.locator('#compiled-prompt').textContent(), /图1是待编辑的局部裁片/);
+    await page.locator('#prompt-preview>summary').click();
+    const templateName = `UI临时模板-${width}-${Date.now()}`;
+    const customText = '只整理头发边缘，不改变脸型、衣服与背景。保持柔和二次元厚涂。';
+    await page.locator('#prompt-mode').selectOption('custom');
+    await page.locator('#prompt').fill(customText);
+    await page.locator('#template-name').fill(templateName);
+    const saveResponse = page.waitForResponse(response => response.url().endsWith('/api/templates/save') && response.request().method() === 'POST');
+    await page.locator('#save-template').click();
+    const saved = await (await saveResponse).json();
+    await page.waitForFunction(id => document.querySelector('#template-select').value === id, saved.template.id);
+    await page.locator('#prompt').fill('暂时修改'); await page.locator('#apply-template').click();
+    assert.equal(await page.locator('#prompt').inputValue(), customText);
+    assert.equal(await page.locator('#prompt-mode').inputValue(), 'custom');
+    const exported = page.waitForEvent('download'); await page.locator('#export-templates').click();
+    assert.match((await exported).suggestedFilename(), /提示词库/);
+    page.once('dialog', dialog => dialog.accept());
+    const deleted = page.waitForResponse(response => response.url().includes(`/api/templates/${saved.template.id}/delete`));
+    await page.locator('#delete-template').click(); await deleted;
+    await page.waitForFunction(id => ![...document.querySelector('#template-select').options].some(option => option.value === id), saved.template.id);
+    await page.locator('#prompt-mode').selectOption('guided');
+    if (!await page.locator('#tools-panel').evaluate(el => el.open)) await page.locator('#tools-panel>summary').click();
+    await page.locator('[data-operation="full-body"]').click();
+    if (width <= 1100) await page.locator('#tools-panel>summary').click();
+    await page.locator('#theme').click();
+    assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
+    await page.screenshot({ path: path.join(out, `${name}-dark-upload.png`), fullPage: true });
+    const after = await page.evaluate(() => ({ viewport: innerWidth, scroll: document.documentElement.scrollWidth }));
+    assert.ok(after.scroll <= after.viewport, `${name} upload overflow`);
+    assert.deepEqual(errors, [], `${name} browser errors`);
+    console.log(`${name}: prompt editing/templates/export, tools, scopes, selection, dark mode, and login guard passed; no overflow`);
+    await context.close();
+  }
+} finally { await browser.close(); }

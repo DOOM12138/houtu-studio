@@ -1,0 +1,10 @@
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {spawn} from 'node:child_process';
+import {projectEnvironment} from '../lib/project-env.mjs';
+const root = fileURLToPath(new URL('../', import.meta.url));
+const args = process.argv.slice(2);
+if (!args.length) throw new Error('Specify a Node.js script or arguments.');
+const child = spawn(process.execPath, args, {cwd:root, env:projectEnvironment(root), stdio:'inherit', windowsHide:true});
+child.on('error', error => { console.error(error.message); process.exitCode = 1; });
+child.on('exit', (code, signal) => { process.exitCode = code ?? (signal ? 1 : 0); });

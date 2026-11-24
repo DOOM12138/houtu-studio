@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>厚涂小站 · 人物精修与二次元厚涂</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="厚涂小站首页"><span class="brand-mark" aria-hidden="true">涂</span><span>厚涂小站<span class="brand-note">自己的二次元画室</span></span></a>
+    <div class="account-actions">
+      <a href="/color/" class="text-button">调色与蒙版</a>
+      <a href="/creative/" class="text-button">特效与合成</a><a href="/workflows/" class="text-button">工作流管理</a>
+      <button id="theme" class="icon-button" type="button" aria-label="切换深浅主题" title="切换深浅主题"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M20 15.4A8.5 8.5 0 0 1 8.6 4 8.5 8.5 0 1 0 20 15.4Z"/></svg></button>
+      <span id="account" class="account-label">正在检查连接</span>
+      <button id="login" class="button account-button" type="button">使用 ChatGPT 登录</button>
+      <button id="logout" class="text-button" type="button" hidden>退出</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-heading"><div><h1>人物精修与厚涂</h1><p>从五官发丝到服装光影，把整个人物修得更协调。</p></div><span class="local-label"><span class="status-dot"></span>ChatGPT 本机工作台</span></div>
+    <section id="connection" class="connection-notice" aria-live="polite" hidden></section>
+    <details id="prompt-workshop" class="prompt-workshop prompt-details" open>
+      <summary>提示词编辑器<span>自己写，也可以保存成模板反复使用</span></summary>
+      <div class="prompt-workshop-grid">
+        <div class="prompt-writing">
+          <div class="prompt-heading"><label for="prompt-mode">写法</label><select id="prompt-mode"><option value="guided">补充描述 · 结合所选功能</option><option value="custom">完整自定义 · 使用我的指令</option></select></div>
+          <label for="prompt" id="prompt-label">补充修图描述</label>
+          <textarea id="prompt" rows="5" maxlength="6000" spellcheck="false" aria-describedby="prompt-help" placeholder="写清要精修哪里、想要什么风格，以及必须保留的内容。"></textarea>
+          <div class="prompt-writing-footer"><p id="prompt-help" class="field-hint">这段描述会和所选功能、画风、程度组合。</p><span id="prompt-length">0 / 6000</span></div>
+          <div class="prompt-actions"><button id="reset-prompt" class="text-button" type="button">恢复默认</button><button id="export-current" class="text-button" type="button">导出当前 TXT</button></div>
+          <details id="prompt-preview" class="prompt-preview"><summary>查看完整修图指令</summary><button id="copy-instructions" class="text-button" type="button">复制完整指令</button><pre id="compiled-prompt">展开后可查看将发送的完整指令。</pre></details>
+        </div>
+        <div class="template-library">
+          <label for="template-name">模板名称</label><input id="template-name" maxlength="60" placeholder="例如：COS 全人物轻柔精修">
+          <div class="template-buttons"><button id="save-template" type="button" class="button">保存为新模板</button><button id="update-template" type="button" class="text-button" disabled>更新所选模板</button></div>
+          <label for="template-select">我的提示词库</label><select id="template-select"><option value="">选择一个模板</option></select>
+          <div class="template-buttons"><button id="apply-template" type="button" class="button" disabled>应用模板</button><button id="delete-template" type="button" class="text-button" disabled>删除</button></div>
+          <div class="template-transfer"><button id="export-templates" class="text-button" type="button">导出提示词库</button><button id="import-templates" class="text-button" type="button">导入 JSON / TXT</button><input id="template-file" type="file" accept=".json,.txt,application/json,text/plain" hidden></div>
+          <p id="template-feedback" class="template-feedback" role="status" aria-live="polite">模板保存在本机，可随便携包一起迁移。</p>
+        </div>
+      </div>
+    </details>
+    <div class="workbench">
+      <aside class="tools-panel" aria-label="精修功能库"><details id="tools-panel" open>
+        <summary>精修功能<span id="active-tool-name">整个人物精修</span></summary>
+        <div class="tools-content"><label class="visually-hidden" for="tool-search">查找精修功能</label><input id="tool-search" type="search" placeholder="查找功能，如发丝、手部">
+          <div id="tool-filters" class="tool-filters" aria-label="功能分类"><button type="button" data-filter="全部" aria-pressed="true">全部</button><button type="button" data-filter="人物精修" aria-pressed="false">人物</button><button type="button" data-filter="造型细节" aria-pressed="false">造型</button><button type="button" data-filter="画面与风格" aria-pressed="false">画面</button></div>
+          <div id="tool-list" class="tool-list"></div><p id="no-tools" class="field-hint" hidden>没有匹配功能，试试其他关键词。</p>
+        </div>
+      </details></aside>
+      <div class="studio">
+      <section class="workspace" aria-label="图片工作区">
+        <div class="workspace-toolbar"><span id="file-name">画面预览</span><div class="segmented" aria-label="对比模式"><button id="split-mode" class="selected" type="button" aria-pressed="true">并排</button><button id="source-mode" type="button" aria-pressed="false">原图</button><button id="compare-mode" type="button" aria-pressed="false" disabled>滑动对比</button></div></div>
+        <div class="region-toolbar"><button id="select-region" class="text-button" type="button" disabled>画局部选区</button><button id="clear-region" class="text-button" type="button" disabled>清除选区</button><span id="region-note">整图精修</span></div>
+        <details class="region-numbers"><summary>按比例设置局部选区</summary><div class="region-number-fields"><label>左侧 %<input id="region-x" type="number" min="0" max="99" value="25" step="0.1"></label><label>顶部 %<input id="region-y" type="number" min="0" max="99" value="25" step="0.1"></label><label>宽度 %<input id="region-w" type="number" min="1" max="100" value="50" step="0.1"></label><label>高度 %<input id="region-h" type="number" min="1" max="100" value="50" step="0.1"></label><button id="apply-region" type="button" class="button" disabled>应用选区</button></div></details>
+        <div id="canvases" class="canvases">
+          <div class="image-pane source-pane">
+            <div class="pane-label"><span>原图</span><button id="replace" class="text-button" type="button" hidden>更换图片</button></div>
+            <input id="file" class="visually-hidden" type="file" accept="image/png,image/jpeg,image/webp" aria-label="选择原图">
+            <button id="upload" class="upload-target" type="button" aria-label="上传原图，或将图片拖到这里">
+              <span class="upload-icon"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="8" y="10" width="32" height="28" rx="4"/><circle cx="18" cy="20" r="3"/><path d="m9 33 9-8 7 6 6-6 9 8M33 5v10m-5-5h10"/></svg></span>
+              <strong>把原图放在这里</strong><span>点击选择，或拖入图片</span><small>PNG / JPG / WebP · 最大 12 MB</small>
+            </button>
+            <div id="source-frame" class="image-frame" hidden><img id="source" alt="待精修的完整原图"><canvas id="selection-canvas" aria-label="局部精修选区，可拖动绘制矩形，也可用上方比例输入框设置"></canvas></div>
+          </div>
+          <div class="image-pane result-pane">
+            <div class="pane-label"><span>精修结果</span></div>
+            <div id="result-empty" class="result-empty"><span class="brush-icon" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m25 36 25-25a4.2 4.2 0 0 1 6 6L31 42M25 36l6 6M24 38c-7-3-12 2-11 9 0 4-4 7-7 7 10 4 25 1 24-10"/><path d="M18 46c-2 3-2 6-5 7"/></svg></span><p>人物细节，慢慢成形</p><span>精修整个人物，也可以只修一处。</span></div>
+            <div id="result-frame" class="image-frame" hidden><img id="result" alt="二次元厚涂生成结果"></div>
+            <div id="loading" class="loading-state" role="status" hidden><span class="paint-loader" aria-hidden="true"></span><strong id="loading-message">正在绘制</strong><span id="elapsed">已等待 0:00</span><small>图片生成需要一些时间，请保持网站运行。</small></div>
+          </div>
+        </div>
+        <div id="comparison" class="comparison" hidden>
+          <img id="compare-result" alt="厚涂结果对比底图">
+          <div id="compare-overlay" class="compare-overlay"><img id="compare-source" alt="原图对比覆盖层"></div>
+          <span class="compare-label before-label">原图</span><span class="compare-label after-label">厚涂</span><div id="compare-line" class="compare-line" aria-hidden="true"><span>↔</span></div>
+          <label class="visually-hidden" for="compare-range">调整原图与厚涂的对比分界</label><input id="compare-range" type="range" min="0" max="100" value="50">
+        </div>
+        <div class="workspace-footer"><span id="image-info">原图与作品保存在本机</span><div class="result-actions"><button id="to-color" class="text-button" type="button">进入调色</button><button id="reuse-result" class="text-button" type="button" hidden>细化这一版人物</button><button id="portrait-rollback" class="text-button" type="button" hidden>退回本轮输入</button><a id="download" class="text-button" href="#" download hidden>下载 <span aria-hidden="true">↓</span></a></div><span id="footer-hint">全人物精修保留原始取景</span></div>
+      </section>
+
+      <aside class="settings" aria-label="厚涂设置">
+        <h2 id="operation-title">整个人物精修</h2><p id="operation-description" class="settings-intro">从五官到服装，统一整个人物的细节与光影。</p>
+        <div class="style-field"><label for="edit-style">修图风格</label><select id="edit-style"><option value="anime">二次元厚涂</option><option value="cos">COS 质感厚涂</option><option value="natural">自然人物精修</option></select><p id="style-help" class="field-hint">动漫感、柔和色块与自然笔触</p></div>
+        <section id="portrait-panel" class="portrait-panel" hidden><h3>人物细化 · 本轮设置</h3><label for="portrait-profile">细化起点</label><select id="portrait-profile"><option value="gentle">保守细化</option><option value="texture">质感细化</option><option value="faceHair">五官与发丝</option><option value="handsOutfit">手部与服装</option><option value="custom">自定义／画面检查建议</option></select><div id="portrait-levels"></div><label for="portrait-texture">原有质感保留 <output id="portrait-texture-value">85</output> / 100</label><input id="portrait-texture" type="range" min="0" max="100" value="85"><label class="portrait-check"><input id="portrait-face-lock" type="checkbox" checked>锁定脸型、五官位置与神态</label><label class="portrait-check"><input id="portrait-protect-bg" type="checkbox" checked>人物蒙版保护背景与合成效果</label><label for="portrait-mask-file">自备人物蒙版 · 可选灰度PNG</label><input id="portrait-mask-file" type="file" accept="image/png"><button id="portrait-build-mask" class="text-button" type="button">分析／查看本轮人物蒙版</button><figure id="portrait-mask-view" hidden><img id="portrait-mask-preview" alt="本轮人物蒙版：白色会细化，黑色保留原图"><figcaption>白色可细化，黑色像素保留；自动分割不准确时可上传修正蒙版，或用局部选区。</figcaption></figure><div class="portrait-actions"><button id="portrait-audit" class="button" type="button">AI检查本轮输入人物</button><button id="portrait-apply-audit" class="text-button" type="button" disabled>采用检查建议</button></div><div id="portrait-audit-result" aria-live="polite"></div><p class="field-hint">部位等级、五官锁定和质感偏好会转成AI编辑指令，实际效果需检查。背景保护由蒙版合成执行；配合矩形选区可只修一处。</p></section>
+        <fieldset class="strength-field"><legend>精修程度</legend><div class="strength-options">
+          <label><input type="radio" name="strength" value="light" checked><span><strong>轻柔</strong><small>贴近原图</small></span><span class="radio-mark" aria-hidden="true"></span></label>
+          <label><input type="radio" name="strength" value="balanced"><span><strong>适中</strong><small>细节更明确</small></span><span class="radio-mark" aria-hidden="true"></span></label>
+          <label><input type="radio" name="strength" value="rich"><span><strong>浓厚</strong><small>增强塑形</small></span><span class="radio-mark" aria-hidden="true"></span></label>
+        </div></fieldset>
+        <button id="generate" class="button primary" type="button" disabled><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m5 14 9-9 2 2-9 9-3 1 1-3Z"/><path d="m11 3 1-2m4 11 2 1M4 7 2 6"/></svg><span>开始精修</span></button>
+        <button id="cancel" class="button cancel-button" type="button" hidden>停止生成</button>
+        <p id="action-hint" class="action-hint">上传一张原图，再登录 ChatGPT。</p>
+        <div id="feedback" class="feedback" role="status" aria-live="polite" hidden></div>
+        <label class="toggle-row" for="preserve"><span>保留角色特征<small>尽量保持五官、发色与服装</small></span><input id="preserve" type="checkbox" checked><span class="switch" aria-hidden="true"></span></label>
+        <details id="areas-details" class="areas-details" open><summary>精修部位<span id="areas-count">8 项已选</span></summary><fieldset id="area-options" class="area-options"><legend class="visually-hidden">整个人物要精修的部位</legend></fieldset><p class="field-hint">只处理画面中可见的部位，不补画画外身体。</p></details>
+        <button id="edit-prompt" class="button edit-prompt-button" type="button">写提示词 / 选择模板</button>
+        <p class="usage-note">未画选区时，由 AI 按功能识别修改部位；画选区后，选区外使用原图。通过本机 Codex 使用 ChatGPT 订阅额度。</p>
+      </aside>
+      </div>
+    </div>
+
+    <section id="portrait-versions" class="portrait-versions" hidden><h2>人物精修版本</h2><p>每一轮独立保留；点击旧版会从该版成品另开一轮，失败不会覆盖上一版。</p><div id="portrait-version-list"></div></section><section class="history-section" aria-labelledby="history-heading"><div class="history-heading"><h2 id="history-heading">最近的笔触</h2><span>保存在这台电脑上</span></div><div id="history" class="history"><p class="history-empty">完成的画面会留在这里，随时回来看看。</p></div></section>
+    <section class="deployment-section" aria-labelledby="deployment-heading"><div><h2 id="deployment-heading">打包到另一台电脑</h2><p>Windows 10/11 x64 · 自带运行环境，解压后双击部署或启动。</p><label class="include-prompts"><input id="include-prompts" type="checkbox" checked>包含我的提示词和调色预设</label><p class="field-hint">不打包账号、照片、作品、日志或备份；新电脑单独登录 ChatGPT。</p></div><div class="package-actions"><button id="build-package" class="button" type="button">打包 Windows 便携版</button><a id="package-download" class="button primary" hidden>下载便携包</a><p id="package-status" role="status" aria-live="polite">生成的 ZIP 可以复制到其他电脑。</p></div></section>
+  </main>
+  <footer class="site-footer"><span>厚涂小站</span><span>原图与作品保存在本机；生成时，原图会发送给 OpenAI。</span></footer>
+</body>
+</html>

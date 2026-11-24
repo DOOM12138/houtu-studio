@@ -1,0 +1,106 @@
+import path from 'node:path';
+import os from 'node:os';
+import net from 'node:net';
+import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, stat, rm } from 'node:fs/promises';
+import assert from 'node:assert/strict';
+import { powershell } from '../lib/platform.mjs';
+
+const archive = path.resolve(process.argv[2] || 'release/厚涂小站-1.7.0-Windows-x64.zip');
+const temporary = path.join(os.tmpdir(), `houtu-smoke-${randomUUID().slice(0,8)}`);
+const extracted = path.join(temporary, 'unpacked');
+const installed = path.join(temporary, '另一台电脑 test', 'HoutuStudio');
+const runtime = path.join(installed, 'runtime', 'node.exe');
+const launcher = path.join(installed, 'launcher.mjs');
+await mkdir(extracted, { recursive: true });
+const isolatedEnv = { ...process.env, PATH: path.join(process.env.SystemRoot || 'C:/Windows', 'System32') };
+for (const key of ['OPENAI_API_KEY', 'OPENAI_BASE_URL', 'CODEX_HOME', 'NODE_PATH', 'NODE_OPTIONS']) delete isolatedEnv[key];
+function run(file, args, options = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(file, args, { windowsHide: true, env: isolatedEnv, ...options, stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '', stderr = '';
+    child.stdout.on('data', bytes => { stdout += bytes.toString(); }); child.stderr.on('data', bytes => { stderr += bytes.toString(); });
+    const timer = setTimeout(() => { child.kill(); reject(new Error('Portable verification command timed out')); }, 45000);
+    child.on('error', error => { clearTimeout(timer); reject(error); });
+    child.on('exit', code => { clearTimeout(timer); if (code === 0) resolve(stdout); else reject(new Error(`Portable command exited ${code}: ${stderr || stdout}`)); });
+  });
+}
+const barrier = net.createServer();
+await new Promise(resolve => barrier.listen(0, '127.0.0.1', resolve));
+let blockedPort = barrier.address().port;
+assert.ok(blockedPort < 65400, 'Choose a lower temporary port and retry this smoke test');
+let launched = false;
+try {
+  await run(powershell(), ['-NoProfile', '-NonInteractive', '-Command', 'Add-Type -AssemblyName System.IO.Compression.FileSystem; [IO.Compression.ZipFile]::ExtractToDirectory($env:HOUTU_TEST_ZIP, $env:HOUTU_TEST_DEST)'], { env: { ...isolatedEnv, HOUTU_TEST_ZIP: archive, HOUTU_TEST_DEST: extracted } });
+  const portable = path.join(extracted, '厚涂小站');
+  const manifest = JSON.parse(await readFile(path.join(portable, 'portable-manifest.json'), 'utf8'));
+  assert.equal(manifest.platform, 'win32-x64');
+  assert.ok(!manifest.files.some(file => /^(data|backups|test|\.git|\.impeccable)\//.test(file.path)));
+  assert.ok(!manifest.files.some(file => /auth\.json$|\.log$/.test(file.path)));
+  await assert.rejects(() => stat(path.join(portable, 'data')), { code: 'ENOENT' });
+  assert.ok((await stat(path.join(portable,'node_modules','playwright-core','package.json'))).size>0);
+  assert.ok((await stat(path.join(portable, 'runtime', 'LICENSE.txt'))).size > 100000);
+  assert.ok((await stat(path.join(portable, 'vendor-licenses', 'codex-APACHE-2.0.txt'))).size > 10000);
+  if (manifest.templatesIncluded) {
+    const defaults = JSON.parse(await readFile(path.join(portable, 'defaults', 'prompts.json'), 'utf8'));
+    assert.equal(defaults.templates.length, manifest.templatesIncluded);
+    assert.ok(!defaults.templates.some(item => item.name.startsWith('UI临时模板')));
+  }
+  const localDeploy = await run(powershell(), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(portable, 'scripts', 'install.ps1'), '-NoShortcut', '-NoLaunch']);
+  assert.ok(localDeploy.includes('Deployed to: ' + portable), 'Default deployment must remain in the unpacked directory');
+  for (const document of ['AGENTS.md','agent.md','ARCHITECTURE.md','GIT_WORKFLOW.md','LICENSE']) assert.ok((await stat(path.join(portable,document))).size>50);
+  await run(powershell(), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(portable, 'scripts', 'install.ps1'), '-Destination', installed, '-NoShortcut', '-NoLaunch']);
+  for (const required of ['vendor-licenses','scripts','lib','public','frontend','backend','models','node_modules','runtime']) assert.ok((await stat(path.join(installed, required))).isDirectory(), `Installer omitted ${required}`);
+  assert.ok((await stat(path.join(installed, 'vendor-licenses', 'codex-APACHE-2.0.txt'))).size > 10000);
+  const started = await run(runtime, [launcher, '--no-open', '--port', String(blockedPort)], { cwd: installed });
+  assert.match(started, /http:\/\/127\.0\.0\.1:/);
+  launched = true;
+  const record = JSON.parse(await readFile(path.join(installed, 'data', 'server.json'), 'utf8'));
+  assert.notEqual(record.port, blockedPort);
+  const origin = `http://127.0.0.1:${record.port}`;
+  const health = await (await fetch(origin + '/api/health')).json();
+  assert.equal(health.instanceId, record.instanceId); assert.equal(health.version, manifest.version);
+  const state = await (await fetch(origin + '/api/state')).json();
+  assert.equal(state.serviceError, ''); assert.equal(state.account, null);
+  const library = await (await fetch(origin + '/api/templates')).json();
+  assert.ok(library.templates.length >= 3);
+  const html = await (await fetch(origin)).text();
+  assert.ok(html.includes('prompt-workshop') && html.includes('build-package'));
+  assert.ok((await(await fetch(origin+'/color/')).text()).includes('mask-type'));
+  assert.ok((await(await fetch(origin+'/workflows/')).text()).includes('workflow-detail'));
+  assert.ok((await(await fetch(origin+'/creative/')).text()).includes('creative-run'));
+  assert.equal((await(await fetch(origin+'/api/platform/status')).json()).open,false);
+  assert.equal((await fetch(origin+'/color/effects.js')).status,200);
+  assert.equal((await fetch(origin+'/color/creative-multi.js')).status,200);
+  assert.equal((await fetch(origin+'/portrait-ui.js')).status,200);
+  assert.equal((await fetch(origin+'/portrait-options.js')).status,200);
+  assert.ok((await(await fetch(origin)).text()).includes('portrait-panel'));
+  assert.ok((await(await fetch(origin+'/creative/')).text()).includes('auto-analyze-images'));
+  assert.equal((await fetch(origin+'/color/workflow-client.js')).status,200);
+  assert.equal((await fetch(origin+'/vision/wasm/vision_wasm_internal.wasm')).status,200);
+  assert.equal((await(await fetch(origin+'/models/selfie_multiclass_256x256.tflite')).arrayBuffer()).byteLength,16371837);
+  const sharpOutput = await run(runtime, ['--input-type=module', '-e', "import sharp from 'sharp'; const b=await sharp({create:{width:2,height:3,channels:3,background:'red'}}).png().toBuffer(); const m=await sharp(b).metadata(); console.log(m.width+'x'+m.height);console.log(b.toString('base64'));"], { cwd: installed });
+  assert.match(sharpOutput, /2x3/);
+  const post=async(route,input)=>{const response=await fetch(origin+route,{method:'POST',headers:{Origin:origin,'X-Paint-CSRF':health.csrf,'Content-Type':'application/json'},body:JSON.stringify(input)});assert.ok(response.ok,await response.clone().text());return response.json();};
+  const wf=await post('/api/workflows',{name:'Portable workflow smoke'});
+  const asset=await(await fetch(origin+`/api/workflows/${wf.id}/assets`,{method:'POST',headers:{Origin:origin,'X-Paint-CSRF':health.csrf,'Content-Type':'image/png'},body:Buffer.from(sharpOutput.trim().split(/\r?\n/).at(-1),'base64')})).json();assert.equal(asset.width,2);
+  const attempt=await post(`/api/workflows/${wf.id}/begin`,{step:'source',revision:wf.revision});
+  await post(`/api/workflows/${wf.id}/complete`,{step:'source',token:attempt.token,state:{imageAsset:asset.id},artifacts:[{id:asset.id,type:'image',label:'Portable source'}]});
+  assert.equal((await(await fetch(origin+`/api/workflows/${wf.id}`)).json()).steps[0].status,'done');
+  const rebuiltArchive = path.join(temporary, 'repacked-on-new-computer.zip');
+  const rebuilt = await run(runtime, [path.join(installed, 'scripts', 'build-portable.mjs'), '--include-prompts', '--output', rebuiltArchive], { cwd: installed });
+  assert.ok(rebuilt.includes('"type":"done"'));
+  assert.ok((await stat(rebuiltArchive)).size > 100 * 1024 * 1024);
+  await run(runtime, [launcher, '--no-open'], { cwd: installed });
+  assert.equal(JSON.parse(await readFile(path.join(installed, 'data', 'server.json'), 'utf8')).pid, record.pid);
+  await run(runtime, [launcher, '--stop', '--no-open'], { cwd: installed }); launched = false;
+  await assert.rejects(() => stat(path.join(installed, 'data', 'server.json')), { code: 'ENOENT' });
+  console.log(JSON.stringify({ result: 'PASS', version: manifest.version, bundledNode: manifest.nodeVersion, files: manifest.files.length + 1, templates: library.templates.length, tested: ['no-global-node-or-npm', 'default-install-stays-on-project-drive', 'agent-and-architecture-docs-bundled', 'fresh-Chinese-and-space-path-install', 'all-required-directories-installed', 'repackage-from-installed-copy', 'auto-port-fallback', 'isolated-Codex-startup', 'native-sharp-DLL', 'prompt-library', 'repeat-launch', 'graceful-stop', 'no-account-photo-log-backup-in-archive'] }));
+} finally {
+  if (launched) await run(runtime, [launcher, '--stop', '--no-open'], { cwd: installed }).catch(() => {});
+  await new Promise(resolve => barrier.close(resolve));
+  const relative = path.relative(os.tmpdir(), temporary);
+  if (!relative || path.isAbsolute(relative) || relative.startsWith('..') || !/^houtu-smoke-[a-f0-9]+$/.test(relative)) throw new Error('Unsafe temporary cleanup target');
+  await rm(temporary, { recursive: true, force: true });
+}
