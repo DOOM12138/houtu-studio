@@ -74,3 +74,12 @@
 - https://www.adobe.com/learn/lightroom-cc/web/adjust-photo-tone-with-color-grading ：分别控制阴影、中间调与高光的色彩关系。本站使用自有sRGB参数，与Lightroom数值不等价。
 
 实图本机对照使用原有CC0 COS样片与原创成人动漫测试图，原图及导出保存在F盘私有data/tone-evaluations。示例只证明这些素材上的实际处理，不是所有照片审美合格的保证。
+
+
+## 修图工作台与对比界面参考（2026-11-25）
+
+- 像素蛋糕官方预览视图说明：https://wiki.pixcakeai.com/guide/9390.html ，参考大画布、原图／全效果并排、视角切换与参数分区。
+- 像素蛋糕官方手动工具说明：https://wiki.pixcakeai.com/guide/9587.html ，参考显示比例、适应、1:1、抓手与专注查看的组织。
+- Adobe 官方对比视图说明：https://helpx.adobe.com/lightroom-classic/help/comparing-photos-library-module.html ，参考联动缩放及对比流程。
+
+实现与样式为本站原创。第三方官网截图只在F盘私有缓存中供布局研究，不加入源码、发布包或本站示例图库。

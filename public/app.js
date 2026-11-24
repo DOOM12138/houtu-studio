@@ -1,3 +1,4 @@
+import {createImageViewer} from './image-viewer.js';
 import {COS_PAINT_LEVELS,PAINT_EDIT_BRIEF} from './paint-profile.js';
 import {featureDefault,DEFAULT_EDIT_BRIEF} from './prompt-contract.js';
 import {createFeatureTools} from './feature-ui.js';
@@ -15,6 +16,16 @@ let operation = 'full-body', toolFilter = '全部', selection = null, selecting 
 let sourceMeta = null, dragStart = null, previousSelection = null, compiledVersion = 0;
 let sourceReference = null, sourceObjectUrl = null;
 let promptInitialized = false, templates = [], packageJob = null, packageTimer = null;
+// Keep the original media and editing canvases; only their viewing containers change.
+const oldCanvases=$('canvases'),oldComparison=$('comparison'),viewMount=document.createElement('div');viewMount.id='retouch-view';oldCanvases.before(viewMount);
+const sourceFrame=$('source-frame'),resultFrame=$('result-frame'),fileInput=$('file'),replaceButton=$('replace'),uploadButton=$('upload'),emptyResult=$('result-empty'),loadingState=$('loading');
+document.querySelector('.workspace-toolbar .segmented').remove();viewMount.append(fileInput);
+const photoView=createImageViewer({mount:viewMount,before:sourceFrame,after:resultFrame,beforeEmpty:uploadButton,afterEmpty:emptyResult,afterExtra:loadingState,beforeAction:replaceButton,
+ ids:{side:'split-mode',before:'source-mode',after:'result-mode',wipe:'compare-mode',range:'compare-range',line:'compare-line'},editing:side=>selecting&&side==='before',isBusy:()=>busy||running(currentJob?.status),
+ onGestureStart:()=>{if(dragStart){dragStart=null;selection=previousSelection;drawSelection();}},onChange:()=>drawSelection()});
+oldCanvases.remove();oldComparison.remove();photoView.stage.id='canvases';photoView.stage.querySelector('.iv-before').classList.add('source-pane');
+const promptPanel=$('prompt-workshop');promptPanel.open=false;document.querySelector('.workbench').after(promptPanel);const labLink=document.querySelector('a[href="/lab/"]');if(labLink?.parentElement.tagName==='P')promptPanel.after(labLink.parentElement);
+const editorShortcuts=document.createElement('div');editorShortcuts.className='editor-shortcuts';const promptShortcut=document.createElement('button');promptShortcut.type='button';promptShortcut.textContent='编辑提示词';promptShortcut.onclick=()=>{promptPanel.open=true;promptPanel.scrollIntoView({behavior:'smooth',block:'start'});$('prompt').focus({preventScroll:true});};editorShortcuts.append(promptShortcut);document.querySelector('.workspace-toolbar').append(editorShortcuts);
 const modelPicker=createModelPicker({mount:$('model-picker'),onChange:optionsChanged});
 const hasSource = () => Boolean(sourceData || sourceReference);
 
@@ -82,7 +93,7 @@ document.querySelectorAll('[name="strength"]').forEach(el => el.addEventListener
 $('preserve').addEventListener('change', optionsChanged);
 $('cos-head-scope').onclick=async()=>{if(busy||!hasSource())return;const sourceToken=sourceReference||sourceData;busy=true;updateControls();try{const data=await api('/api/targets/analyze',{...(sourceReference?{source:sourceReference}:{image:sourceData}),operation:'face'});if((sourceReference||sourceData)!==sourceToken)throw Error('图片已更换，请重新定位。');if(!data.found||!data.selectionSuggestion)throw Error('未可靠定位面部，请手动框选包含头发、脸和上下衔接的范围。未调用图片生成。');selection=data.selectionSuggestion;updateRegion();feedback('已给出本机估算范围，请检查发型、兽耳与下颌是否完整，可拖动修正；生成时发送局部裁片＋完整原图，不会自动出图。');}catch(e){feedback(e.message);}finally{busy=false;updateControls();optionsChanged();}};
 
-if (matchMedia('(max-width:1100px)').matches) $('tools-panel').open = false;
+const toolsMobile=matchMedia('(max-width:1100px)');if(toolsMobile.matches)$('tools-panel').open=false;toolsMobile.addEventListener('change',e=>$('tools-panel').open=!e.matches);
 
 function optionsChanged() {
   $('areas-count').textContent = `${selectedAreas().length} 项已选`;
@@ -229,34 +240,8 @@ $('theme').addEventListener('click', () => {
 });
 try { document.documentElement.dataset.theme = localStorage.getItem('paint-theme') || (matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light'); } catch {}
 
-function splitMode() {
-  $('canvases').hidden = false; $('comparison').hidden = true;
-  $('canvases').classList.remove('source-view');
-  $('split-mode').classList.add('selected'); $('compare-mode').classList.remove('selected');
-  $('source-mode').classList.remove('selected'); $('source-mode').setAttribute('aria-pressed', 'false');
-  $('split-mode').setAttribute('aria-pressed', 'true'); $('compare-mode').setAttribute('aria-pressed', 'false');
-  requestAnimationFrame(drawSelection);
-}
-$('split-mode').addEventListener('click', splitMode);
-function sourceMode() {
-  $('canvases').hidden = false; $('comparison').hidden = true; $('canvases').classList.add('source-view');
-  $('source-mode').classList.add('selected'); $('source-mode').setAttribute('aria-pressed', 'true');
-  for (const id of ['split-mode', 'compare-mode']) { $(id).classList.remove('selected'); $(id).setAttribute('aria-pressed', 'false'); }
-  requestAnimationFrame(drawSelection);
-}
-$('source-mode').addEventListener('click', sourceMode);
-$('compare-mode').addEventListener('click', () => {
-  if (!currentJob?.outputUrl) return;
-  $('compare-source').src = $('source').src; $('compare-result').src = currentJob.outputUrl;
-  $('canvases').hidden = true; $('comparison').hidden = false;
-  $('split-mode').classList.remove('selected'); $('compare-mode').classList.add('selected');
-  $('source-mode').classList.remove('selected'); $('source-mode').setAttribute('aria-pressed', 'false');
-  $('split-mode').setAttribute('aria-pressed', 'false'); $('compare-mode').setAttribute('aria-pressed', 'true');
-});
-$('compare-range').addEventListener('input', event => {
-  $('compare-overlay').style.clipPath = `inset(0 ${100 - event.target.value}% 0 0)`;
-  $('compare-line').style.left = `${event.target.value}%`;
-});
+function splitMode(){photoView.setMode('side');}
+function sourceMode(){photoView.setMode('before');}
 
 async function setFile(file, reference = null) {
   if (!file || busy || portraitChecking || running(currentJob?.status)) return;
@@ -312,7 +297,7 @@ function updateRegion() {
 }
 
 function drawSelection() {
-  const frame = $('source-frame'), image = $('source'), canvas = $('selection-canvas');
+  const image = $('source'), canvas = $('selection-canvas'), frame = canvas.parentElement;
   if (!sourceMeta || frame.hidden || !frame.getClientRects().length || !image.naturalWidth) return;
   const frameBox = frame.getBoundingClientRect(), imageBox = image.getBoundingClientRect();
   const scale = Math.min(imageBox.width / sourceMeta.width, imageBox.height / sourceMeta.height);
@@ -321,8 +306,8 @@ function drawSelection() {
   canvas.style.left = `${imageBox.left - frameBox.left + (imageBox.width - width) / 2}px`;
   canvas.style.top = `${imageBox.top - frameBox.top + (imageBox.height - height) / 2}px`;
   canvas.style.width = `${width}px`; canvas.style.height = `${height}px`;
-  const ratio = devicePixelRatio || 1; canvas.width = Math.round(width * ratio); canvas.height = Math.round(height * ratio);
-  const ctx = canvas.getContext('2d'); ctx.scale(ratio, ratio);
+  const ratio = Math.min(devicePixelRatio || 1,2048/Math.max(width,height)); if(canvas.width!==Math.round(width*ratio))canvas.width=Math.round(width*ratio);if(canvas.height!==Math.round(height*ratio))canvas.height=Math.round(height*ratio);
+  const ctx = canvas.getContext('2d');ctx.setTransform(ratio,0,0,ratio,0,0);ctx.clearRect(0,0,width,height);
   if (selection) {
     ctx.fillStyle = '#a44e3126'; ctx.fillRect(selection.x * width, selection.y * height, selection.width * width, selection.height * height);
     ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(); ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
@@ -385,7 +370,6 @@ function renderJob(job) {
   $('result-frame').hidden = !job.outputUrl || working;
   $('download').hidden = !job.outputUrl || working;
   $('footer-hint').hidden = Boolean(job.outputUrl) && !working;
-  $('compare-mode').disabled = !job.outputUrl || working;
   if (job.outputUrl && !working) {
     $('result').src = job.outputUrl;
     $('download').href = job.outputUrl + '?download=1';
@@ -394,7 +378,7 @@ function renderJob(job) {
   if (!working) {
     clearInterval(timer); timer = null;
     feedback(job.message, job.status === 'done' || job.status === 'cancelled');
-    if (wasRunning && job.outputUrl) { selecting = false; splitMode(); }
+    if (wasRunning && job.outputUrl) { selecting = false; photoView.refresh(); }
   }
   updateControls();if(!working&&job.outputUrl)loadPortraitVersions(job);
 }

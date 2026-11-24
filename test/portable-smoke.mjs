@@ -63,7 +63,7 @@ try {
   const record = JSON.parse(await readFile(path.join(installed, 'data', 'server.json'), 'utf8'));
   assert.notEqual(record.port, blockedPort);
   const origin = `http://127.0.0.1:${record.port}`;
-  for(const route of ['/color/updates.js','/update-notice.js','/update-notice.css'])assert.equal((await fetch(origin+route)).status,200,route);
+  for(const route of ['/color/updates.js','/update-notice.js','/update-notice.css','/image-viewer.js','/view-geometry.js','/image-viewer.css','/editor-layout.css'])assert.equal((await fetch(origin+route)).status,200,route);
   for(const entry of ['检查更新.cmd','回退版本.cmd','scripts/apply-update.mjs','scripts/extract-update.ps1'])assert.ok((await stat(path.join(installed,entry))).size>50);
   const updates=await(await fetch(origin+'/api/updates/status')).json();assert.equal(updates.currentVersion,manifest.version);assert.equal(updates.sourceMode,false);assert.equal(updates.settings.autoCheck,true);
   assert.ok((await run(runtime,[launcher,'--updates','--no-open'],{cwd:extracted})).includes('/server/#software-updates'));

@@ -17,7 +17,7 @@ class Bridge extends EventEmitter{
  async stop(){}
  async begin(job){this.images++;job.resolvedModel=job.model||A;await job.onModelSelected?.(job.resolvedModel);job.threadId='model-ui';job.turnId='turn';setTimeout(()=>{this.emit('notification','item/completed',{threadId:job.threadId,item:{type:'imageGeneration',status:'completed',result:picture.toString('base64')}});this.emit('notification','turn/completed',{threadId:job.threadId,turn:{status:'completed'}});},20);}
 }
-const directory=await mkdtemp(path.join(tmpdir(),'houtu-model-ui-')),bridge=new Bridge(),app=await createApp({directory,bridge,platform:{async close(){}}});
+const directory=await mkdtemp(path.join(tmpdir(),'houtu-model-ui-')),bridge=new Bridge(),app=await createApp({directory,bridge,platform:{async close(){}},targetAnalyzer:async()=>({found:true,mask:await sharp({create:{width:240,height:320,channels:3,background:'white'}}).png().toBuffer(),origin:'synthetic-fixture'})});
 await new Promise(resolve=>app.server.listen(0,'127.0.0.1',resolve));const origin='http://127.0.0.1:'+app.server.address().port;
 const browser=await chromium.launch({executablePath:await browserExecutable(),headless:true}),page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];
 page.on('pageerror',error=>errors.push(error.message));page.setDefaultTimeout(15000);
@@ -27,8 +27,8 @@ try{
  await page.goto(origin);await page.waitForFunction(()=>document.querySelector('#model-picker').textContent.includes('请先使用ChatGPT登录'));assert.equal(await select().isDisabled(),true);
  bridge.signedIn=true;await page.reload();await page.waitForFunction(()=>document.querySelectorAll('#model-picker-select option').length===3);
  await select().selectOption(B);assert.equal(bridge.images,0);
- await page.locator('#prompt-mode').selectOption('custom');assert.equal(await select().isDisabled(),false);await page.locator('#prompt-mode').selectOption('guided');
- await page.locator('#template-name').fill('B model template');await page.locator('#save-template').click();await page.waitForFunction(()=>document.querySelector('#template-feedback').textContent.includes('已保存为新模板'));
+ await page.getByRole('button',{name:'编辑提示词',exact:true}).click();await page.locator('#prompt-mode').selectOption('custom');assert.equal(await select().isDisabled(),false);await page.getByRole('button',{name:'编辑提示词',exact:true}).click();await page.locator('#prompt-mode').selectOption('guided');
+ await page.getByRole('button',{name:'编辑提示词',exact:true}).click();await page.locator('#template-name').fill('B model template');await page.locator('#save-template').click();await page.waitForFunction(()=>document.querySelector('#template-feedback').textContent.includes('已保存为新模板'));
  await select().selectOption(A);await page.locator('#apply-template').click();assert.equal(await select().inputValue(),B);assert.match(await page.locator('#model-picker').textContent(),/已选：Test Vision B/);
  await page.locator('#file').setInputFiles({name:'models-test.png',mimeType:'image/png',buffer:picture});
  bridge.available=[catalog[0]];await page.locator('#model-picker button').click();await page.waitForFunction(()=>document.querySelector('#model-picker').textContent.includes('此前所选模型不可用'));

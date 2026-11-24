@@ -1,3 +1,4 @@
+import {createImageViewer} from '/image-viewer.js';
 import {TARGET_POLICIES} from '/target-policy.js';
 import {PRESETS,STYLES} from '/catalog.js';
 import {createModelPicker} from '/model-picker.js';
@@ -5,6 +6,9 @@ import {createSubjectMaskEditor} from '/subject-mask.js';
 import {TONAL_LOOKS} from './tonal-looks.js';
 import {BUILTINS,LIMITS,settings} from './engine.js';
 const $=id=>document.getElementById(id),copy=x=>structuredClone(x);
+const studioCompare=document.querySelector('.studio-compare'),resultCaption=$('result-label');
+const studioView=createImageViewer({mount:studioCompare,before:$('detail-original'),after:$('detail-result')});studioCompare.querySelectorAll('figure').forEach(e=>e.remove());
+studioView.root.after(resultCaption);const geometryNote=document.createElement('p');geometryNote.className='hint';geometryNote.textContent='原图与当前步骤同步查看。裁切、旋转或扩图后保留各自构图，视点联动不改变图片。';resultCaption.after(geometryNote);
 const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 const status={idle:'尚未开始',pending:'待执行',running:'处理中',pausing:'准备暂停',paused:'已暂停',done:'已完成',error:'需处理',interrupted:'已中断',stale:'待更新'};
 let csrf,project=null,recipe=null,recipes=[],photoId=null,detail=null,busy=false,polling=false,maskBusy=false;

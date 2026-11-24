@@ -50,11 +50,11 @@ await page.waitForFunction(()=>document.querySelector('#prompt').value.length>0)
   await page.waitForFunction(()=>document.querySelector('#compiled-prompt').textContent.includes('非厚涂摄影精修'));
   assert.doesNotMatch(await page.locator('#compiled-prompt').textContent(),/将画面统一为干净自然的二次元数字厚涂/);
   await page.locator('[data-operation="full-body"]').click();
-  await page.locator('#prompt-mode').selectOption('custom');
+  await page.getByRole('button',{name:'编辑提示词',exact:true}).click();await page.locator('#prompt-mode').selectOption('custom');
   assert.equal(await page.locator('#paint-field').isVisible(),false);assert.equal(await page.locator('#edit-style').isDisabled(),true);
   await page.locator('#prompt').fill('只整理原有饰品。');
-  await page.locator('#prompt-mode').selectOption('guided');await page.locator('#edit-style').selectOption('cos');await level(9);
-  await page.locator('#template-name').fill('UI厚涂9级');await page.locator('#save-template').click();
+  await page.getByRole('button',{name:'编辑提示词',exact:true}).click();await page.locator('#prompt-mode').selectOption('guided');await page.locator('#edit-style').selectOption('cos');await level(9);
+  await page.getByRole('button',{name:'编辑提示词',exact:true}).click();await page.locator('#template-name').fill('UI厚涂9级');await page.locator('#save-template').click();
   await page.waitForFunction(()=>document.querySelector('#template-feedback').textContent.includes('已保存为新模板'));
   const saved=await(await fetch(origin+'/api/templates')).json();assert.equal(saved.templates.find(t=>t.name==='UI厚涂9级').options.paintLevel,9);
   await level(1);await page.locator('#edit-style').selectOption('photo');await page.locator('#apply-template').click();
@@ -72,7 +72,7 @@ await page.waitForFunction(()=>document.querySelector('#prompt').value.length>0)
   const mask=await sharp({create:{width:240,height:320,channels:3,background:'white'}}).png().toBuffer();
   await page.locator('#target-mask-file').setInputFiles({name:'manual.png',mimeType:'image/png',buffer:mask});
   await page.locator('#target-mask-canvas').waitFor({state:'visible'});
-  await page.locator('#prompt-mode').selectOption('custom');await page.locator('#prompt').fill('Only clean the original clothing edge.');
+  await page.getByRole('button',{name:'编辑提示词',exact:true}).click();await page.locator('#prompt-mode').selectOption('custom');await page.locator('#prompt').fill('Only clean the original clothing edge.');
   assert.equal(await page.locator('#task-panel').isVisible(),false);assert.equal(await page.locator('#target-panel').isVisible(),false);
   const customRequest=page.waitForRequest(r=>r.url().endsWith('/api/jobs')&&r.method()==='POST');await page.locator('#generate').click();
   const sent=(await customRequest).postDataJSON();assert.deepEqual(sent.references,[]);assert.equal('targetMask' in sent,false);
