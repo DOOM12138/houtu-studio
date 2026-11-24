@@ -1,6 +1,11 @@
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
+set "TEMP=%~dp0tmp"
+set "TMP=%~dp0tmp"
+set "TMPDIR=%~dp0tmp"
+set "npm_config_cache=%~dp0.cache\npm"
+if not exist "%TEMP%" mkdir "%TEMP%"
 if exist "%~dp0runtime\node.exe" (
   "%~dp0runtime\node.exe" "%~dp0launcher.mjs"
   if errorlevel 1 pause

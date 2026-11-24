@@ -44,13 +44,14 @@ async function main() {
     console.log('厚涂小站已停止。'); return;
   }
   const show = !process.argv.includes('--no-open');
-  if (existing) { console.log(`http://127.0.0.1:${existing.port}`); if (show) openBrowser(existing.port); return; }
+  const page = process.argv.includes('--manage')?'/server/':'/';
+  if (existing) { console.log(`http://127.0.0.1:${existing.port}${page==='/'?'':page}`); if (show) openBrowser(existing.port,page); return; }
   const lockFile = path.join(DATA, 'launch.lock');
   let lock;
   try { lock = await open(lockFile, 'wx'); }
   catch (error) {
     if (error.code !== 'EEXIST') throw error;
-    for (let i = 0; i < 50; i++) { await wait(200); existing = await registered(); if (existing) { console.log(`http://127.0.0.1:${existing.port}`); if (show) openBrowser(existing.port); return; } }
+    for (let i = 0; i < 50; i++) { await wait(200); existing = await registered(); if (existing) { console.log(`http://127.0.0.1:${existing.port}${page==='/'?'':page}`); if (show) openBrowser(existing.port,page); return; } }
     // A lock left by a crashed launcher is a single known file, never a directory tree.
     try { await unlink(lockFile); } catch {}
     throw new Error('上次启动未完成，已清理启动标记，请再双击启动一次。');
@@ -69,7 +70,7 @@ async function main() {
     child.on('error', () => {}); child.unref();
     for (let i = 0; i < 100; i++) { await wait(150); existing = await registered(); if (existing) break; }
     if (!existing) throw new Error('网站启动失败，请查看 data/server-error.log。');
-    console.log(`http://127.0.0.1:${existing.port}`); if (show) openBrowser(existing.port);
+    console.log(`http://127.0.0.1:${existing.port}${page==='/'?'':page}`); if (show) openBrowser(existing.port,page);
   } finally { await lock.close(); try { await unlink(lockFile); } catch {} }
 }
 main().catch(error => { console.error(error.message); process.exitCode = 1; });

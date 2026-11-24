@@ -1,3 +1,6 @@
+import {AccountLedger,trackedBridge,accountSnapshot} from './backend/accounts.mjs';
+import {ImageLibrary} from './backend/library.mjs';
+import os from 'node:os';
 import {normalizeModel} from './public/model-options.js';
 import http from 'node:http';
 import path from 'node:path';
@@ -28,7 +31,7 @@ import {useProjectEnvironment} from './lib/project-env.mjs';
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
 useProjectEnvironment(ROOT);
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.svg': 'image/svg+xml' };
-const publicJob = j => ({ id: j.id, status: j.status, model:j.model||null, resolvedModel:j.resolvedModel||null, strength: j.strength, paintLevel: normalizePaintLevel(j.paintLevel,j.strength), prompt: j.prompt, preserve: j.preserve,
+const publicJob = j => ({ id: j.id, status: j.status, account:accountSnapshot(j.account), model:j.model||null, resolvedModel:j.resolvedModel||null, strength: j.strength, paintLevel: normalizePaintLevel(j.paintLevel,j.strength), prompt: j.prompt, preserve: j.preserve,
   operation: j.operation || 'full-body', style: j.style || 'anime', areas: j.areas, selection: j.selection || null,
   parentId: j.parentId || null, imageWidth: j.imageWidth, imageHeight: j.imageHeight,
   promptMode: j.promptMode || 'guided',
@@ -41,8 +44,11 @@ const publicJob = j => ({ id: j.id, status: j.status, model:j.model||null, resol
 export async function createApp({ directory = path.join(ROOT, 'data'), bridge: suppliedBridge, packageBuilder = buildPortable, composeImage = finishEditImage, platform: suppliedPlatform } = {}) {
   const home = path.join(directory, 'codex');
   const jobsDirectory = path.join(directory, 'jobs');
-  await mkdir(jobsDirectory, { recursive: true });
-  const bridge = suppliedBridge || new CodexBridge(home);
+  await mkdir(jobsDirectory, { recursive: true });await mkdir(home,{recursive:true});
+  const accounts=new AccountLedger(directory);await accounts.load();
+  const library=new ImageLibrary(directory);await library.load();
+  const bridge = trackedBridge(suppliedBridge || new CodexBridge(home),accounts);
+  const startedAt=Date.now();
   const csrf = randomBytes(32).toString('hex');
   const jobs = new Map();
   const instanceId = randomUUID();
@@ -107,11 +113,13 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     if(job.runId!==runId)throw new Error('这次执行已过期。');
     const filename=`result-${runId}.png`;await writeFile(path.join(job.directory,filename),output);
     if(job.runId!==runId)throw new Error('这次执行已过期。');job.output=filename;
-    await doneJobStep(job,{imageAsset:asset.id,jobId:job.id},[{id:asset.id,label:'完整精修成品',type:'image'}],'合成完成，完整图片已保存',runId);
+    const generation=workflow.steps.find(n=>n.id==='generate')?.output;
+    await doneJobStep(job,{imageAsset:asset.id,jobId:job.id,account:accountSnapshot(generation?.account),model:generation?.model||null,resolvedModel:generation?.resolvedModel||null},[{id:asset.id,label:'完整精修成品',type:'image'}],'合成完成，完整图片已保存',runId);
   };
   const generateJob=async(job)=>{if(isClosing||job.cancelled)throw new Error('网站正在停止，本轮可从当前步骤继续。');
     await startJobStep(job,'generate');
     if(!await bridge.account())throw new Error('请先使用 ChatGPT 账号登录。');
+    bridge.capture(job);
     job.onModelSelected=async()=>{await persist(job);};
     const runId=job.runId;job.status='generating';job.threadId=null;job.turnId=null;job.saving=null;job.message='正在连接 ChatGPT 图片服务…';await persist(job);
     clearTimeout(job.deadline);job.deadline=setTimeout(()=>{bridge.cancel(job).catch(()=>{});finish(job,'error','等待已超过12分钟，可从生成步骤重试。',runId).catch(()=>{});},12*60*1000);
@@ -148,7 +156,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     } else throw new Error('客户端没有返回可下载的图片，请升级客户端后重试。');
     if(job.runId!==runId)throw new Error('这次执行已过期。');
     const raw=await workflows.putAsset(job.workflowId,bytes,item.result?.startsWith('data:image/jpeg')?'image/jpeg':'image/png');if(job.runId!==runId)throw new Error('这次执行已过期。');job.rawAsset=raw.id;
-    await doneJobStep(job,{rawAsset:raw.id,model:job.model||null,resolvedModel:job.resolvedModel||null},[{id:raw.id,label:'AI返回的原始出图（合成前）',type:'image'}],'原始生成图已保存，后续合成无需再次生成',runId);
+    await doneJobStep(job,{rawAsset:raw.id,account:accountSnapshot(job.account),appVersion:'1.10.0',model:job.model||null,resolvedModel:job.resolvedModel||null},[{id:raw.id,label:'AI返回的原始出图（合成前）',type:'image'}],'原始生成图已保存，后续合成无需再次生成',runId);
     await composeOutput(job,bytes,runId);
   };
 
@@ -212,7 +220,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       if (req.method === 'POST') {
         if (req.headers.origin !== `http://${host}` || req.headers['x-paint-csrf'] !== csrf) return json(res, 403, { error: '请从本站页面发起操作。' });
       }
-      if (route === '/api/health' && req.method === 'GET') return json(res, 200, { app: 'houtu-studio', version: '1.9.0', instanceId, csrf });
+      if (route === '/api/health' && req.method === 'GET') return json(res, 200, { app: 'houtu-studio', version: '1.10.0', instanceId, csrf });
       if(route==='/api/portrait/source'&&req.method==='GET'){
         const auditId=url.searchParams.get('audit');if(auditId){const w=await workflows.get(auditId);if(w.kind!=='portrait-audit')throw new Error('不是人物检查工作流。');const assetId=w.steps[0].output?.imageAsset;if(!assetId)throw new Error('检查原图尚未保存。');return json(res,200,{workflowId:w.id,assetId,url:`/api/workflows/${w.id}/assets/${assetId}`,name:w.name,auditId:w.id,diagnosis:w.steps.find(n=>n.id==='diagnose').status==='done'?w.steps.find(n=>n.id==='diagnose').output:null});}
         const id=url.searchParams.get('workflow'),assetId=url.searchParams.get('asset');await resolvePicture({source:{kind:'workflow',workflowId:id,assetId}},{jobs,workflows});const w=await workflows.get(id);return json(res,200,{workflowId:id,assetId,url:`/api/workflows/${id}/assets/${assetId}`,name:w.name});
@@ -287,13 +295,14 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
           critiqueActive=true;const dir=path.join(directory,'analysis',randomUUID());let analysisAttempt=null;
           try{const input=await body(req);if(input.workflow){const w=await workflows.get(input.workflow.id),n=w.steps.find(n=>n.id==='analysis');if(w.kind!=='color'||n?.status!=='running'||n.token!==input.workflow.token)throw Object.assign(new Error('审美步骤已过期，请重新开始。'),{status:409});analysisAttempt=input.workflow;}if(!await bridge.account())throw Object.assign(new Error('请先在人物精修页面登录 ChatGPT，再使用审美分析。'),{status:401});await mkdir(dir,{recursive:true});const image=decodeImage(input.image);const prepared=await prepareEditImage(image.bytes,null);const imagePath=path.join(dir,'source.png');await writeFile(imagePath,prepared.source);let referencePath=null;
             if(input.reference){const ref=decodeImage(input.reference);const ready=await prepareEditImage(ref.bytes,null);referencePath=path.join(dir,'reference.png');await writeFile(referencePath,ready.source);}
-            const model=normalizeModel(input.model),control={model};
-            if(analysisAttempt){const previous=(await workflows.get(analysisAttempt.id)).steps.find(n=>n.id==='analysis')?.output;if(normalizeModel(previous?.model)===model)control.resolvedModel=normalizeModel(previous?.resolvedModel);}
-            if(analysisAttempt){const record=async resolvedModel=>{await workflows.mutate(analysisAttempt.id,w=>{const n=w.steps.find(n=>n.id==='analysis');if(n.token!==analysisAttempt.token)throw Error('审美步骤已过期。');n.output={...n.output,model,resolvedModel};Object.assign(n.attempts.at(-1),{output:n.output});return {};});};await record(control.resolvedModel||null);control.onModelSelected=record;}
+            const model=normalizeModel(input.model),control={model,account:null};
+            if(analysisAttempt){const previous=(await workflows.get(analysisAttempt.id)).steps.find(n=>n.id==='analysis')?.output;control.account=accountSnapshot(previous?.account);if(normalizeModel(previous?.model)===model)control.resolvedModel=normalizeModel(previous?.resolvedModel);}
+            bridge.capture(control);
+            if(analysisAttempt){const record=async resolvedModel=>{await workflows.mutate(analysisAttempt.id,w=>{const n=w.steps.find(n=>n.id==='analysis');if(n.token!==analysisAttempt.token)throw Error('审美步骤已过期。');n.output={...n.output,model,resolvedModel,account:accountSnapshot(control.account)};Object.assign(n.attempts.at(-1),{output:n.output});return {};});};await record(control.resolvedModel||null);control.onModelSelected=record;}
             const result=await bridge.critique(imagePath,referencePath,null,[],control);
             const preset=normalizePreset({name:'ChatGPT 审美方案',settings:result.settings,layers:result.layers});
-            const response={model,resolvedModel:control.resolvedModel||null,summary:String(result.summary||'').slice(0,600),query:String(result.query||'').slice(0,120),preset};
-            if(analysisAttempt)response.workflow=(await workflows.complete(analysisAttempt.id,'analysis',analysisAttempt.token,{state:{aiPlan:preset,model,resolvedModel:control.resolvedModel||null,summary:response.summary,query:response.query},message:'审美方案已保存，关闭页面后仍可恢复'})).workflow;
+            const response={account:accountSnapshot(control.account),model,resolvedModel:control.resolvedModel||null,summary:String(result.summary||'').slice(0,600),query:String(result.query||'').slice(0,120),preset};
+            if(analysisAttempt)response.workflow=(await workflows.complete(analysisAttempt.id,'analysis',analysisAttempt.token,{state:{aiPlan:preset,account:accountSnapshot(control.account),model,resolvedModel:control.resolvedModel||null,summary:response.summary,query:response.query},message:'审美方案已保存，关闭页面后仍可恢复'})).workflow;
             return json(res,200,response);
           }catch(e){if(analysisAttempt)await workflows.fail(analysisAttempt.id,'analysis',analysisAttempt.token,friendlyError(e.message)).catch(()=>{});throw e;}finally{critiqueActive=false;await rm(dir,{recursive:true,force:true});}
         }
@@ -309,6 +318,18 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
         if ((await body(req)).instanceId !== instanceId) return json(res, 403, { error: '实例不匹配。' });
         if (activePackage) return json(res, 409, { error: '正在打包，请完成后再停止网站。' });
         json(res, 200, { ok: true }); setTimeout(() => close().catch(() => {}), 60); return;
+      }
+      if(route==='/api/server/status'&&req.method==='GET'){
+        try{await bridge.account();}catch{}
+        const images=await library.refresh(jobs,workflows);
+        const records=accounts.records().map(account=>({...account,images:images.filter(image=>image.account?.email.toLowerCase()===account.email.toLowerCase()).length}));
+        return json(res,200,{serverId:accounts.state.serverId,startedAt,created:accounts.state.created,machine:os.hostname(),version:'1.10.0',projectRoot:ROOT,dataRoot:path.resolve(directory),loginRoot:path.join(path.resolve(directory),'codex'),scope:'local',current:accounts.current(),accounts:records,images:images.length});
+      }
+      if(route==='/api/server/images'&&req.method==='GET'){await library.refresh(jobs,workflows);return json(res,200,library.list(url.searchParams,accounts.records()));}
+      const thumbnail=/^\/api\/server\/thumbnails\/([a-f0-9]{64})$/.exec(route);
+      if(thumbnail&&req.method==='GET'){
+        if(!library.records.has(thumbnail[1]))await library.refresh(jobs,workflows);
+        const file=await library.thumbnail(thumbnail[1],jobs,workflows),info=await stat(file);res.writeHead(200,{'Content-Type':'image/webp','Content-Length':info.size,'Cache-Control':'no-store'});await pipeline(createReadStream(file),res);return;
       }
       if(route==='/api/models'&&req.method==='GET'){
         try{
@@ -433,13 +454,15 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       if (imageMatch && req.method === 'GET' && jobs.has(imageMatch[1])) {
         file = path.join(jobsDirectory, imageMatch[1], imageMatch[2]);
         if (url.searchParams.has('download')) res.setHeader('Content-Disposition', `attachment; filename="anime-paint-${imageMatch[1].slice(0,8)}.${path.extname(file).slice(1)}"`);
+      } else if(req.method==='GET'&&(route==='/server'||route==='/server/')){
+        file=path.join(ROOT,'frontend','server.html');
       } else if (req.method === 'GET' && (route === '/color' || route === '/color/')) {
         file=path.join(ROOT,'frontend','index.html');
       } else if(req.method==='GET'&&(route==='/workflows'||route==='/workflows/')){
         file=path.join(ROOT,'frontend','workflows.html');
       } else if(req.method==='GET'&&(route==='/creative'||route==='/creative/')){
         file=path.join(ROOT,'frontend','creative.html');
-      } else if (req.method === 'GET' && /^\/color\/(app\.js|engine\.js|worker\.js|masks\.js|workflow-client\.js|workflows\.js|effects\.js|creative\.js|creative-multi\.js|style\.css)$/.test(route)) {
+      } else if (req.method === 'GET' && /^\/color\/(app\.js|engine\.js|worker\.js|masks\.js|workflow-client\.js|workflows\.js|effects\.js|creative\.js|creative-multi\.js|server\.js|style\.css)$/.test(route)) {
         file=path.join(ROOT,'frontend',path.basename(route));
       } else if (req.method === 'GET' && /^\/vision\/(vision_bundle\.mjs|wasm\/vision_wasm_(?:nosimd_)?internal\.(?:js|wasm))$/.test(route)) {
         file=path.join(ROOT,'node_modules','@mediapipe','tasks-vision',route.slice('/vision/'.length));
@@ -464,6 +487,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     await bridge.stop(); for (const j of jobs.values()) clearTimeout(j.deadline);
     await creative.drain();if(portraitAuditTask)await Promise.allSettled([portraitAuditTask]);
     await Promise.allSettled([...jobWrites.values()]);
+    await Promise.allSettled([accounts.queue,library.queue,...library.pendingThumbs.values()]);
     server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
     try { const record = JSON.parse(await readFile(path.join(directory, 'server.json'), 'utf8')); if (record.instanceId === instanceId) await unlink(path.join(directory, 'server.json')); } catch {}
   })();

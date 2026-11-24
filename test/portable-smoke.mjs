@@ -54,7 +54,7 @@ try {
   await run(powershell(), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(portable, 'scripts', 'install.ps1'), '-Destination', installed, '-NoShortcut', '-NoLaunch']);
   for (const required of ['vendor-licenses','scripts','lib','public','frontend','backend','models','node_modules','runtime']) assert.ok((await stat(path.join(installed, required))).isDirectory(), `Installer omitted ${required}`);
   assert.ok((await stat(path.join(installed, 'vendor-licenses', 'codex-APACHE-2.0.txt'))).size > 10000);
-  const started = await run(runtime, [launcher, '--no-open', '--port', String(blockedPort)], { cwd: installed });
+  const started = await run(runtime, [launcher, '--no-open', '--port', String(blockedPort)], { cwd: extracted });
   assert.match(started, /http:\/\/127\.0\.0\.1:/);
   launched = true;
   const record = JSON.parse(await readFile(path.join(installed, 'data', 'server.json'), 'utf8'));
@@ -62,6 +62,13 @@ try {
   const origin = `http://127.0.0.1:${record.port}`;
   const health = await (await fetch(origin + '/api/health')).json();
   assert.equal(health.instanceId, record.instanceId); assert.equal(health.version, manifest.version);
+  const serverInfo=await(await fetch(origin+'/api/server/status')).json();
+  assert.equal(path.resolve(serverInfo.dataRoot),path.join(installed,'data'));
+  assert.equal(serverInfo.current.status,'signedOut');assert.deepEqual(serverInfo.accounts,[]);
+  for(const entry of ['启动服务器.cmd','服务器管理.cmd','停止服务器.cmd'])assert.ok((await stat(path.join(installed,entry))).size>50);
+  assert.ok((await(await fetch(origin+'/server/')).text()).includes('图片档案'));
+  assert.equal((await fetch(origin+'/color/server.js')).status,200);
+  const management=await run(runtime,[launcher,'--manage','--no-open'],{cwd:extracted});assert.ok(management.includes('/server/'));
   const state = await (await fetch(origin + '/api/state')).json();
   assert.equal(state.serviceError, ''); assert.equal(state.account, null);
   const library = await (await fetch(origin + '/api/templates')).json();
@@ -95,6 +102,9 @@ try {
   const attempt=await post(`/api/workflows/${wf.id}/begin`,{step:'source',revision:wf.revision});
   await post(`/api/workflows/${wf.id}/complete`,{step:'source',token:attempt.token,state:{imageAsset:asset.id},artifacts:[{id:asset.id,type:'image',label:'Portable source'}]});
   assert.equal((await(await fetch(origin+`/api/workflows/${wf.id}`)).json()).steps[0].status,'done');
+  const grading=await post(`/api/workflows/${wf.id}/begin`,{step:'grade'});await post(`/api/workflows/${wf.id}/complete`,{step:'grade',token:grading.token,state:{settings:{},layers:[]}});
+  const exporting=await post(`/api/workflows/${wf.id}/begin`,{step:'export'});await post(`/api/workflows/${wf.id}/complete`,{step:'export',token:exporting.token,state:{imageAsset:asset.id},artifacts:[{id:asset.id,type:'image',label:'Portable archived output'}]});
+  const gallery=await(await fetch(origin+'/api/server/images')).json();assert.equal(gallery.total,1);assert.equal(gallery.images[0].account,null);assert.equal((await fetch(origin+gallery.images[0].thumbnailUrl)).status,200);
   const rebuiltArchive = path.join(temporary, 'repacked-on-new-computer.zip');
   const rebuilt = await run(runtime, [path.join(installed, 'scripts', 'build-portable.mjs'), '--include-prompts', '--output', rebuiltArchive], { cwd: installed });
   assert.ok(rebuilt.includes('"type":"done"'));
@@ -104,7 +114,11 @@ try {
   await run(runtime, [launcher, '--stop', '--no-open'], { cwd: installed }); launched = false;
   await assert.rejects(() => stat(path.join(installed, 'data', 'server.json')), { code: 'ENOENT' });
   assert.throws(()=>process.kill(record.pid,0),error=>error.code==='ESRCH','Stop must wait until the server process has exited and released its executable');
-  console.log(JSON.stringify({ result: 'PASS', version: manifest.version, bundledNode: manifest.nodeVersion, files: manifest.files.length + 1, templates: library.templates.length, tested: ['no-global-node-or-npm', 'default-install-stays-on-project-drive', 'agent-and-architecture-docs-bundled', 'fresh-Chinese-and-space-path-install', 'all-required-directories-installed', 'repackage-from-installed-copy', 'auto-port-fallback', 'isolated-Codex-startup', 'native-sharp-DLL', 'prompt-library', 'nonpainting-and-ten-level-instructions', 'model-picker-and-signed-out-account-state', 'repeat-launch', 'graceful-stop', 'no-account-photo-log-backup-in-archive'] }));
+  await run(runtime,[launcher,'--no-open'],{cwd:extracted});launched=true;
+  const cold=JSON.parse(await readFile(path.join(installed,'data','server.json'),'utf8')),coldOrigin='http://127.0.0.1:'+cold.port;
+  const restored=await(await fetch(coldOrigin+'/api/server/status')).json();assert.equal(restored.serverId,serverInfo.serverId);assert.equal(restored.images,1);assert.equal((await(await fetch(coldOrigin+'/api/server/images')).json()).images[0].id,gallery.images[0].id);
+  await run(runtime,[launcher,'--stop','--no-open'],{cwd:extracted});launched=false;assert.throws(()=>process.kill(cold.pid,0),error=>error.code==='ESRCH');
+  console.log(JSON.stringify({ result: 'PASS', version: manifest.version, bundledNode: manifest.nodeVersion, files: manifest.files.length + 1, templates: library.templates.length, tested: ['no-global-node-or-npm', 'default-install-stays-on-project-drive', 'agent-and-architecture-docs-bundled', 'fresh-Chinese-and-space-path-install', 'all-required-directories-installed', 'repackage-from-installed-copy', 'auto-port-fallback', 'isolated-Codex-startup', 'native-sharp-DLL', 'prompt-library', 'nonpainting-and-ten-level-instructions', 'model-picker-and-signed-out-account-state', 'repeat-launch', 'graceful-stop', 'project-root-private-data-and-server-entrypoints', 'archived-images-and-server-identity-survive-cold-restart', 'no-account-photo-log-backup-in-archive'] }));
 } finally {
   if (launched) await run(runtime, [launcher, '--stop', '--no-open'], { cwd: installed }).catch(() => {});
   await new Promise(resolve => barrier.close(resolve));

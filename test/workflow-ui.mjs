@@ -7,7 +7,7 @@ import path from 'node:path';
 import {EventEmitter} from 'node:events';
 import sharp from 'sharp';
 import {createApp} from '../server.mjs';
-const directory=await mkdtemp(path.join(tmpdir(),'houtu-wf-ui-'));class Bridge extends EventEmitter{calls=0;async account(){return {plan:'test'};}async stop(){}async critique(){this.calls++;return {summary:'测试用审美方案，不是真实AI效果',query:'soft portrait',settings:{exposure:.2},layers:[]};}}
+const directory=await mkdtemp(path.join(tmpdir(),'houtu-wf-ui-'));class Bridge extends EventEmitter{calls=0;async account(){return {email:'fixture@example.invalid',plan:'test'};}async stop(){}async critique(){this.calls++;return {summary:'测试用审美方案，不是真实AI效果',query:'soft portrait',settings:{exposure:.2},layers:[]};}}
 let bridge=new Bridge(),app=await createApp({directory,bridge});await new Promise(r=>app.server.listen(0,'127.0.0.1',r));let origin='http://127.0.0.1:'+app.server.address().port;
 const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});const context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage();page.setDefaultTimeout(30000);const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());const out=path.resolve('.impeccable/review/workflows');await mkdir(out,{recursive:true});
 try{

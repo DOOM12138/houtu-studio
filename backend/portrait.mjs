@@ -1,3 +1,4 @@
+import {accountSnapshot} from './accounts.mjs';
 import {normalizeModel} from '../public/model-options.js';
 import path from 'node:path';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
@@ -41,12 +42,13 @@ export async function auditPortrait({workflows,bridge,resolved,auditId,control={
  if(auditId){w=await workflows.get(auditId);if(w.kind!=='portrait-audit')throw Error('人物检查工作流类型不符。');}
  else{w=await workflows.create({kind:'portrait-audit',name:'人物画面检查',parentId:resolved.parentWorkflowId});const image=await workflows.putAsset(w.id,resolved.bytes,'image/png');await workflows.checkpoint(w.id,'source',{model,imageAsset:image.id,pixelSignature:await pictureSignature(resolved.bytes),sourceWorkflowId:resolved.parentWorkflowId},[{id:image.id,type:'image',label:'本轮实际需要细化的图片'}],'当前人物成品已保存');}
  const node=w.steps.find(n=>n.id==='diagnose');if(node.status==='done')return {workflowId:w.id,diagnosis:node.output};
- control.model=model||w.executionModel||null;
+ control.model=model||w.executionModel||null;control.account=w.executionAccount||null;bridge.capture?.(control);
+ if(control.account&&!w.executionAccount)await workflows.mutate(w.id,current=>{current.executionAccount=control.account;return {};});
  control.onModelSelected=async selected=>{if(selected)await workflows.mutate(w.id,current=>{current.executionModel=selected;return {};});};
  const attempt=await workflows.begin(w.id,'diagnose');
  try{
   const image=await workflows.asset(w.id,(await workflows.get(w.id)).steps[0].output.imageAsset),dir=path.join(workflows.folder(w.id),'vision',attempt.token);await mkdir(dir,{recursive:true});const file=path.join(dir,'portrait.jpg');await writeFile(file,await sharp(image.file).rotate().flatten({background:'#f0f0f0'}).resize({width:1600,height:1600,fit:'inside',withoutEnlargement:true}).jpeg({quality:92}).toBuffer());
   const data=await bridge.analyzeImages([file],`Inspect this exact finished image for a conservative second-pass portrait retouch. Do not identify the real person or give medical diagnoses. Preserve identity, facial proportions, pose, existing medium/style (anime/photo/3D), clothing design, background, color grading and composite effects. Inspect visible defects and opportunities only; do not invent hidden hands, texture or anatomy. Return JSON {summary:Chinese string,issues:[{area:face|eyes|skin|hair|hands|outfit|accessories|light,severity:none|minor|moderate|not-visible,finding:Chinese string,recommendation:Chinese string}],profile:{levels:{face:0..3,eyes:0..3,skin:0..3,hair:0..3,hands:0..3,outfit:0..3,accessories:0..3,light:0..3},texture:0..100,faceLock:true}}. Include all eight areas; use not-visible and level0 for areas outside the image. Prefer level1 for minor refinements, no blanket strong smoothing. Levels are model-editing instructions, not deterministic numeric filter amounts.`,control);
-  const diagnosis={...validatePortraitAudit(data),model,resolvedModel:control.resolvedModel||null};await workflows.complete(w.id,'diagnose',attempt.token,{state:diagnosis,message:'画面检查与细化建议已保存，等待确认，不自动出图'});return {workflowId:w.id,diagnosis};
+  const diagnosis={...validatePortraitAudit(data),account:accountSnapshot(control.account),model,resolvedModel:control.resolvedModel||null};await workflows.complete(w.id,'diagnose',attempt.token,{state:diagnosis,message:'画面检查与细化建议已保存，等待确认，不自动出图'});return {workflowId:w.id,diagnosis};
  }catch(e){await workflows.fail(w.id,'diagnose',attempt.token,e.message).catch(()=>{});throw Object.assign(e,{workflowId:w.id});}
 }

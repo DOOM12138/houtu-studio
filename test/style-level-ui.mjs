@@ -11,7 +11,7 @@ import {browserExecutable} from '../backend/platform-browser.mjs';
 const directory=await mkdtemp(path.join(tmpdir(),'houtu-style-ui-'));
 const picture=await sharp({create:{width:240,height:320,channels:3,background:'#c1b29e'}}).png().toBuffer();
 class Bridge extends EventEmitter {
-  async account(){return {plan:'test'};}
+  async account(){return {email:'fixture@example.invalid',plan:'test'};}
   async stop(){}
   async begin(job,prompt){this.prompt=prompt;job.threadId='style-ui';job.turnId='turn';setTimeout(()=>{this.emit('notification','item/completed',{threadId:job.threadId,item:{type:'imageGeneration',status:'completed',result:picture.toString('base64')}});this.emit('notification','turn/completed',{threadId:job.threadId,turn:{status:'completed'}});},25);}
 }

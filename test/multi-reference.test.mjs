@@ -12,7 +12,7 @@ import {createHash} from 'node:crypto';
 const png=n=>sharp({create:{width:96,height:128,channels:3,background:{r:n,g:80,b:150}}}).png().toBuffer();
 class VisionBridge extends EventEmitter{
  visionCalls=[];imageCalls=0;bad=false;
- async account(){return {plan:'test'};}async cancel(){}
+ async account(){return {email:'fixture@example.invalid',plan:'test'};}async cancel(){}
  async analyzeImages(files,prompt){const roles=JSON.parse(prompt.split('input order:\n')[1].split('\n')[0]);this.visionCalls.push({files,roles,prompt});assert.equal(files.length,roles.length);for(const file of files)assert.ok((await readFile(file)).length>50);
   if(!prompt.includes('selectedIds'))return {subjectAnalysis:'人物发色与服装分析',backgroundAnalysis:'背景冷暖与纵深分析',characterConstraints:['保留五官和服装'],queries:{commons:'forest cool portrait',xiaohongshu:'森林 人像 光影 合成'},summary:'人物与背景的检索规划'};
   const refs=roles.filter(r=>r.id.startsWith('R')),pinned=refs.filter(r=>prompt.includes(`"assetId":"${r.assetId}","pinned":true`));let selected=(pinned.length?pinned:[...refs].reverse().slice(0,Number(prompt.match(/Select exactly (\d+)/)?.[1]||5))).map(r=>r.id);const exact=prompt.match(/exact asset set; keep only these and do not add others: (\[[^\]]*\])/);if(exact){const ids=JSON.parse(exact[1]);selected=refs.filter(r=>ids.includes(r.assetId)).map(r=>r.id);}
