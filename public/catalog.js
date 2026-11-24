@@ -35,6 +35,12 @@ export const PRESETS = [
   { id: 'background', name: '背景清理', group: '画面与风格', short: '清理干扰，保留人物', description: '移除背景明显干扰物；想移除具体物体时，先画选区并补充说明。', instruction: '清理背景中明显干扰主体的小物件与杂乱细节，按周围环境自然补全，不改变人物、发丝、服装、原有场景类型和整体透视。不要擅自换成纯白背景或另一个场景。' },
   { id: 'anime-paint', nonPaintingInstruction: '保留原有媒介、线条与画风，协调本次选择的人物细节和明暗，不做画风转换。', name: '二次元厚涂', group: '画面与风格', short: '柔和色块与手绘笔触', description: '统一画面的二次元厚涂语言，保持完整构图与角色辨识度。', style: 'anime', instruction: '将画面统一为干净自然的二次元数字厚涂，重点表现人物的体积、柔和色块和顺应形体的笔触；保留原始完整取景与角色特征。' },
   { id: 'cos-paint', nonPaintingInstruction: '细化COS原照片的妆造、假发、眼部、服装和饰品，保留真人身份、摄影光感和真实纹理，不做画风转换。', name: 'COS 质感厚涂', group: '画面与风格', short: '角色妆造与真人质感', description: '针对 COS 照片细化假发、妆容和服装，同时保留真人身份。', style: 'cos', instruction: '针对COS照片精修角色妆造、假发、眼部、服装和饰品，保留真人身份与摄影光感，将厚涂细节融入原照片，不把人物重新设计成另一个角色。' },
+  {"id":"remove-people","name":"去人物／路人","group":"场照与次元","short":"保留主角，清理背景人群","description":"去除背景路人和无关摄影师，保留COS主角与指定同伴；可框选需要清除的人。","style":"natural","instruction":"保留原场地，自然清除背景路人。"},
+  {"id":"remove-equipment","name":"去灯架","group":"场照与次元","short":"灯架、柔光箱与拍摄穿帮","description":"清理摄影灯架、支架、箱包与电线，保留人物的武器、长柄伞和角色道具。","style":"natural","instruction":"移除拍摄器材穿帮并自然补回原地面和墙面。"},
+  {"id":"clear-background","name":"清空背景／场照净场","group":"场照与次元","short":"保留主角，现场背景干净清空","description":"清理漫展背景中的路人、灯架和杂物，保留原场地空间、地面与光线；不换白底或透明底。","style":"natural","instruction":"保留主体，在原场馆完成背景净场。"},
+  {"id":"hair-lift","name":"反重力发丝","group":"场照与次元","short":"自然飘发与次元动势","description":"调整原有发梢和少量发束的动势，保留发型、发色与五官。","style":"natural","instruction":"仅为原有发丝增加合理的飘动与反重力表现。"},
+  {"id":"hair-glow","name":"发丝辉光","group":"场照与次元","short":"沿光源增强发丝边缘","description":"让原有发丝边缘更通透，保持发型和瞳色，不把头发改成发光塑料。","style":"natural","instruction":"细化原发丝的边缘辉光和光源衔接。"},
+  {"id":"dimension-effects","name":"次元氛围特效","group":"场照与次元","short":"轮廓光、雷电、火星与羽毛","description":"按人物与现场光线添加次元效果，程度1–10可调，可用主体保护保留原人物细节。","style":"natural","instruction":"在保留人物与现场构图的基础上加入所选次元特效。"},
   { id: 'custom', name: '自定义修图', group: '画面与风格', short: '直接写想修改的地方', description: '用补充描述说明修改目标；可先在原图画局部选区。', instruction: '根据用户的补充描述执行具体图像编辑，保持未要求改变的内容、构图和人物身份。' },
 ];
 

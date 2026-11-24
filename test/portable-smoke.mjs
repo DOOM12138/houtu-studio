@@ -83,7 +83,7 @@ try {
   assert.ok((await(await fetch(origin+'/creative/')).text()).includes('creative-run'));
   assert.equal((await(await fetch(origin+'/api/platform/status')).json()).open,false);
   const models=await(await fetch(origin+'/api/models')).json();assert.equal(models.signedIn,false);assert.deepEqual(models.models,[]);
-  for(const asset of ['/model-picker.js','/model-options.js'])assert.equal((await fetch(origin+asset)).status,200);
+  for(const asset of ['/model-picker.js','/model-options.js','/scene-options.js','/scene-ui.js','/subject-mask.js'])assert.equal((await fetch(origin+asset)).status,200);
   for(const route of ['/','/color/','/creative/'])assert.ok((await(await fetch(origin+route)).text()).includes('model-picker'));
   assert.equal((await fetch(origin+'/color/effects.js')).status,200);
   assert.equal((await fetch(origin+'/color/creative-multi.js')).status,200);
@@ -97,6 +97,7 @@ try {
   const sharpOutput = await run(runtime, ['--input-type=module', '-e', "import sharp from 'sharp'; const b=await sharp({create:{width:2,height:3,channels:3,background:'red'}}).png().toBuffer(); const m=await sharp(b).metadata(); console.log(m.width+'x'+m.height);console.log(b.toString('base64'));"], { cwd: installed });
   assert.match(sharpOutput, /2x3/);
   const post=async(route,input)=>{const response=await fetch(origin+route,{method:'POST',headers:{Origin:origin,'X-Paint-CSRF':health.csrf,'Content-Type':'application/json'},body:JSON.stringify(input)});assert.ok(response.ok,await response.clone().text());return response.json();};
+  const scene=await post('/api/prompt',{operation:'clear-background',style:'anime',paintLevel:10,scene:{protectSubject:false}});assert.ok(scene.prompt.includes('原地净场'));assert.ok(!scene.prompt.includes('厚涂程度10/10'));
   const wf=await post('/api/workflows',{name:'Portable workflow smoke'});
   const asset=await(await fetch(origin+`/api/workflows/${wf.id}/assets`,{method:'POST',headers:{Origin:origin,'X-Paint-CSRF':health.csrf,'Content-Type':'image/png'},body:Buffer.from(sharpOutput.trim().split(/\r?\n/).at(-1),'base64')})).json();assert.equal(asset.width,2);
   const attempt=await post(`/api/workflows/${wf.id}/begin`,{step:'source',revision:wf.revision});
@@ -118,7 +119,7 @@ try {
   const cold=JSON.parse(await readFile(path.join(installed,'data','server.json'),'utf8')),coldOrigin='http://127.0.0.1:'+cold.port;
   const restored=await(await fetch(coldOrigin+'/api/server/status')).json();assert.equal(restored.serverId,serverInfo.serverId);assert.equal(restored.images,1);assert.equal((await(await fetch(coldOrigin+'/api/server/images')).json()).images[0].id,gallery.images[0].id);
   await run(runtime,[launcher,'--stop','--no-open'],{cwd:extracted});launched=false;assert.throws(()=>process.kill(cold.pid,0),error=>error.code==='ESRCH');
-  console.log(JSON.stringify({ result: 'PASS', version: manifest.version, bundledNode: manifest.nodeVersion, files: manifest.files.length + 1, templates: library.templates.length, tested: ['no-global-node-or-npm', 'default-install-stays-on-project-drive', 'agent-and-architecture-docs-bundled', 'fresh-Chinese-and-space-path-install', 'all-required-directories-installed', 'repackage-from-installed-copy', 'auto-port-fallback', 'isolated-Codex-startup', 'native-sharp-DLL', 'prompt-library', 'nonpainting-and-ten-level-instructions', 'model-picker-and-signed-out-account-state', 'repeat-launch', 'graceful-stop', 'project-root-private-data-and-server-entrypoints', 'archived-images-and-server-identity-survive-cold-restart', 'no-account-photo-log-backup-in-archive'] }));
+  console.log(JSON.stringify({ result: 'PASS', version: manifest.version, bundledNode: manifest.nodeVersion, files: manifest.files.length + 1, templates: library.templates.length, tested: ['no-global-node-or-npm', 'default-install-stays-on-project-drive', 'agent-and-architecture-docs-bundled', 'fresh-Chinese-and-space-path-install', 'all-required-directories-installed', 'repackage-from-installed-copy', 'auto-port-fallback', 'isolated-Codex-startup', 'native-sharp-DLL', 'prompt-library', 'nonpainting-and-ten-level-instructions', 'scene-cleanup-and-subject-protection-assets', 'model-picker-and-signed-out-account-state', 'repeat-launch', 'graceful-stop', 'project-root-private-data-and-server-entrypoints', 'archived-images-and-server-identity-survive-cold-restart', 'no-account-photo-log-backup-in-archive'] }));
 } finally {
   if (launched) await run(runtime, [launcher, '--stop', '--no-open'], { cwd: installed }).catch(() => {});
   await new Promise(resolve => barrier.close(resolve));

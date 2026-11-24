@@ -18,7 +18,7 @@ try {
     await page.goto(site, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => document.querySelector('#prompt').value.length > 0);
     assert.equal(await page.locator('#generate').isDisabled(), true);
-    assert.equal(await page.locator('#tool-list button').count(), 17);
+    assert.equal(await page.locator('#tool-list button').count(), 23);
     const initial = await page.evaluate(() => ({ viewport: innerWidth, scroll: document.documentElement.scrollWidth }));
     assert.ok(initial.scroll <= initial.viewport, `${name} horizontal overflow: ${JSON.stringify(initial)}`);
     await page.screenshot({ path: path.join(out, `${name}.png`), fullPage: true });
@@ -47,7 +47,7 @@ try {
     await page.locator('#tool-search').fill('眼睛');
     assert.equal(await page.locator('#tool-list button').count(), 1);
     await page.locator('[data-operation="eyes"]').click();
-    assert.equal(await page.locator('#operation-title').textContent(), '厚涂眼睛');
+    assert.equal(await page.locator('#operation-title').textContent(), '眼睛精修');
     await page.locator('#edit-style').selectOption('cos');
     assert.match(await page.locator('#style-help').textContent(), /真人/);
     await page.locator('#tool-search').fill('');

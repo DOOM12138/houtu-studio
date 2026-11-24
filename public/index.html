@@ -49,8 +49,8 @@
     <div class="workbench">
       <aside class="tools-panel" aria-label="精修功能库"><details id="tools-panel" open>
         <summary>精修功能<span id="active-tool-name">整个人物精修</span></summary>
-        <div class="tools-content"><label class="visually-hidden" for="tool-search">查找精修功能</label><input id="tool-search" type="search" placeholder="查找功能，如发丝、手部">
-          <div id="tool-filters" class="tool-filters" aria-label="功能分类"><button type="button" data-filter="全部" aria-pressed="true">全部</button><button type="button" data-filter="人物精修" aria-pressed="false">人物</button><button type="button" data-filter="造型细节" aria-pressed="false">造型</button><button type="button" data-filter="画面与风格" aria-pressed="false">画面</button></div>
+        <div class="tools-content"><label class="visually-hidden" for="tool-search">查找精修功能</label><input id="tool-search" type="search" placeholder="查找发丝、路人、灯架或场照">
+          <div id="tool-filters" class="tool-filters" aria-label="功能分类"><button type="button" data-filter="全部" aria-pressed="true">全部</button><button type="button" data-filter="人物精修" aria-pressed="false">人物</button><button type="button" data-filter="造型细节" aria-pressed="false">造型</button><button type="button" data-filter="画面与风格" aria-pressed="false">画面</button><button type="button" data-filter="场照与次元" aria-pressed="false">场照</button></div>
           <div id="tool-list" class="tool-list"></div><p id="no-tools" class="field-hint" hidden>没有匹配功能，试试其他关键词。</p>
         </div>
       </details></aside>
@@ -89,6 +89,25 @@
         <h2 id="operation-title">整个人物精修</h2><p id="operation-description" class="settings-intro">从五官到服装，统一整个人物的细节与光影。</p>
         <div id="model-picker"></div>
         <div class="style-field"><label for="edit-style">修图风格</label><select id="edit-style"><optgroup label="非厚涂精修"><option value="natural">保留原画风（非厚涂）</option><option value="photo">自然摄影精修（非厚涂）</option></optgroup><optgroup label="厚涂风格"><option value="anime" selected>二次元厚涂</option><option value="cos">COS 质感厚涂</option></optgroup></select><p id="style-help" class="field-hint">动漫感、柔和色块与自然笔触</p></div>
+        <section id="scene-panel" class="scene-panel" hidden><h3>场照与次元设置</h3>
+          <label for="scene-subject">要保留的主体／同伴</label><textarea id="scene-subject" rows="2" maxlength="500" placeholder="例如：前景蓝发白衣的主角；一起保留右边持伞的同伴"></textarea>
+          <p class="field-hint">说明用于指导AI；像素保护按下方蒙版执行。</p>
+          <div id="scene-people-row"><label for="scene-people">路人清理范围</label><select id="scene-people"><option value="bystanders">背景路人，保留主角</option><option value="selection">只去编辑选区中的路人</option></select></div>
+          <label for="scene-tone">现场明暗</label><select id="scene-tone"><option value="keep">保留原光线</option><option value="bright">明调场照</option><option value="dark">暗调场照</option></select>
+          <div id="scene-effect-row"><label for="scene-effect">次元效果</label><select id="scene-effect"><option value="glow">氛围轮廓光</option><option value="lightning">雷电能量</option><option value="fire">火焰与火星</option><option value="feathers">飘浮羽毛</option><option value="particles">次元光粒</option></select></div>
+          <div id="scene-intensity-row"><label for="scene-intensity">次元程度 <output id="scene-intensity-value">3 / 10</output></label><input id="scene-intensity" type="range" min="1" max="10" step="1" value="3"></div>
+          <label class="scene-check"><input id="scene-protect" type="checkbox" checked>主体像素保护 · 原图细节优先</label>
+          <p id="scene-guidance" class="field-hint">场照净场保留主角与原场地，请先检查主体保护。</p>
+          <details id="scene-mask-tools"><summary>查看／调整主体保护</summary><p class="field-hint">绿色为保留区域。自动识别可能漏掉道具或同伴，请预览并增减保护；重新分析会替换笔触。关闭像素保护时由AI按说明保留主体。</p>
+            <label for="scene-mask-mode">本机识别方式</label><select id="scene-mask-mode"><option value="primary">自动主角 · 最大居中人物区域</option><option value="all">全部检测到的人物 · 可减去路人</option></select>
+            <button id="scene-mask-analyze" type="button" class="text-button">分析／重新分析主体</button>
+            <label for="scene-mask-file">自备保护蒙版 · PNG，白色保留主体</label><input id="scene-mask-file" type="file" accept="image/png">
+            <canvas id="scene-mask-canvas" hidden aria-label="主体保护预览与增减画笔"></canvas>
+            <div class="scene-mask-actions"><button id="scene-mask-add" type="button" aria-pressed="false">增保护</button><button id="scene-mask-subtract" type="button" aria-pressed="false">减保护</button><button id="scene-mask-stop" type="button">停止绘制</button><button id="scene-mask-undo" type="button" disabled>撤销／恢复</button></div>
+            <label for="scene-brush-size">保护画笔大小</label><input id="scene-brush-size" type="range" min="1" max="20" value="4">
+          </details>
+          <button id="scene-recompose" type="button" class="button" hidden>按当前保护重新合成 · 不再出图</button><p id="scene-recompose-help" class="field-hint" hidden>沿用已保存的AI原始图。关闭主体保护再合成，可查看完整AI效果；不会重新调用模型。</p>
+        </section>
         <section id="portrait-panel" class="portrait-panel" hidden><h3>人物细化 · 本轮设置</h3><label for="portrait-profile">细化起点</label><select id="portrait-profile"><option value="gentle">保守细化</option><option value="texture">质感细化</option><option value="faceHair">五官与发丝</option><option value="handsOutfit">手部与服装</option><option value="custom">自定义／画面检查建议</option></select><div id="portrait-levels"></div><label for="portrait-texture">原有质感保留 <output id="portrait-texture-value">85</output> / 100</label><input id="portrait-texture" type="range" min="0" max="100" value="85"><label class="portrait-check"><input id="portrait-face-lock" type="checkbox" checked>锁定脸型、五官位置与神态</label><label class="portrait-check"><input id="portrait-protect-bg" type="checkbox" checked>人物蒙版保护背景与合成效果</label><label for="portrait-mask-file">自备人物蒙版 · 可选灰度PNG</label><input id="portrait-mask-file" type="file" accept="image/png"><button id="portrait-build-mask" class="text-button" type="button">分析／查看本轮人物蒙版</button><figure id="portrait-mask-view" hidden><img id="portrait-mask-preview" alt="本轮人物蒙版：白色会细化，黑色保留原图"><figcaption>白色可细化，黑色像素保留；自动分割不准确时可上传修正蒙版，或用局部选区。</figcaption></figure><div class="portrait-actions"><button id="portrait-audit" class="button" type="button">AI检查本轮输入人物</button><button id="portrait-apply-audit" class="text-button" type="button" disabled>采用检查建议</button></div><div id="portrait-audit-result" aria-live="polite"></div><p class="field-hint">部位等级、五官锁定和质感偏好会转成AI编辑指令，实际效果需检查。背景保护由蒙版合成执行；配合矩形选区可只修一处。</p></section>
         <div id="paint-field" class="paint-field">
           <div class="paint-heading"><label for="paint-level">厚涂程度</label><output id="paint-value" for="paint-level">2 / 10</output></div>

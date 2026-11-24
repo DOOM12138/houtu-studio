@@ -1,6 +1,6 @@
 # 前后端与运行边界
 
-本项目是个人本机图片工作台，当前版本 1.10.0。默认一个进程在 127.0.0.1:4317 同时托管静态页面与 JSON API。它不是公网多用户服务。
+本项目是个人本机图片工作台，当前版本 1.11.0。默认一个进程在 127.0.0.1:4317 同时托管静态页面与 JSON API。它不是公网多用户服务。
 
 ## 前端
 
@@ -29,3 +29,5 @@ Git 初始基线为当前 1.7.0；更早版本 ZIP 是本机归档，不伪装�
 模型边界：public/model-picker.js 为三页共享选择器，public/model-options.js 校验模型ID。GET /api/models 从本应用独立客户端读取目录；lib/codex.mjs 对显式选择校验并传入线程和回合。任务保存所选与实际模型，创作缓存纳入所选模型，默认工作流保存首次实际模型以固定重试。主模型和服务侧绘图引擎分别说明。
 
 本机服务器：backend/accounts.mjs记录官方客户端确认的账号标识，backend/library.mjs从所有工作流尝试与旧任务构建图片索引，frontend/server.html和server.js提供本机管理页。私有账号档案、可重建索引与按需缩略图在data/library；官方授权继续在data/codex，图片仍在原有jobs/workflows目录，不重复搬运原图。账号快照在实际AI调用边界捕获，重试检查原账号；仅本机计算不调用账号。
+
+场照与次元：public/scene-options.js提供经过校验的任务参数与自研指令，scene-ui.js管理设置，subject-mask.js处理最大居中连通主体估计、原尺寸蒙版与增减画笔。用户预览为白色保留，发送后台时反色为黑色保留，以复用lib/images.mjs保护合成。compose-only替换保存为独立compositionMaskAsset覆盖，不修改source的原始蒙版或重放AI调用。

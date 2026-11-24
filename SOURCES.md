@@ -36,3 +36,10 @@
 
 - 官方客户端模型列表和线程请求：https://learn.chatgpt.com/docs/app-server 。使用model/list分页与model字段；还通过当前安装的0.172.0客户端生成类型定义，在F盘临时目录核对协议。
 - 内置绘图边界：https://learn.chatgpt.com/docs/image-generation 。主模型选择与服务内置图片引擎不同，不将Images API型号列作订阅接口的任意可选绘图模型。
+
+## 1.11 场照清场与次元方向
+
+- 用户明确：需要保留主体的干净漫展场照，不是白棚或透明PNG。
+- 官方工具箱：https://www.pixcakeai.com/guide/230427 。可确认场照清场、消除灯架、飘发、发丝与光影特效等公开功能，以及细节保护层／效果层的高层操作方向。未获得商业私有模型、完整提示词、内部参数或源码；本站为自研实现，不宣称同效果复刻。
+- 官方COS工具集合：https://wiki.pixcakeai.com/ai-toolbox/huanxiang-cos 。用于确认功能范围。
+- 场馆灯阵实景观察：https://www.jfdaily.com/news/detail?id=958292 ，图片 https://images.shobserver.com/img/2025/08/03/l_CB20250803150913010083.jpg 。仅作为场照背景人群、柔光箱、摄影支架与地面杂物的研究参考，未放入源码或软件包，也未作为虚构AI效果展示。

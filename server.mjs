@@ -1,3 +1,4 @@
+import {isSceneOperation} from './public/scene-options.js';
 import {AccountLedger,trackedBridge,accountSnapshot} from './backend/accounts.mjs';
 import {ImageLibrary} from './backend/library.mjs';
 import os from 'node:os';
@@ -13,7 +14,7 @@ import { pipeline } from 'node:stream/promises';
 import { stat, unlink } from 'node:fs/promises';
 import { CodexBridge } from './lib/codex.mjs';
 import { DEFAULT_PROMPT, paintingPrompt, decodeImage, normalizeEditOptions } from './lib/painting.mjs';
-import { prepareEditImage, finishEditImage, applyProtectionMask } from './lib/images.mjs';
+import { prepareEditImage, finishEditImage, applyProtectionMask, orientedDimensions } from './lib/images.mjs';
 import { PRESETS, normalizePaintLevel } from './public/catalog.js';
 import { TemplateStore } from './lib/templates.mjs';
 import { buildPortable } from './scripts/build-portable.mjs';
@@ -37,7 +38,7 @@ const publicJob = j => ({ id: j.id, status: j.status, account:accountSnapshot(j.
   promptMode: j.promptMode || 'guided',
   workflowId:j.workflowId||null, workflowStep:j.workflowStep||null, workflowToken:j.workflowToken||null, runId:j.runId||null,
   region:j.region||null,rawAsset:j.rawAsset||null,
-  portrait:j.portrait||null,maskAsset:j.maskAsset||null,round:j.round||1,sourceWorkflowId:j.sourceWorkflowId||null,sourceAsset:j.sourceAsset||null,sourceStep:j.sourceStep||null,portraitAuditId:j.portraitAuditId||null,
+  scene:j.scene||null,compositionMaskOverride:Boolean(j.compositionMaskOverride),compositionMaskAsset:j.compositionMaskAsset||null,portrait:j.portrait||null,maskAsset:j.maskAsset||null,round:j.round||1,sourceWorkflowId:j.sourceWorkflowId||null,sourceAsset:j.sourceAsset||null,sourceStep:j.sourceStep||null,portraitAuditId:j.portraitAuditId||null,
   created: j.created, message: j.message, sourceUrl: `/images/${j.id}/source.${j.extension}`,
   outputUrl: j.output ? `/images/${j.id}/${j.output}` : null });
 
@@ -107,14 +108,15 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     if(job.runId!==runId)throw new Error('这次执行已过期。');
     let output=await composeImage(bytes,original,prepared.region||null);
     const sourceState=workflow.steps.find(n=>n.id==='source')?.output;
-    if(sourceState?.maskAsset){const mask=await workflows.asset(job.workflowId,sourceState.maskAsset);output=await applyProtectionMask(output,original,await readFile(mask.file));}
+    const effectiveMask=job.compositionMaskOverride?job.compositionMaskAsset:sourceState?.maskAsset;
+    if(effectiveMask){const mask=await workflows.asset(job.workflowId,effectiveMask);output=await applyProtectionMask(output,original,await readFile(mask.file));}
     if(job.runId!==runId)throw new Error('这次执行已过期。');
     const asset=await workflows.putAsset(job.workflowId,output,'image/png');
     if(job.runId!==runId)throw new Error('这次执行已过期。');
     const filename=`result-${runId}.png`;await writeFile(path.join(job.directory,filename),output);
     if(job.runId!==runId)throw new Error('这次执行已过期。');job.output=filename;
     const generation=workflow.steps.find(n=>n.id==='generate')?.output;
-    await doneJobStep(job,{imageAsset:asset.id,jobId:job.id,account:accountSnapshot(generation?.account),model:generation?.model||null,resolvedModel:generation?.resolvedModel||null},[{id:asset.id,label:'完整精修成品',type:'image'}],'合成完成，完整图片已保存',runId);
+    await doneJobStep(job,{imageAsset:asset.id,jobId:job.id,account:accountSnapshot(generation?.account),maskAsset:effectiveMask||null,model:generation?.model||null,resolvedModel:generation?.resolvedModel||null},[{id:asset.id,label:'完整精修成品',type:'image'}],'合成完成，完整图片已保存',runId);
   };
   const generateJob=async(job)=>{if(isClosing||job.cancelled)throw new Error('网站正在停止，本轮可从当前步骤继续。');
     await startJobStep(job,'generate');
@@ -156,7 +158,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     } else throw new Error('客户端没有返回可下载的图片，请升级客户端后重试。');
     if(job.runId!==runId)throw new Error('这次执行已过期。');
     const raw=await workflows.putAsset(job.workflowId,bytes,item.result?.startsWith('data:image/jpeg')?'image/jpeg':'image/png');if(job.runId!==runId)throw new Error('这次执行已过期。');job.rawAsset=raw.id;
-    await doneJobStep(job,{rawAsset:raw.id,account:accountSnapshot(job.account),appVersion:'1.10.0',model:job.model||null,resolvedModel:job.resolvedModel||null},[{id:raw.id,label:'AI返回的原始出图（合成前）',type:'image'}],'原始生成图已保存，后续合成无需再次生成',runId);
+    await doneJobStep(job,{rawAsset:raw.id,account:accountSnapshot(job.account),appVersion:'1.11.0',model:job.model||null,resolvedModel:job.resolvedModel||null},[{id:raw.id,label:'AI返回的原始出图（合成前）',type:'image'}],'原始生成图已保存，后续合成无需再次生成',runId);
     await composeOutput(job,bytes,runId);
   };
 
@@ -220,7 +222,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       if (req.method === 'POST') {
         if (req.headers.origin !== `http://${host}` || req.headers['x-paint-csrf'] !== csrf) return json(res, 403, { error: '请从本站页面发起操作。' });
       }
-      if (route === '/api/health' && req.method === 'GET') return json(res, 200, { app: 'houtu-studio', version: '1.10.0', instanceId, csrf });
+      if (route === '/api/health' && req.method === 'GET') return json(res, 200, { app: 'houtu-studio', version: '1.11.0', instanceId, csrf });
       if(route==='/api/portrait/source'&&req.method==='GET'){
         const auditId=url.searchParams.get('audit');if(auditId){const w=await workflows.get(auditId);if(w.kind!=='portrait-audit')throw new Error('不是人物检查工作流。');const assetId=w.steps[0].output?.imageAsset;if(!assetId)throw new Error('检查原图尚未保存。');return json(res,200,{workflowId:w.id,assetId,url:`/api/workflows/${w.id}/assets/${assetId}`,name:w.name,auditId:w.id,diagnosis:w.steps.find(n=>n.id==='diagnose').status==='done'?w.steps.find(n=>n.id==='diagnose').output:null});}
         const id=url.searchParams.get('workflow'),assetId=url.searchParams.get('asset');await resolvePicture({source:{kind:'workflow',workflowId:id,assetId}},{jobs,workflows});const w=await workflows.get(id);return json(res,200,{workflowId:id,assetId,url:`/api/workflows/${id}/assets/${assetId}`,name:w.name});
@@ -268,11 +270,16 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
           if(action==='retry'){
             if(active||activePackage||critiqueActive)return json(res,409,{error:'有任务正在运行，请勿重复启动。'});
             active='reserved';let job;
-            try{const input=await body(req,4096),w=await workflows.get(id);job=jobs.get(w.jobId);if(w.kind!=='retouch'||!job)throw new Error('此工作流应在调色工作台继续。');
+            try{const input=await body(req,24*1024*1024),w=await workflows.get(id);job=jobs.get(w.jobId);if(w.kind!=='retouch'||!job)throw new Error('此工作流应在调色工作台继续。');
               if(!['prepare','generate','compose'].includes(input.step))throw new Error('请选择裁片、生成或合成步骤。');
               const dependency={prepare:'source',generate:'prepare',compose:'generate'}[input.step],upstream=w.steps.find(n=>n.id===dependency);if(upstream?.status!=='done')throw new Error('前置步骤尚未完成，请先从前面的失败步骤继续。');
               if(input.step!=='compose'&&!await bridge.account())return json(res,401,{error:'请先登录 ChatGPT，合成步骤本身不需要重新生成。'});
-              await workflows.restart(id,input.step,input.revision);Object.assign(job,{runId:randomUUID(),status:'preparing',message:'从所选步骤继续执行…',output:null,workflowToken:null,threadId:null,turnId:null,saving:null});active=job.id;await persist(job);const runId=job.runId;
+              let maskUpdate=null;if(input.replaceProtection===true){
+                if(input.step!=='compose'||!isSceneOperation(job.operation))throw Error('只有场照与次元的重合成可以替换主体保护。');
+                let mask=null;if(input.protectionMask){const decoded=decodeImage(input.protectionMask);if(decoded.extension!=='png')throw Error('主体保护蒙版需要PNG格式。');mask=(await workflows.putAsset(id,decoded.bytes,'image/png')).id;}
+                maskUpdate={compositionMaskOverride:true,compositionMaskAsset:mask};
+              }
+              await workflows.restart(id,input.step,input.revision);if(maskUpdate)Object.assign(job,maskUpdate);Object.assign(job,{runId:randomUUID(),status:'preparing',message:'从所选步骤继续执行…',output:null,workflowToken:null,threadId:null,turnId:null,saving:null});active=job.id;await persist(job);const runId=job.runId;
               Promise.resolve().then(async()=>{if(input.step==='compose'){const asset=await workflows.asset(id,upstream.output.rawAsset);await composeOutput(job,await readFile(asset.file),runId);await finish(job,'done','已复用原始出图完成合成，没有再次调用AI。',runId);}else{if(input.step==='prepare'){const asset=await workflows.asset(id,upstream.output.imageAsset);await prepareJob(job,await readFile(asset.file));}await generateJob(job);}}).catch(e=>finish(job,'error',friendlyError(e.message),runId)).catch(()=>{});
               return json(res,202,publicJob(job));
             }finally{if(active==='reserved')active=null;}
@@ -323,7 +330,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
         try{await bridge.account();}catch{}
         const images=await library.refresh(jobs,workflows);
         const records=accounts.records().map(account=>({...account,images:images.filter(image=>image.account?.email.toLowerCase()===account.email.toLowerCase()).length}));
-        return json(res,200,{serverId:accounts.state.serverId,startedAt,created:accounts.state.created,machine:os.hostname(),version:'1.10.0',projectRoot:ROOT,dataRoot:path.resolve(directory),loginRoot:path.join(path.resolve(directory),'codex'),scope:'local',current:accounts.current(),accounts:records,images:images.length});
+        return json(res,200,{serverId:accounts.state.serverId,startedAt,created:accounts.state.created,machine:os.hostname(),version:'1.11.0',projectRoot:ROOT,dataRoot:path.resolve(directory),loginRoot:path.join(path.resolve(directory),'codex'),scope:'local',current:accounts.current(),accounts:records,images:images.length});
       }
       if(route==='/api/server/images'&&req.method==='GET'){await library.refresh(jobs,workflows);return json(res,200,library.list(url.searchParams,accounts.records()));}
       const thumbnail=/^\/api\/server\/thumbnails\/([a-f0-9]{64})$/.exec(route);
@@ -414,6 +421,9 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
         try {
           const input = await body(req);
           const options = normalizeEditOptions(input);
+          if(isSceneOperation(options.operation)&&!options.scene.protectSubject&&input.protectionMask)throw Error('关闭主体像素保护时请不要提交保护蒙版。');
+          if(isSceneOperation(options.operation)&&options.scene.protectSubject&&!input.protectionMask)throw Error('请先分析主体保护或上传蒙版，也可关闭像素保护后按AI语义清理。');
+          if(options.operation==='remove-people'&&options.scene.people==='selection'&&!options.selection)throw Error('请先画出需要清除路人的编辑选区。');
           if (options.parentId && !jobs.has(options.parentId)) throw new Error('上一版作品不存在，请重新打开作品。');
           const prompt = paintingPrompt(options);
           const resolved=await resolvePicture(input,{jobs,workflows}),image={bytes:resolved.bytes};if(resolved.parentJobId)options.parentId=resolved.parentJobId;
@@ -427,7 +437,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
           jobs.set(id, job); active = id; await persist(job);
           await startJobStep(job,'source');
           const source=await workflows.putAsset(workflow.id,image.bytes,'image/png');
-          let maskAsset=null;if(input.protectionMask){const mask=decodeImage(input.protectionMask);maskAsset=(await workflows.putAsset(workflow.id,mask.bytes,'image/png')).id;}job.maskAsset=maskAsset;const referenceAssets=[];for(const ref of resolved.identity){const asset=await workflows.asset(ref.workflowId,ref.assetId);referenceAssets.push((await workflows.putAsset(workflow.id,await readFile(asset.file),'image/png')).id);}if(input.portraitAuditId){const audit=await workflows.get(input.portraitAuditId);if(audit.kind!=='portrait-audit')throw new Error('人物检查记录无效。');const audited=await workflows.asset(audit.id,audit.steps[0].output.imageAsset);if((audit.steps[0].output.pixelSignature||await pictureSignature(await readFile(audited.file)))!==await pictureSignature(image.bytes))throw new Error('这份检查针对其他图片，请重新检查。');}await doneJobStep(job,{imageAsset:source.id,options,maskAsset,referenceAssets,sourceWorkflowId:resolved.parentWorkflowId,sourceStep:resolved.sourceStep,sourceAsset:resolved.sourceAsset},[{id:source.id,label:'本轮实际人物成品输入',type:'image'},...(maskAsset?[{id:maskAsset,label:'本轮背景保护蒙版',type:'image'}]:[])],'原图、细化参数与保护蒙版已保存');
+          let maskAsset=null;if(input.protectionMask){const mask=decodeImage(input.protectionMask);if(isSceneOperation(options.operation)&&mask.extension!=='png')throw Error('主体保护蒙版需要PNG格式。');const stored=await workflows.putAsset(workflow.id,mask.bytes,'image/png'),displayShape=isSceneOperation(options.operation)?await orientedDimensions(image.bytes):source;if(isSceneOperation(options.operation)&&Math.abs(stored.width/stored.height-displayShape.width/displayShape.height)>.025)throw Error('主体保护蒙版与原图长宽比不一致，请重新分析。');maskAsset=stored.id;}job.maskAsset=maskAsset;const referenceAssets=[];for(const ref of resolved.identity){const asset=await workflows.asset(ref.workflowId,ref.assetId);referenceAssets.push((await workflows.putAsset(workflow.id,await readFile(asset.file),'image/png')).id);}if(input.portraitAuditId){const audit=await workflows.get(input.portraitAuditId);if(audit.kind!=='portrait-audit')throw new Error('人物检查记录无效。');const audited=await workflows.asset(audit.id,audit.steps[0].output.imageAsset);if((audit.steps[0].output.pixelSignature||await pictureSignature(await readFile(audited.file)))!==await pictureSignature(image.bytes))throw new Error('这份检查针对其他图片，请重新检查。');}await doneJobStep(job,{imageAsset:source.id,options,maskAsset,referenceAssets,sourceWorkflowId:resolved.parentWorkflowId,sourceStep:resolved.sourceStep,sourceAsset:resolved.sourceAsset},[{id:source.id,label:'本轮实际人物成品输入',type:'image'},...(maskAsset?[{id:maskAsset,label:isSceneOperation(options.operation)?'主体保护蒙版：黑色保留、白色可修改':'本轮背景保护蒙版',type:'image'}]:[])],'原图、细化参数与保护蒙版已保存');
           await prepareJob(job,image.bytes);await generateJob(job);
           return json(res, 202, publicJob(job));
         } catch (error) {
@@ -469,7 +479,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       } else if (req.method === 'GET' && route === '/models/selfie_multiclass_256x256.tflite') {
         file=path.join(ROOT,'models','selfie_multiclass_256x256.tflite');
       } else {
-        const files = { '/': 'index.html', '/app.js': 'app.js', '/catalog.js': 'catalog.js', '/style.css': 'style.css', '/favicon.svg': 'favicon.svg','/portrait-options.js':'portrait-options.js','/portrait-ui.js':'portrait-ui.js','/model-picker.js':'model-picker.js','/model-options.js':'model-options.js' };
+        const files = { '/': 'index.html', '/app.js': 'app.js', '/catalog.js': 'catalog.js', '/style.css': 'style.css', '/favicon.svg': 'favicon.svg','/portrait-options.js':'portrait-options.js','/portrait-ui.js':'portrait-ui.js','/model-picker.js':'model-picker.js','/model-options.js':'model-options.js','/scene-options.js':'scene-options.js','/scene-ui.js':'scene-ui.js','/subject-mask.js':'subject-mask.js' };
         if (!Object.hasOwn(files, route) || req.method !== 'GET') return json(res, 404, { error: '页面不存在。' });
         file = path.join(ROOT, 'public', files[route]);
       }
