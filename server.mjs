@@ -43,7 +43,7 @@ const publicJob = j => ({ requestKey:j.requestKey||null,pipelineParentId:j.pipel
   parentId: j.parentId || null, imageWidth: j.imageWidth, imageHeight: j.imageHeight,
   promptMode: j.promptMode || 'guided',
   workflowId:j.workflowId||null, workflowStep:j.workflowStep||null, workflowToken:j.workflowToken||null, runId:j.runId||null,
-  region:j.region||null,rawAsset:j.rawAsset||null,
+  region:j.region||null,rawAsset:j.rawAsset||null,composition:j.composition||null,
   belly:j.belly||null,scene:j.scene||null,compositionMaskOverride:Boolean(j.compositionMaskOverride),compositionMaskAsset:j.compositionMaskAsset||null,portrait:j.portrait||null,maskAsset:j.maskAsset||null,round:j.round||1,sourceWorkflowId:j.sourceWorkflowId||null,sourceAsset:j.sourceAsset||null,sourceStep:j.sourceStep||null,portraitAuditId:j.portraitAuditId||null,
   created: j.created, message: j.message, sourceUrl: `/images/${j.id}/source.${j.extension}`,
   outputUrl: j.output ? `/images/${j.id}/${j.output}` : null });
@@ -91,7 +91,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
 
   const finish = async (job, status, message, runId=job.runId) => {
     if (!isRunning(job)||job.runId!==runId||job.finishingRun===runId) return;
-    job.finishingRun=runId;
+    job.finishingRun=runId;if(status==='done'&&job.composition?.needsReview)message+=' 边缘颜色、取景比例或过窄区域需复核，请对照原图检查；原始出图已保留，可只重新合成。';
     const workflowId=job.workflowId,step=job.workflowStep,token=job.workflowToken;
     clearTimeout(job.deadline);
     if(workflowId&&status!=='done'&&token)await workflows.fail(workflowId,step,token,message).catch(()=>{});
@@ -112,17 +112,19 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     if(!prepared?.sourceAsset)throw new Error('原图检查点缺失，请从裁片步骤继续。');
     const source=await workflows.asset(job.workflowId,prepared.sourceAsset),original=await readFile(source.file);
     if(job.runId!==runId)throw new Error('这次执行已过期。');
-    let output=await composeImage(bytes,original,prepared.region||null);
+    job.composition=null;const localReport={},maskReport={};
+    let output=await composeImage(bytes,original,prepared.region||null,{report:localReport});
     const sourceState=workflow.steps.find(n=>n.id==='source')?.output;
     const effectiveMask=job.compositionMaskOverride?job.compositionMaskAsset:sourceState?.maskAsset;
-    if(effectiveMask){const mask=await workflows.asset(job.workflowId,effectiveMask);output=await applyProtectionMask(output,original,await readFile(mask.file));}
+    if(effectiveMask){const mask=await workflows.asset(job.workflowId,effectiveMask);output=await applyProtectionMask(output,original,await readFile(mask.file),{report:maskReport});}
     if(job.runId!==runId)throw new Error('这次执行已过期。');
     const asset=await workflows.putAsset(job.workflowId,output,'image/png');
     if(job.runId!==runId)throw new Error('这次执行已过期。');
     const filename=`result-${runId}.png`;await writeFile(path.join(job.directory,filename),output);
     if(job.runId!==runId)throw new Error('这次执行已过期。');job.output=filename;
+    job.composition={method:localReport.method||maskReport.method||'custom-compositor',stages:[{scope:'selection',...localReport},...(effectiveMask?[{scope:'protection',...maskReport}]:[])],needsReview:Boolean(localReport.needsReview||maskReport.needsReview)};
     const generation=workflow.steps.find(n=>n.id==='generate')?.output;
-    await doneJobStep(job,{imageAsset:asset.id,jobId:job.id,account:accountSnapshot(generation?.account),maskAsset:effectiveMask||null,model:generation?.model||null,resolvedModel:generation?.resolvedModel||null},[{id:asset.id,label:'完整精修成品',type:'image'}],'合成完成，完整图片已保存',runId);
+    await doneJobStep(job,{imageAsset:asset.id,jobId:job.id,composition:job.composition,account:accountSnapshot(generation?.account),maskAsset:effectiveMask||null,model:generation?.model||null,resolvedModel:generation?.resolvedModel||null},[{id:asset.id,label:'完整精修成品',type:'image'}],'合成完成，完整图片已保存',runId);
   };
   const generateJob=async(job)=>{if(isClosing||job.cancelled)throw new Error('网站正在停止，本轮可从当前步骤继续。');
     await startJobStep(job,'generate');
@@ -164,7 +166,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     } else throw new Error('客户端没有返回可下载的图片，请升级客户端后重试。');
     if(job.runId!==runId)throw new Error('这次执行已过期。');
     const raw=await workflows.putAsset(job.workflowId,bytes,item.result?.startsWith('data:image/jpeg')?'image/jpeg':'image/png');if(job.runId!==runId)throw new Error('这次执行已过期。');job.rawAsset=raw.id;
-    await doneJobStep(job,{rawAsset:raw.id,account:accountSnapshot(job.account),appVersion:'1.13.0',model:job.model||null,resolvedModel:job.resolvedModel||null},[{id:raw.id,label:'AI返回的原始出图（合成前）',type:'image'}],'原始生成图已保存，后续合成无需再次生成',runId);
+    await doneJobStep(job,{rawAsset:raw.id,account:accountSnapshot(job.account),appVersion:'1.13.1',model:job.model||null,resolvedModel:job.resolvedModel||null},[{id:raw.id,label:'AI返回的原始出图（合成前）',type:'image'}],'原始生成图已保存，后续合成无需再次生成',runId);
     await composeOutput(job,bytes,runId);
   };
 
@@ -284,7 +286,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       }
       const studioDownload=/^\/api\/studio\/downloads\/([a-f0-9-]{36})$/.exec(route);
       if(studioDownload&&req.method==='GET'){const receipt=JSON.parse(await readFile(path.join(studio.directory,'exports',studioDownload[1]+'.json'),'utf8')),file=path.join(studio.directory,'exports',studioDownload[1]+(receipt.kind==='backup'?'.jsondata':'.zip'));res.writeHead(200,{'Content-Type':receipt.kind==='backup'?'application/json':'application/zip','Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(receipt.name)}`,'Content-Length':(await stat(file)).size});await pipeline(createReadStream(file),res);return;}
-      if (route === '/api/health' && req.method === 'GET') return json(res, 200, { app: 'houtu-studio', version: '1.13.0', instanceId, csrf });
+      if (route === '/api/health' && req.method === 'GET') return json(res, 200, { app: 'houtu-studio', version: '1.13.1', instanceId, csrf });
       if(route==='/api/portrait/source'&&req.method==='GET'){
         const auditId=url.searchParams.get('audit');if(auditId){const w=await workflows.get(auditId);if(w.kind!=='portrait-audit')throw new Error('不是人物检查工作流。');const assetId=w.steps[0].output?.imageAsset;if(!assetId)throw new Error('检查原图尚未保存。');return json(res,200,{workflowId:w.id,assetId,url:`/api/workflows/${w.id}/assets/${assetId}`,name:w.name,auditId:w.id,diagnosis:w.steps.find(n=>n.id==='diagnose').status==='done'?w.steps.find(n=>n.id==='diagnose').output:null});}
         const id=url.searchParams.get('workflow'),assetId=url.searchParams.get('asset');await resolvePicture({source:{kind:'workflow',workflowId:id,assetId}},{jobs,workflows});const w=await workflows.get(id);return json(res,200,{workflowId:id,assetId,url:`/api/workflows/${id}/assets/${assetId}`,name:w.name});
@@ -392,7 +394,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
         try{await bridge.account();}catch{}
         const images=await library.refresh(jobs,workflows);
         const records=accounts.records().map(account=>({...account,images:images.filter(image=>image.account?.email.toLowerCase()===account.email.toLowerCase()).length}));
-        return json(res,200,{serverId:accounts.state.serverId,startedAt,created:accounts.state.created,machine:os.hostname(),version:'1.13.0',projectRoot:ROOT,dataRoot:path.resolve(directory),loginRoot:path.join(path.resolve(directory),'codex'),scope:'local',current:accounts.current(),accounts:records,images:images.length});
+        return json(res,200,{serverId:accounts.state.serverId,startedAt,created:accounts.state.created,machine:os.hostname(),version:'1.13.1',projectRoot:ROOT,dataRoot:path.resolve(directory),loginRoot:path.join(path.resolve(directory),'codex'),scope:'local',current:accounts.current(),accounts:records,images:images.length});
       }
       if(route==='/api/server/images'&&req.method==='GET'){await library.refresh(jobs,workflows);return json(res,200,library.list(url.searchParams,accounts.records()));}
       const thumbnail=/^\/api\/server\/thumbnails\/([a-f0-9]{64})$/.exec(route);

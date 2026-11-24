@@ -2,6 +2,7 @@
 import {mkdir,readdir,readFile,writeFile} from 'node:fs/promises';
 import {randomUUID,createHash} from 'node:crypto';
 import sharp from 'sharp';
+import {SEAM_VERSION} from '../lib/seam.mjs';
 import {replaceFile} from '../lib/files.mjs';
 import {recipeValue,RECIPE_SEEDS} from './studio-recipe.mjs';
 import {inspectPhoto,hashDistance,localProcess,gradeProcess,exportProcess,safeName} from './local-image.mjs';
@@ -53,7 +54,7 @@ export class StudioService{
       if(!child){const owner=await this.adapter.authorize(w.executionAccount);if(!w.executionAccount)await this.workflows.mutate(w.id,current=>{current.executionAccount=owner;return {};});
       child=await this.adapter.startRetouch({...definition.options,model:w.recipe.model||w.executionModel||null,source:{kind:'workflow',workflowId,assetId:dependency.output.imageAsset},...(mask?{protectionMask:'data:image/png;base64,'+(await readFile(mask.file)).toString('base64')}:{})},{requestKey,pipelineParentId:workflowId,expectedAccount:owner,managed:true});}
       await this.partial(workflowId,step,attempt.token,{requestKey,childJobId:child.id,childWorkflowId:child.workflowId,inputAsset:dependency.output.imageAsset});
-      if(['error','cancelled'].includes(child.status)&&child.rawAsset){const childFlow=await this.workflows.get(child.workflowId);if(childFlow.steps.find(n=>n.id==='generate')?.status==='done')child=await this.adapter.recompose(child);}
+      if(child.rawAsset&&(['error','cancelled'].includes(child.status)||child.status==='done'&&child.composition?.method!==SEAM_VERSION)){const childFlow=await this.workflows.get(child.workflowId);if(childFlow.steps.find(n=>n.id==='generate')?.status==='done')child=await this.adapter.recompose(child);}
       while(['preparing','generating','cancelling'].includes(child.status)){if(this.closing)throw failure('服务器正在停止，已保存子任务，重启后可恢复。');await sleep(100);child=this.adapter.getJob(child.id);}
       if(child.status!=='done'||!child.outputUrl)throw failure('子任务尚未完成：'+child.message+'。可打开子工作流从失败步骤继续，再恢复本流程。',409,'CHILD_FAILED');
       const childFlow=await this.workflows.get(child.workflowId),result=childFlow.steps.find(n=>n.id==='compose').output,done=await this.workflows.asset(child.workflowId,result.imageAsset);bytes=await readFile(done.file);type=done.type;output={engine:'ChatGPT-image',childJobId:child.id,childWorkflowId:child.workflowId,requestKey,account:accountSnapshot(child.account),model:child.model,resolvedModel:child.resolvedModel};if(!w.executionModel&&child.resolvedModel)await this.workflows.mutate(w.id,current=>{current.executionModel=child.resolvedModel;return {};});
