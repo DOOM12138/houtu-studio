@@ -17,3 +17,5 @@
 
 # Preserve upstream license formatting without treating it as project whitespace.
 vendor-licenses/** -whitespace
+
+*.onnx binary

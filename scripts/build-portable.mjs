@@ -1,3 +1,4 @@
+import {SR_MODELS} from '../public/superres-options.js';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { randomUUID, createHash } from 'node:crypto';
@@ -44,6 +45,7 @@ export async function buildPortable({ root = ROOT, output, includePrompts = fals
     for (const file of ALLOWED) await cp(path.join(root, file), path.join(app, file), { recursive: true, dereference: false });
     if(await hashFile(path.join(app,'models','selfie_multiclass_256x256.tflite'))!=='c6748b1253a99067ef71f7e26ca71096cd449baefa8f101900ea23016507e0e0')throw new Error('内置人物模型校验失败，已取消打包。');
     for(const [name,expected]of Object.entries({'face_landmarker.task':'64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff','hand_landmarker.task':'fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1'}))if(await hashFile(path.join(app,'models',name))!==expected)throw Error('部位模型校验失败：'+name);
+    for(const model of SR_MODELS)if(await hashFile(path.join(app,'models/superres',model.file))!==model.sha256)throw Error('内置超分模型校验失败：'+model.id);
     progress('正在加入免安装运行环境');
     await mkdir(path.join(app, 'runtime'));
     await copyFile(process.execPath, path.join(app, 'runtime', 'node.exe'));
@@ -55,11 +57,11 @@ export async function buildPortable({ root = ROOT, output, includePrompts = fals
     const dependencies = [];
     for (const relative of productionDirectories(lock)) {
       if (!await exists(path.join(root, relative))) continue; // Other OS/CPU optional packages.
-      await cp(path.join(root, relative), path.join(app, relative), { recursive: true, dereference: false });
+      await cp(path.join(root, relative), path.join(app, relative), { recursive: true, dereference: false, filter:source=>{if(relative!=='node_modules/onnxruntime-node')return true;const parts=path.relative(path.join(root,relative),source).split(path.sep);if(parts[0]!=='bin'||parts[1]!=='napi-v6'||parts.length<3)return true;return parts[2]==='win32'&&(parts.length<4||parts[3]==='x64');} });
       const pkg = JSON.parse(await readFile(path.join(root, relative, 'package.json'), 'utf8'));
       dependencies.push({ name: pkg.name, version: pkg.version, license: pkg.license || 'See bundled package license' });
     }
-    for (const required of ['node_modules/@openai/codex/bin/codex.js', 'node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe', 'node_modules/sharp/package.json']) if (!await exists(path.join(app, required))) throw new Error('缺少 Windows x64 生产依赖，请先完成 npm install。');
+    for (const required of ['node_modules/@openai/codex/bin/codex.js', 'node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe', 'node_modules/sharp/package.json','node_modules/onnxruntime-node/bin/napi-v6/win32/x64/onnxruntime_binding.node','node_modules/onnxruntime-node/bin/napi-v6/win32/x64/onnxruntime.dll','vendor-licenses/onnxruntime-1.31.1/LICENSE','vendor-licenses/directml-1.15.4/LICENSE.txt','vendor-licenses/dxc-1.8.2502.8/LICENSE-LLVM.txt']) if (!await exists(path.join(app, required))) throw new Error('缺少 Windows x64 生产依赖，请先完成 npm install。');
     const nativeFiles = await readdir(path.join(app, 'node_modules', '@img', 'sharp-win32-x64', 'lib'));
     if (!nativeFiles.some(name => name.endsWith('.node')) || !nativeFiles.some(name => name.endsWith('.dll'))) throw new Error('缺少图片处理的原生模块或 DLL。');
     let templateCount = 0;
@@ -82,6 +84,10 @@ export async function buildPortable({ root = ROOT, output, includePrompts = fals
     await writeFile(path.join(app, 'THIRD-PARTY-NOTICES.txt'), [
       'This distribution includes Node.js and the production npm packages listed below.',
       'Node.js license and third-party notices are in runtime/LICENSE.txt.',
+      'Local super-resolution: official Real-ESRGAN checkpoints converted to ONNX; BSD-3-Clause and provenance in models/superres/.',
+      'ONNX Runtime 1.31.1 MIT and full third-party notices: vendor-licenses/onnxruntime-1.31.1/.',
+      'Bundled Windows DirectML 1.15.4 is under Microsoft Software License Terms, with additional code notices: vendor-licenses/directml-1.15.4/.',
+      'Bundled DXC 1.8.2502.8 LLVM/MIT/Microsoft notices: vendor-licenses/dxc-1.8.2502.8/.',
       'Individual package licenses and notices are preserved in their node_modules directories.',
       'MediaPipe model card and license: models/model-card.pdf and models/LICENSE.txt. Model source and SHA-256 are recorded in models/README.md.',
       '', ...dependencies.map(dep => `${dep.name} ${dep.version} — ${dep.license}`), '',

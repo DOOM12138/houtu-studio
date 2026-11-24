@@ -83,3 +83,10 @@
 - Adobe 官方对比视图说明：https://helpx.adobe.com/lightroom-classic/help/comparing-photos-library-module.html ，参考联动缩放及对比流程。
 
 实现与样式为本站原创。第三方官网截图只在F盘私有缓存中供布局研究，不加入源码、发布包或本站示例图库。
+
+
+## 本机4K超分（2026-11-25）
+
+Real-ESRGAN官方权重与SRVGGNetCompact架构：https://github.com/xinntao/Real-ESRGAN （BSD-3-Clause）。固定checkpoint源、SHA-256、转换工具及ONNX哈希在models/superres/manifest.json和README.md。没有重新训练基础权重。
+
+ONNX Runtime1.31.1 CPU，官方Node支持：https://onnxruntime.ai/docs/get-started/with-javascript/node.html 。MIT及第三方全文来自Microsoft.ML.OnnxRuntime1.31.1官方NuGet；DirectML1.15.4和DXC1.8.2502.8随Windows包附带，分别保留各自微软／MIT／LLVM条款，见vendor-licenses。未把DirectML二进制标成MIT。

@@ -173,6 +173,7 @@ function updateControls() {
   $('delete-template').disabled = working || !$('template-select').value;
   $('build-package').disabled = working || !state.csrf;
   $('include-prompts').disabled = packing;
+  $('to-superres').disabled=!hasSource()||working;$('result-superres').hidden=!currentJob?.outputUrl||working;$('result-superres').href=currentJob?.id?'/upscale/?job='+currentJob.id:'#';
   $('select-region').disabled = !hasSource() || working || Boolean(PRESETS.find(t=>t.id===operation)?.fullFrame);
   $('apply-region').disabled = !hasSource() || working;
   $('clear-region').disabled = !selection || working;
@@ -564,6 +565,7 @@ $('reuse-result').addEventListener('click',()=>checkoutPortraitVersion(currentJo
 $('portrait-rollback').addEventListener('click',async()=>{const before=currentJob;if(!before||busy||running(before.status))return;try{const response=await fetch(before.sourceUrl);if(!response.ok)throw Error('本轮输入图片已不可用。');const blob=await response.blob();if(!await setFile(new File([blob],'回退-本轮开始前.png',{type:blob.type}),{kind:'source',jobId:before.id}))return;parentId=before.parentId||null;$('prompt-mode').value='guided';setOperation('portrait-polish');feedback('已退回本轮开始前的图片。旧成品保留，继续生成会另建一轮。',true);}catch(e){feedback(e.message);}});
 async function loadPortraitVersions(job){try{const response=await api(`/api/jobs/${job.id}/lineage`);if(currentJob?.id!==job.id)return;$('portrait-version-list').replaceChildren();for(const version of response.versions){const button=document.createElement('button');button.type='button';button.className='portrait-version';button.dataset.jobId=version.id;button.disabled=busy||portraitChecking||running(currentJob?.status);button.setAttribute('aria-pressed',String(version.id===job.id));if(version.outputUrl){const img=document.createElement('img');img.src=version.outputUrl;img.alt='人物精修第'+(version.round||1)+'轮';button.append(img);}const label=document.createElement('span');label.textContent=`从第${version.round||1}轮成品继续 · ${PRESETS.find(p=>p.id===version.operation)?.name||'人物精修'}`;button.append(label);button.onclick=()=>checkoutPortraitVersion(version);$('portrait-version-list').append(button);}if(job.sourceWorkflowId){const a=document.createElement('a');a.href='/workflows/?id='+job.sourceWorkflowId;a.className='text-button';a.textContent='查看本轮来源工作流';$('portrait-version-list').append(a);}$('portrait-versions').hidden=false;}catch{/* The ordinary history remains available if the version query fails. */}}
 
+$('to-superres').onclick=async()=>{if(!hasSource()||busy||running(currentJob?.status))return;busy=true;updateControls();try{const value=await api('/api/superres/import',{...(sourceReference?{source:sourceReference}:{image:sourceData}),name:$('file-name').textContent});location.href=value.url;}catch(e){feedback(e.message);}finally{busy=false;updateControls();}};
 $('to-color').addEventListener('click', async () => {
   try {
     if(currentJob?.outputUrl&&currentJob.workflowId){location.href='/color/?fromWorkflow='+currentJob.workflowId;return;}

@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "license": "BSD-3-Clause",
+  "upstream": "https://github.com/xinntao/Real-ESRGAN",
+  "architectureCommit": "a4abfb2979a7bbff3f69f58f58ae324608821e27",
+  "converter": {
+    "onnx": "1.20.1",
+    "numpy": "2.4.2",
+    "opset": 17
+  },
+  "models": [
+    {
+      "id": "general-x4v3-dn50",
+      "file": "general-x4v3-dn50.onnx",
+      "architecture": "SRVGGNetCompact",
+      "nativeScale": 4,
+      "convolutions": 34,
+      "padding": 40,
+      "sha256": "4843177d075bf9be09c19da44c9d5da9c3327e13512cd503e726a36b51e71596",
+      "bytes": 4858863,
+      "sources": [
+        {
+          "name": "realesr-general-x4v3",
+          "sha256": "8dc7edb9ac80ccdc30c3a5dca6616509367f05fbc184ad95b731f05bece96292",
+          "bytes": 4885111,
+          "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth"
+        },
+        {
+          "name": "realesr-general-wdn-x4v3",
+          "sha256": "1641f8c4464b9f097c9fdda5589273713f67cf59f3d909e0bd688f0cee269dca",
+          "bytes": 4885111,
+          "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth"
+        }
+      ],
+      "blend": "general 50% + weak-denoise 50%"
+    },
+    {
+      "id": "animevideov3",
+      "file": "animevideov3.onnx",
+      "architecture": "SRVGGNetCompact",
+      "nativeScale": 4,
+      "convolutions": 18,
+      "padding": 24,
+      "sha256": "59a9f65af7de62b3f8851590d4fe56cf72f23cda816156049a32aa823c194568",
+      "bytes": 2488843,
+      "sources": [
+        {
+          "name": "realesr-animevideov3",
+          "sha256": "b8a8376811077954d82ca3fcf476f1ac3da3e8a68a4f4d71363008000a18b75d",
+          "bytes": 2504012,
+          "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-animevideov3.pth"
+        }
+      ],
+      "blend": null
+    }
+  ]
+}
