@@ -1,10 +1,21 @@
 ﻿<!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>本机服务器 · 厚涂小站</title><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/color/style.css"><script type="module" src="/color/server.js"></script></head>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>本机服务器 · 厚涂小站</title><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/color/style.css"><script type="module" src="/color/server.js"></script><link rel="stylesheet" href="/update-notice.css"><script type="module" src="/update-notice.js"></script></head>
 <body><header><a class="brand" href="/">厚涂小站</a><nav aria-label="工作台"><a href="/studio/">照片项目</a><a href="/">人物精修</a><a href="/color/">调色与蒙版</a><a href="/creative/">特效与合成</a><a href="/workflows/">工作流管理</a><a href="/server/" aria-current="page">本机服务器</a></nav><button id="theme">切换主题</button></header>
 <main class="server-main">
  <div class="titlebar"><div><h1>本机服务器</h1><p>这台电脑的图片档案与账号记录，关闭网页后仍保留。</p></div><button id="refresh-server">刷新全部记录</button></div>
  <p id="server-notice" role="status" aria-live="polite">正在读取服务器记录…</p>
  <div class="server-session"><span id="server-current">正在确认 ChatGPT 登录状态…</span><a href="/">管理 ChatGPT 登录</a></div>
+ <section id="software-updates" class="software-updates" aria-labelledby="updates-title">
+  <div class="section-head"><div><h2 id="updates-title">版本与更新</h2><p id="updates-versions" class="hint">正在读取当前版本…</p></div><button id="updates-check">检查更新</button></div>
+  <p id="updates-status" role="status" aria-live="polite">正在读取更新信息…</p>
+  <label class="updates-auto"><input id="updates-auto" type="checkbox" checked>自动检查并提示新版本</label>
+  <p class="hint">网站启动后及运行中每 12 小时检查公开版本。安装由你决定；请先保存其他页面的修改。</p>
+  <progress id="updates-progress" max="100" value="0" hidden aria-label="安装包下载进度"></progress><p id="updates-bytes" class="hint" hidden></p>
+  <div class="updates-actions"><button id="updates-download" hidden>下载并校验更新</button><button id="updates-apply" hidden>重启并安装更新</button><button id="updates-rollback" hidden>回退上个版本</button><a id="updates-release" href="https://github.com/DOOM12138/houtu-studio/releases" target="_blank" rel="noopener">查看公开版本</a></div>
+  <p id="updates-source" class="hint" hidden>当前为源码部署，请按项目的 Git 更新说明操作。网站不会覆盖本地源码或未提交的修改。</p>
+  <details id="updates-notes" hidden><summary>新版本更新说明</summary><pre id="updates-notes-text"></pre></details>
+  <details><summary>备份与回退</summary><p class="hint">便携版安装前会在项目的 backups/software-updates 中备份程序和本机 data。更新失败会尝试恢复原程序；回退只切换程序，不覆盖当前照片、预设、账号和工作流。断电等情况可运行根目录“恢复上次更新.cmd”。</p><a href="https://github.com/DOOM12138/houtu-studio/blob/main/GIT_WORKFLOW.md" target="_blank" rel="noopener">源码更新与 Git 回退说明</a></details>
+ </section>
  <div class="server-layout">
   <aside class="server-sidebar">
    <details id="server-storage" open><summary>服务器与存储位置</summary><dl id="server-info"></dl><p class="hint">在哪台电脑启动，就在该电脑的项目根目录创建 data。图片、任务和本机登录资料保存在这里。</p><p class="hint">独立启动：启动服务器.cmd<br>打开此页：服务器管理.cmd<br>停止后台：停止服务器.cmd</p></details>

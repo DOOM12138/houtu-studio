@@ -29,3 +29,18 @@ Git 只管理源码。切换版本不会把 data/ 的工作流格式回退，旧
 ## 新电脑
 
 安装 Git 和 Node.js（当前验证环境为 Node 25），在数据盘执行 git clone https://github.com/DOOM12138/houtu-studio.git，再进入目录、打开 开发终端.cmd、执行 npm ci 和 npm start。无需开发环境时使用完整 Windows x64 便携包；目标电脑独立登录 ChatGPT，不复制其他电脑的登录资料。
+
+
+## 公开版本与自行更新
+
+公开仓库：https://github.com/DOOM12138/houtu-studio
+
+完整安装包与更新说明：https://github.com/DOOM12138/houtu-studio/releases/latest
+
+1.17 起，打开「本机服务器 → 版本与更新」或双击「检查更新.cmd」。自动检查只获取版本信息，网站运行时会提示新版本；关闭网站后不发送系统通知。也可关闭自动检查。无需 GitHub 账号。
+
+便携版：先下载并校验，然后保存其他网页中的修改，完成或暂停修图、分析、登录及打包任务，再点击「重启并安装更新」。下载支持继续；校验不通过不会安装。程序与 data 安装前备份至本机 backups/software-updates；data 保留原位。启动失败会尝试恢复原程序，也可在此页回退上次升级。回退不恢复旧 data，当前照片、账号、预设与工作流会保留。意外中断可双击根目录「恢复上次更新.cmd」。备份可能较大，确认不再需要回退后自行归档。
+
+源码目录（含 .git）或未完整部署运行环境的目录显示版本提示，但请继续按 GIT_WORKFLOW.md 使用 Git 更新；不会自动覆盖源码。旧于 1.17 的便携版第一次需手动下载新包，停止旧网站，备份 data，再把 data 放入新包目录。GitHub 自动生成的 Source code ZIP 不含便携运行环境，请下载 Windows-x64 ZIP。
+
+维护者：修改版本号与 CHANGELOG，完成检查并提交后推送 v版本号 标签。GitHub Actions 会校验、打包、上传到草稿，确认 ZIP 与 SHA256 文件齐全后才公开发布。失败的草稿不会成为客户端最新稳定版；已公开版本不原地替换，修复请递增版本。分叉发布需同步修改 lib/distribution.mjs 中的更新仓库。

@@ -38,3 +38,18 @@ Windows 文件保护、网络代理和账号可用性由目标电脑环境决定
 源码开发和回退使用 Git，见 [GIT_WORKFLOW.md](GIT_WORKFLOW.md)。需要指定部署目录时，可在项目终端运行 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1 -Destination "F:\厚涂小站"`；不要对正在运行的目录执行覆盖更新。开发、测试和打包临时文件保存在项目目录的 `tmp/`，缓存保存在 `.cache/`。
 
 1.9的停止脚本会等待网站进程真正退出后才返回，避免覆盖更新或回退时运行文件仍被占用。
+
+
+## 公开版本与自行更新
+
+公开仓库：https://github.com/DOOM12138/houtu-studio
+
+完整安装包与更新说明：https://github.com/DOOM12138/houtu-studio/releases/latest
+
+1.17 起，打开「本机服务器 → 版本与更新」或双击「检查更新.cmd」。自动检查只获取版本信息，网站运行时会提示新版本；关闭网站后不发送系统通知。也可关闭自动检查。无需 GitHub 账号。
+
+便携版：先下载并校验，然后保存其他网页中的修改，完成或暂停修图、分析、登录及打包任务，再点击「重启并安装更新」。下载支持继续；校验不通过不会安装。程序与 data 安装前备份至本机 backups/software-updates；data 保留原位。启动失败会尝试恢复原程序，也可在此页回退上次升级。回退不恢复旧 data，当前照片、账号、预设与工作流会保留。意外中断可双击根目录「恢复上次更新.cmd」。备份可能较大，确认不再需要回退后自行归档。
+
+源码目录（含 .git）或未完整部署运行环境的目录显示版本提示，但请继续按 GIT_WORKFLOW.md 使用 Git 更新；不会自动覆盖源码。旧于 1.17 的便携版第一次需手动下载新包，停止旧网站，备份 data，再把 data 放入新包目录。GitHub 自动生成的 Source code ZIP 不含便携运行环境，请下载 Windows-x64 ZIP。
+
+维护者：修改版本号与 CHANGELOG，完成检查并提交后推送 v版本号 标签。GitHub Actions 会校验、打包、上传到草稿，确认 ZIP 与 SHA256 文件齐全后才公开发布。失败的草稿不会成为客户端最新稳定版；已公开版本不原地替换，修复请递增版本。分叉发布需同步修改 lib/distribution.mjs 中的更新仓库。

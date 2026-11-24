@@ -1,4 +1,5 @@
-﻿const $=id=>document.getElementById(id);
+﻿import './updates.js';
+const $=id=>document.getElementById(id);
 let page=1,total=0,requestId=0,timer;
 const names={pipeline:'照片配方',retouch:'人物精修',color:'调色成品',creative:'特效与合成'};
 const date=value=>value?new Date(value).toLocaleString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'尚未记录';

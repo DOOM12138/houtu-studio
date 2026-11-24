@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, stat, rm } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { powershell } from '../lib/platform.mjs';
+import {inspectUpdatePackage} from '../backend/update-package.mjs';
 
 const metadata = JSON.parse(await readFile(new URL('../package.json',import.meta.url),'utf8'));
 const archive = path.resolve(process.argv[2] || `release/厚涂小站-${metadata.version}-Windows-x64.zip`);
@@ -37,6 +38,8 @@ try {
   const portable = path.join(extracted, '厚涂小站');
   const manifest = JSON.parse(await readFile(path.join(portable, 'portable-manifest.json'), 'utf8'));
   assert.equal(manifest.platform, 'win32-x64');
+  assert.equal(manifest.schemaVersion,2);assert.equal(manifest.updaterCompatibility,1);
+  await inspectUpdatePackage(portable,manifest.version);
   assert.ok(!manifest.files.some(file => /^(data|backups|test|\.git|\.impeccable)\//.test(file.path)));
   assert.ok(!manifest.files.some(file => /auth\.json$|\.log$/.test(file.path)));
   await assert.rejects(() => stat(path.join(portable, 'data')), { code: 'ENOENT' });
@@ -60,6 +63,10 @@ try {
   const record = JSON.parse(await readFile(path.join(installed, 'data', 'server.json'), 'utf8'));
   assert.notEqual(record.port, blockedPort);
   const origin = `http://127.0.0.1:${record.port}`;
+  for(const route of ['/color/updates.js','/update-notice.js','/update-notice.css'])assert.equal((await fetch(origin+route)).status,200,route);
+  for(const entry of ['检查更新.cmd','回退版本.cmd','scripts/apply-update.mjs','scripts/extract-update.ps1'])assert.ok((await stat(path.join(installed,entry))).size>50);
+  const updates=await(await fetch(origin+'/api/updates/status')).json();assert.equal(updates.currentVersion,manifest.version);assert.equal(updates.sourceMode,false);assert.equal(updates.settings.autoCheck,true);
+  assert.ok((await run(runtime,[launcher,'--updates','--no-open'],{cwd:extracted})).includes('/server/#software-updates'));
   for(const route of ['/lab/','/feature-expansion.js','/prompt-contract.js','/feature-ui.js','/target-policy.js','/target-masks.js','/vision-target.html'])assert.equal((await fetch(origin+route)).status,200,route);
   const lab=await(await fetch(origin+'/api/prompt-lab')).json();assert.equal(lab.features.length,75);assert.ok(lab.features.every(f=>f.records.length===0),'private evaluation photos must not enter the package');assert.equal(lab.trialSummary.firstRound,75);assert.equal(lab.trialSummary.targetedRevisions,4);
   for(const [name,size]of [['face_landmarker.task',3758596],['hand_landmarker.task',7819105]])assert.equal((await stat(path.join(installed,'models',name))).size,size);

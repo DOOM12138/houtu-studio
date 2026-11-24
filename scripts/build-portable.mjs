@@ -10,7 +10,7 @@ import { importTemplates } from '../lib/templates.mjs';
 import { normalizePreset } from '../backend/color.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
-const ALLOWED = ['server.mjs', 'launcher.mjs', 'lib', 'public', 'frontend', 'backend', 'models', 'scripts', 'vendor-licenses', 'package.json', 'package-lock.json', 'README.md', 'DEPLOY.md', 'SOURCES.md', 'AGENTS.md', 'agent.md', 'ARCHITECTURE.md', 'GIT_WORKFLOW.md', 'FEATURES.md', 'FEATURE_PARITY.md', 'PROMPT_LAB.md', 'LICENSE', '.npmrc', '开发终端.cmd', '启动网站.cmd', '停止网站.cmd', '一键部署.cmd', '启动服务器.cmd', '服务器管理.cmd', '停止服务器.cmd'];
+const ALLOWED = ['server.mjs', 'launcher.mjs', 'lib', 'public', 'frontend', 'backend', 'models', 'scripts', 'vendor-licenses', 'package.json', 'package-lock.json', 'README.md', 'DEPLOY.md', 'SOURCES.md', 'AGENTS.md', 'agent.md', 'ARCHITECTURE.md', 'GIT_WORKFLOW.md', 'FEATURES.md', 'FEATURE_PARITY.md', 'PROMPT_LAB.md', 'CHANGELOG.md', 'LICENSE', '.npmrc', '开发终端.cmd', '启动网站.cmd', '停止网站.cmd', '一键部署.cmd', '启动服务器.cmd', '服务器管理.cmd', '停止服务器.cmd', '检查更新.cmd', '回退版本.cmd'];
 export function productionDirectories(lock) {
   return Object.entries(lock.packages || {}).filter(([name, entry]) => name.startsWith('node_modules/') && !entry.dev).map(([name]) => name)
     .sort((a,b) => a.length - b.length).filter((name, i, all) => !all.slice(0, i).some(parent => name.startsWith(parent + '/')));
@@ -23,7 +23,7 @@ async function inventory(directory, base = directory) {
     const info = await lstat(absolute);
     if (info.isSymbolicLink()) throw new Error('便携包不接受符号链接。');
     if (info.isDirectory()) files.push(...await inventory(absolute, base));
-    else files.push({ path: path.relative(base, absolute).split(path.sep).join('/'), bytes: info.size });
+    else files.push({ path: path.relative(base, absolute).split(path.sep).join('/'), bytes: info.size, sha256: await hashFile(absolute) });
   }
   return files;
 }
@@ -88,7 +88,7 @@ export async function buildPortable({ root = ROOT, output, includePrompts = fals
     ].join('\n'));
     const files = await inventory(app);
     if (files.some(file => /^(data|backups|test|\.git|\.impeccable)\//i.test(file.path) || /(^|\/)(auth\.json|\.env|config\.toml)$/i.test(file.path) || /\.log$/i.test(file.path))) throw new Error('包内出现不应发布的私有数据，已取消打包。');
-    await writeFile(path.join(app, 'portable-manifest.json'), JSON.stringify({ schemaVersion: 1, app: 'houtu-studio', version: metadata.version, platform: 'win32-x64', nodeVersion: process.version, created: new Date().toISOString(), templatesIncluded: templateCount, dependencies, files }, null, 2));
+    await writeFile(path.join(app, 'portable-manifest.json'), JSON.stringify({ schemaVersion: 2, updaterCompatibility: 1, dataCompatibility: 1, app: 'houtu-studio', version: metadata.version, platform: 'win32-x64', nodeVersion: process.version, created: new Date().toISOString(), templatesIncluded: templateCount, dependencies, files }, null, 2));
     progress('正在压缩便携包');
     await mkdir(path.dirname(output), { recursive: true });
     await new Promise((resolve, reject) => {

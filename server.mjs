@@ -1,3 +1,5 @@
+import {SoftwareUpdates} from './backend/software-updates.mjs';
+import {APP_VERSION} from './lib/app-version.mjs';
 import {exportProjectPhotos,backupProject,restoreProject} from './backend/studio-archive.mjs';
 import {StudioService} from './backend/studio.mjs';
 import {recipeValue,recipeReport} from './backend/studio-recipe.mjs';
@@ -58,7 +60,7 @@ const publicJob = j => ({ requestKey:j.requestKey||null,pipelineParentId:j.pipel
   created: j.created, message: j.message, sourceUrl: `/images/${j.id}/source.${j.extension}`,
   outputUrl: j.output ? `/images/${j.id}/${j.output}` : null });
 
-export async function createApp({ directory = path.join(ROOT, 'data'), bridge: suppliedBridge, packageBuilder = buildPortable, composeImage = finishEditImage, platform: suppliedPlatform,targetAnalyzer:suppliedTargetAnalyzer } = {}) {
+export async function createApp({ directory = path.join(ROOT, 'data'), bridge: suppliedBridge, packageBuilder = buildPortable, composeImage = finishEditImage, platform: suppliedPlatform,targetAnalyzer:suppliedTargetAnalyzer,updatesFetcher,automaticUpdateChecks=!suppliedBridge } = {}) {
   const home = path.join(directory, 'codex');
   const jobsDirectory = path.join(directory, 'jobs');
   await mkdir(jobsDirectory, { recursive: true });await mkdir(home,{recursive:true});
@@ -77,7 +79,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
   const packages = new Map();
   let activePackage = null, latestPackage = null;
   const packageView = value => value && ({ id: value.id, status: value.status, message: value.message, bytes: value.bytes, sha256: value.sha256, downloadUrl: value.status === 'done' ? `/downloads/package/${value.id}` : null });
-  let active = null;
+  let active = null, pendingOperations=0;
   let critiqueActive = false;let portraitAuditControl=null,portraitAuditTask=null,isClosing=false,closingPromise=null;
   let login = null;
   let loginError = '';
@@ -182,7 +184,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     } else throw new Error('客户端没有返回可下载的图片，请升级客户端后重试。');
     if(job.runId!==runId)throw new Error('这次执行已过期。');
     const raw=await workflows.putAsset(job.workflowId,bytes,item.result?.startsWith('data:image/jpeg')?'image/jpeg':'image/png');if(job.runId!==runId)throw new Error('这次执行已过期。');job.rawAsset=raw.id;
-    await doneJobStep(job,{rawAsset:raw.id,generationRunId:runId,reportedImageEngine:typeof item.model==='string'?item.model:null,sentInputs:job.sentInputs||null,account:accountSnapshot(job.account),appVersion:'1.16.0',promptVersion:job.promptVersion||PROMPT_VERSION,compiledPrompt:job.actualPrompt||paintingPrompt(job),model:job.model||null,resolvedModel:job.resolvedModel||null},[{id:raw.id,label:'AI返回的原始出图（合成前）',type:'image'}],'原始生成图已保存，后续合成无需再次生成',runId);
+    await doneJobStep(job,{rawAsset:raw.id,generationRunId:runId,reportedImageEngine:typeof item.model==='string'?item.model:null,sentInputs:job.sentInputs||null,account:accountSnapshot(job.account),appVersion:APP_VERSION,promptVersion:job.promptVersion||PROMPT_VERSION,compiledPrompt:job.actualPrompt||paintingPrompt(job),model:job.model||null,resolvedModel:job.resolvedModel||null},[{id:raw.id,label:'AI返回的原始出图（合成前）',type:'image'}],'原始生成图已保存，后续合成无需再次生成',runId);
     await composeOutput(job,bytes,runId);
   };
 
@@ -269,6 +271,11 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
   };
   studio=new StudioService({directory,workflows,adapter:{isBusy:()=>Boolean(active||activePackage||critiqueActive),startRetouch,findRequest:key=>{const job=findRequest(key);return job?publicJob(job):null;},getJob:id=>jobs.has(id)?publicJob(jobs.get(id)):null,recompose:recomposeManaged,authorize:async expected=>{if(!await bridge.account())throw Error('请先登录本站ChatGPT账号。');const control={account:expected};bridge.capture(control);return control.account;}}});await studio.load();
 
+  const updates=new SoftwareUpdates({root:ROOT,directory,cacheDirectory:suppliedBridge?path.join(directory,'.updates'):undefined,fetcher:updatesFetcher,
+    reserve:()=>{if(isClosing||active||activePackage||critiqueActive||login||studio.active||studio.archiving||studio.queues.size||creative.running.size||pendingOperations||library.pendingThumbs.size)return false;active='software-update';return true;},
+    release:()=>{if(active==='software-update')active=null;},serverInfo:()=>({port:server.address()?.port,instanceId}),
+    onHandoff:()=>{setTimeout(()=>close().catch(error=>console.error('更新前停止网站失败：'+error.message)),150);}});await updates.load();
+  if(automaticUpdateChecks)updates.startAutomatic();
   const server = http.createServer(async (req, res) => {
     const host = req.headers.host || '';
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -276,13 +283,28 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self'; img-src 'self' blob: data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
     if (!/^(127\.0\.0\.1|localhost):\d+$/.test(host)) return json(res, 403, { error: '仅允许本机访问。' });
+    let trackedOperation=false;
     try {
       const url = new URL(req.url, `http://${host}`);
       const route = url.pathname;if(isClosing&&!['/api/health','/api/shutdown'].includes(route))return json(res,503,{error:'网站正在停止，请稍后重开。'});
       if (!['GET', 'POST'].includes(req.method)) return json(res, 405, { error: '不支持的请求。' });
-      if(req.method==='POST'&&(studio.active||studio.archiving)&&!route.startsWith('/api/studio/')&&route!=='/api/shutdown'&&!/^\/api\/jobs\/[a-f0-9-]{36}\/cancel$/.test(route))return json(res,409,{error:'照片流程正在运行，请先完成本步并暂停。'});
+      if(req.method==='POST'&&(studio.active||studio.archiving)&&!route.startsWith('/api/studio/')&&route!=='/api/shutdown'&&!route.startsWith('/api/updates/')&&!/^\/api\/jobs\/[a-f0-9-]{36}\/cancel$/.test(route))return json(res,409,{error:'照片流程正在运行，请先完成本步并暂停。'});
       if (req.method === 'POST') {
         if (req.headers.origin !== `http://${host}` || req.headers['x-paint-csrf'] !== csrf) return json(res, 403, { error: '请从本站页面发起操作。' });
+      }
+      if(updates.handoff&&route.startsWith('/api/')&&!route.startsWith('/api/updates/')&&!['/api/health','/api/shutdown'].includes(route))return json(res,409,{error:'网站即将重启安装更新，请等待完成后重新打开。'});
+      if(route.startsWith('/api/')&&!route.startsWith('/api/updates/')&&!['/api/health','/api/shutdown'].includes(route)){pendingOperations++;trackedOperation=true;}
+      if(route==='/api/updates/status'&&req.method==='GET')return json(res,200,await updates.view());
+      if(route.startsWith('/api/updates/')&&req.method==='POST'){
+        try{if(updates.handoff)throw Error('网站正在重启安装更新，请稍后再操作。');const input=await body(req,4096);let result;
+          if(route==='/api/updates/check')result=await updates.check();
+          else if(route==='/api/updates/settings')result=await updates.configure(input);
+          else if(route==='/api/updates/prepare')result=await updates.beginPrepare();
+          else if(route==='/api/updates/apply')result=await updates.apply({id:input.id});
+          else if(route==='/api/updates/rollback')result=await updates.apply({id:input.id,rollback:true});
+          else return json(res,404,{error:'更新操作不存在。'});
+          return json(res,200,result);
+        }catch(error){return json(res,409,{error:String(error.message).slice(0,400)});}
       }
       if(route==='/api/targets/analyze'&&req.method==='POST'){const input=await body(req),resolved=await resolvePicture(input,{jobs,workflows}),options=normalizeEditOptions(input),result=await targetVision.analyze(resolved.bytes,{operation:options.operation,areas:options.areas,portrait:options.portrait});return json(res,200,{...result,selectionSuggestion:options.operation==='face'&&result.mask?await suggestedHeadScope(result.mask):null,mask:result.mask?'data:image/png;base64,'+result.mask.toString('base64'):null,sourceSignature:await pictureSignature(resolved.bytes)});}
       const labJob=/^\/api\/prompt-lab\/jobs\/([a-f0-9-]{36})$/.exec(route);if(labJob){const job=jobs.get(labJob[1]);if(req.method==='GET')return json(res,200,await jobEvidence(job,workflows));if(req.method==='POST')return json(res,201,await saveJobEvidence(job,workflows,promptLab,await body(req,20000)));}
@@ -307,7 +329,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       }
       const studioDownload=/^\/api\/studio\/downloads\/([a-f0-9-]{36})$/.exec(route);
       if(studioDownload&&req.method==='GET'){const receipt=JSON.parse(await readFile(path.join(studio.directory,'exports',studioDownload[1]+'.json'),'utf8')),file=path.join(studio.directory,'exports',studioDownload[1]+(receipt.kind==='backup'?'.jsondata':'.zip'));res.writeHead(200,{'Content-Type':receipt.kind==='backup'?'application/json':'application/zip','Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(receipt.name)}`,'Content-Length':(await stat(file)).size});await pipeline(createReadStream(file),res);return;}
-      if (route === '/api/health' && req.method === 'GET') return json(res, 200, { app: 'houtu-studio', version: '1.16.0', instanceId, csrf });
+      if (route === '/api/health' && req.method === 'GET') return json(res, 200, { app: 'houtu-studio', version: APP_VERSION, instanceId, csrf });
       if(route==='/api/portrait/source'&&req.method==='GET'){
         const auditId=url.searchParams.get('audit');if(auditId){const w=await workflows.get(auditId);if(w.kind!=='portrait-audit')throw new Error('不是人物检查工作流。');const assetId=w.steps[0].output?.imageAsset;if(!assetId)throw new Error('检查原图尚未保存。');return json(res,200,{workflowId:w.id,assetId,url:`/api/workflows/${w.id}/assets/${assetId}`,name:w.name,auditId:w.id,diagnosis:w.steps.find(n=>n.id==='diagnose').status==='done'?w.steps.find(n=>n.id==='diagnose').output:null});}
         const id=url.searchParams.get('workflow'),assetId=url.searchParams.get('asset');await resolvePicture({source:{kind:'workflow',workflowId:id,assetId}},{jobs,workflows});const w=await workflows.get(id);return json(res,200,{workflowId:id,assetId,url:`/api/workflows/${id}/assets/${assetId}`,name:w.name});
@@ -415,7 +437,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
         try{await bridge.account();}catch{}
         const images=await library.refresh(jobs,workflows);
         const records=accounts.records().map(account=>({...account,images:images.filter(image=>image.account?.email.toLowerCase()===account.email.toLowerCase()).length}));
-        return json(res,200,{serverId:accounts.state.serverId,startedAt,created:accounts.state.created,machine:os.hostname(),version:'1.16.0',projectRoot:ROOT,dataRoot:path.resolve(directory),loginRoot:path.join(path.resolve(directory),'codex'),scope:'local',current:accounts.current(),accounts:records,images:images.length});
+        return json(res,200,{serverId:accounts.state.serverId,startedAt,created:accounts.state.created,machine:os.hostname(),version:APP_VERSION,projectRoot:ROOT,dataRoot:path.resolve(directory),loginRoot:path.join(path.resolve(directory),'codex'),scope:'local',current:accounts.current(),accounts:records,images:images.length});
       }
       if(route==='/api/server/images'&&req.method==='GET'){await library.refresh(jobs,workflows);return json(res,200,library.list(url.searchParams,accounts.records()));}
       const thumbnail=/^\/api\/server\/thumbnails\/([a-f0-9]{64})$/.exec(route);
@@ -532,14 +554,14 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
         file=path.join(ROOT,'frontend','workflows.html');
       } else if(req.method==='GET'&&(route==='/creative'||route==='/creative/')){
         file=path.join(ROOT,'frontend','creative.html');
-      } else if (req.method === 'GET' && /^\/color\/(app\.js|engine\.js|worker\.js|masks\.js|workflow-client\.js|workflows\.js|effects\.js|creative\.js|creative-multi\.js|server\.js|studio\.js|lab\.js|tonal-looks\.js|tone-controls\.js|style\.css)$/.test(route)) {
+      } else if (req.method === 'GET' && /^\/color\/(app\.js|engine\.js|worker\.js|masks\.js|workflow-client\.js|workflows\.js|effects\.js|creative\.js|creative-multi\.js|server\.js|studio\.js|lab\.js|tonal-looks\.js|tone-controls\.js|updates\.js|style\.css)$/.test(route)) {
         file=path.join(ROOT,'frontend',path.basename(route));
       } else if (req.method === 'GET' && /^\/vision\/(vision_bundle\.mjs|wasm\/vision_wasm_(?:nosimd_)?internal\.(?:js|wasm))$/.test(route)) {
         file=path.join(ROOT,'node_modules','@mediapipe','tasks-vision',route.slice('/vision/'.length));
       } else if (req.method === 'GET' && /^\/models\/(selfie_multiclass_256x256\.tflite|face_landmarker\.task|hand_landmarker\.task)$/.test(route)) {
         file=path.join(ROOT,'models',path.basename(route));
       } else {
-        const files = { '/paint-profile.js':'paint-profile.js','/feature-expansion.js':'feature-expansion.js','/prompt-contract.js':'prompt-contract.js','/feature-ui.js':'feature-ui.js','/target-policy.js':'target-policy.js','/target-masks.js':'target-masks.js','/vision-target.html':'vision-target.html', '/': 'index.html', '/app.js': 'app.js', '/catalog.js': 'catalog.js', '/style.css': 'style.css', '/favicon.svg': 'favicon.svg','/portrait-options.js':'portrait-options.js','/portrait-ui.js':'portrait-ui.js','/model-picker.js':'model-picker.js','/model-options.js':'model-options.js','/scene-options.js':'scene-options.js','/belly-options.js':'belly-options.js','/scene-ui.js':'scene-ui.js','/subject-mask.js':'subject-mask.js' };
+        const files = { '/update-notice.js':'update-notice.js','/update-notice.css':'update-notice.css', '/paint-profile.js':'paint-profile.js','/feature-expansion.js':'feature-expansion.js','/prompt-contract.js':'prompt-contract.js','/feature-ui.js':'feature-ui.js','/target-policy.js':'target-policy.js','/target-masks.js':'target-masks.js','/vision-target.html':'vision-target.html', '/': 'index.html', '/app.js': 'app.js', '/catalog.js': 'catalog.js', '/style.css': 'style.css', '/favicon.svg': 'favicon.svg','/portrait-options.js':'portrait-options.js','/portrait-ui.js':'portrait-ui.js','/model-picker.js':'model-picker.js','/model-options.js':'model-options.js','/scene-options.js':'scene-options.js','/belly-options.js':'belly-options.js','/scene-ui.js':'scene-ui.js','/subject-mask.js':'subject-mask.js' };
         if (!Object.hasOwn(files, route) || req.method !== 'GET') return json(res, 404, { error: '页面不存在。' });
         file = path.join(ROOT, 'public', files[route]);
       }
@@ -548,13 +570,13 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     } catch (error) {
       if (!res.headersSent) json(res, error.code === 'ENOENT' ? 404 : error.status || 400, { error: friendlyError(error.message),...(error.workflowId?{workflowId:error.workflowId}:{}) });
       else res.end();
-    }
+    } finally {if(trackedOperation)pendingOperations--;}
   });
   server.requestTimeout = 120000;
   const close = () => closingPromise ||= (async () => {isClosing=true;for(const job of jobs.values())if(isRunning(job))job.cancelled=true;if(portraitAuditControl)portraitAuditControl.cancelled=true;
     studio.closing=true;if(studio.active)studio.active.stop=true;
     for(const state of creative.running.values())state.stop=true;
-    await platform.close();
+    await updates.close();await platform.close();
     await bridge.stop(); for (const j of jobs.values()) clearTimeout(j.deadline);
     await creative.drain();await studio.drain();await targetVision.close();if(portraitAuditTask)await Promise.allSettled([portraitAuditTask]);
     await Promise.allSettled([...jobWrites.values()]);
@@ -562,7 +584,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
     try { const record = JSON.parse(await readFile(path.join(directory, 'server.json'), 'utf8')); if (record.instanceId === instanceId) await unlink(path.join(directory, 'server.json')); } catch {}
   })();
-  return { server, bridge, studio, targetVision, instanceId, close };
+  return { server, bridge, studio, targetVision, updates, instanceId, close };
 }
 
 export function friendlyError(message = '') {
