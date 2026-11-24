@@ -1,3 +1,4 @@
+import {createModelPicker} from './model-picker.js';
 import {createPortraitTools} from './portrait-ui.js';
 import { PRESETS, STYLES, AREAS, DEFAULT_AREAS, PAINT_LEVELS, normalizePaintLevel } from './catalog.js';
 const $ = id => document.getElementById(id);
@@ -8,13 +9,14 @@ let operation = 'full-body', toolFilter = '全部', selection = null, selecting 
 let sourceMeta = null, dragStart = null, previousSelection = null, compiledVersion = 0;
 let sourceReference = null, sourceObjectUrl = null;
 let promptInitialized = false, templates = [], packageJob = null, packageTimer = null;
+const modelPicker=createModelPicker({mount:$('model-picker'),onChange:optionsChanged});
 const hasSource = () => Boolean(sourceData || sourceReference);
 
 const selectedAreas = () => [...document.querySelectorAll('[name="area"]:checked')].map(el => el.value);
-const editOptions = () => ({ operation: $('prompt-mode').value === 'custom' ? 'custom' : operation, style: $('edit-style').value, prompt: $('prompt').value, promptMode: $('prompt-mode').value,
+const editOptions = () => ({ operation: $('prompt-mode').value === 'custom' ? 'custom' : operation, style: $('edit-style').value, model:modelPicker.value, prompt: $('prompt').value, promptMode: $('prompt-mode').value,
   strength: document.querySelector('[name="strength"]:checked').value, paintLevel:Number($('paint-level').value), preserve: $('preserve').checked,
   areas: operation==='portrait-polish'?Object.entries(portraitTools.options().levels).filter(([,n])=>n>0).map(([id])=>id):selectedAreas(), selection, parentId,...(operation==='portrait-polish'?{portrait:portraitTools.options()}:{}) });
-const portraitTools=createPortraitTools({api,getImage:()=>$('source'),getSource:()=>sourceReference?{source:sourceReference}:{image:sourceData},onChange:optionsChanged,onBusy:(value,type)=>{portraitChecking=value;portraitTaskType=type||'';updateControls();},feedback});
+const portraitTools=createPortraitTools({api,getImage:()=>$('source'),getSource:()=>({...((sourceReference)?{source:sourceReference}:{image:sourceData}),model:modelPicker.value}),onChange:optionsChanged,onBusy:(value,type)=>{portraitChecking=value;portraitTaskType=type||'';updateControls();},feedback});
 
 function renderTools() {
   const query = $('tool-search').value.trim().toLowerCase();
@@ -115,7 +117,8 @@ function updateControls() {
   const packing = packageJob?.status === 'building';
   const working = busy || portraitChecking || running(currentJob?.status) || packing;
   const custom = $('prompt-mode').value === 'custom';
-  $('generate').disabled = !hasSource() || !state.account || working || !$('prompt').value.trim() || (!custom && ['full-body','portrait-polish'].includes(operation) && !editOptions().areas.length);
+  modelPicker.setDisabled(working);
+  $('generate').disabled = !modelPicker.valid() || !hasSource() || !state.account || working || !$('prompt').value.trim() || (!custom && ['full-body','portrait-polish'].includes(operation) && !editOptions().areas.length);
   $('generate').querySelector('span').textContent = packing ? '打包中，稍后精修' : portraitChecking ? (portraitTaskType==='audit'?'正在检查人物…':'正在分析人物蒙版…') : working ? '正在精修…' : selection ? '精修选区' : '开始精修';
   $('cancel').hidden = !running(currentJob?.status)&&!(portraitChecking&&portraitTaskType==='audit');
   $('cancel').disabled = currentJob?.status === 'cancelling';
@@ -144,7 +147,9 @@ async function refreshState() {
   if (checking) return;
   checking = true;
   try {
+    const accountBefore=state.account?(state.account.email||'signed-in'):null;
     state = await api('/api/state');
+    if(accountBefore!==(state.account?(state.account.email||'signed-in'):null))modelPicker.reload(true);
     $('account').textContent = state.account ? `${state.account.email || '已连接 ChatGPT'} · ${state.account.plan.toUpperCase()}` : '尚未登录';
     $('login').hidden = Boolean(state.account);
     $('logout').hidden = !state.account;
@@ -409,6 +414,7 @@ async function restoreJob(job) {
     if (!response.ok) throw new Error('原图不存在。');
     const blob = await response.blob();
     if (!await setFile(new File([blob], '之前的原图', { type: blob.type }), { jobId: job.id, kind: 'source' })) return;
+    modelPicker.set(job.model||job.resolvedModel||null);
     $('prompt').value = job.prompt || state.defaultPrompt;
     $('prompt-mode').value = job.promptMode || 'guided';
     const strength = document.querySelector(`[name="strength"][value="${['light', 'balanced', 'rich'].includes(job.strength) ? job.strength : 'light'}"]`);
@@ -434,7 +440,7 @@ async function loadHistory() {
       const tool = PRESETS.find(p => p.id === job.operation)?.name || '人物精修';
       button.setAttribute('aria-label', `打开 ${stamp} 的${tool}作品`);
       const img = document.createElement('img'); img.src = job.outputUrl; img.alt = `${strength}作品缩略图`; img.loading = 'lazy';
-      const label = document.createElement('span'); label.textContent = `${stamp} · ${tool} · ${strength}${job.selection ? ' · 局部' : ''}`;
+      const label = document.createElement('span'); label.textContent = `${stamp} · ${tool} · ${strength}${job.resolvedModel||job.model?' · '+(job.resolvedModel||job.model):''}${job.selection ? ' · 局部' : ''}`;
       button.append(img, label);
       button.addEventListener('click', async () => {
         if (busy || running(currentJob?.status)) return feedback('请先等待当前图片完成。');
@@ -472,6 +478,7 @@ $('save-template').addEventListener('click', () => saveTemplate(false));
 $('update-template').addEventListener('click', () => saveTemplate(true));
 $('apply-template').addEventListener('click', () => {
   const template = templates.find(item => item.id === $('template-select').value); if (!template) return;
+  modelPicker.set(template.options.model);
   $('prompt').value = template.text; $('prompt-mode').value = template.options.promptMode;
   $('edit-style').value = template.options.style; $('preserve').checked = template.options.preserve;
   document.querySelector(`[name="strength"][value="${template.options.strength}"]`).checked = true;

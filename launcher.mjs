@@ -22,6 +22,10 @@ async function registered() {
     return health.app === 'houtu-studio' && health.instanceId === entry.instanceId ? entry : null;
   } catch { return null; }
 }
+function processExists(pid) {
+  if(!Number.isSafeInteger(pid)||pid<1)return false;
+  try{process.kill(pid,0);return true;}catch(error){return error.code!=='ESRCH';}
+}
 async function available(port) {
   return new Promise(resolve => { const server = net.createServer(); server.once('error', () => resolve(false)); server.listen(port, '127.0.0.1', () => server.close(() => resolve(true))); });
 }
@@ -34,8 +38,9 @@ async function main() {
     const state = await (await fetch(origin + '/api/health', { signal: AbortSignal.timeout(3000) })).json();
     const response = await fetch(origin + '/api/shutdown', { method: 'POST', headers: { Origin: origin, 'X-Paint-CSRF': state.csrf, 'Content-Type': 'application/json' }, body: JSON.stringify({ instanceId: existing.instanceId }) });
     if (!response.ok) throw new Error('停止失败，请关闭正在运行的启动窗口。');
-    for (let i = 0; i < 40 && await registered(); i++) await wait(150);
-    if (await registered()) throw new Error('网站尚未停止，请稍后重试。');
+    const deadline=Date.now()+12000;
+    while(Date.now()<deadline && (await registered() || processExists(existing.pid)))await wait(100);
+    if(await registered() || processExists(existing.pid))throw new Error('网站进程尚未完全退出，请稍后重试，暂时不要覆盖运行文件。');
     console.log('厚涂小站已停止。'); return;
   }
   const show = !process.argv.includes('--no-open');

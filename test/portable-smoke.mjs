@@ -75,6 +75,9 @@ try {
   assert.ok((await(await fetch(origin+'/workflows/')).text()).includes('workflow-detail'));
   assert.ok((await(await fetch(origin+'/creative/')).text()).includes('creative-run'));
   assert.equal((await(await fetch(origin+'/api/platform/status')).json()).open,false);
+  const models=await(await fetch(origin+'/api/models')).json();assert.equal(models.signedIn,false);assert.deepEqual(models.models,[]);
+  for(const asset of ['/model-picker.js','/model-options.js'])assert.equal((await fetch(origin+asset)).status,200);
+  for(const route of ['/','/color/','/creative/'])assert.ok((await(await fetch(origin+route)).text()).includes('model-picker'));
   assert.equal((await fetch(origin+'/color/effects.js')).status,200);
   assert.equal((await fetch(origin+'/color/creative-multi.js')).status,200);
   assert.equal((await fetch(origin+'/portrait-ui.js')).status,200);
@@ -100,7 +103,8 @@ try {
   assert.equal(JSON.parse(await readFile(path.join(installed, 'data', 'server.json'), 'utf8')).pid, record.pid);
   await run(runtime, [launcher, '--stop', '--no-open'], { cwd: installed }); launched = false;
   await assert.rejects(() => stat(path.join(installed, 'data', 'server.json')), { code: 'ENOENT' });
-  console.log(JSON.stringify({ result: 'PASS', version: manifest.version, bundledNode: manifest.nodeVersion, files: manifest.files.length + 1, templates: library.templates.length, tested: ['no-global-node-or-npm', 'default-install-stays-on-project-drive', 'agent-and-architecture-docs-bundled', 'fresh-Chinese-and-space-path-install', 'all-required-directories-installed', 'repackage-from-installed-copy', 'auto-port-fallback', 'isolated-Codex-startup', 'native-sharp-DLL', 'prompt-library', 'nonpainting-and-ten-level-instructions', 'repeat-launch', 'graceful-stop', 'no-account-photo-log-backup-in-archive'] }));
+  assert.throws(()=>process.kill(record.pid,0),error=>error.code==='ESRCH','Stop must wait until the server process has exited and released its executable');
+  console.log(JSON.stringify({ result: 'PASS', version: manifest.version, bundledNode: manifest.nodeVersion, files: manifest.files.length + 1, templates: library.templates.length, tested: ['no-global-node-or-npm', 'default-install-stays-on-project-drive', 'agent-and-architecture-docs-bundled', 'fresh-Chinese-and-space-path-install', 'all-required-directories-installed', 'repackage-from-installed-copy', 'auto-port-fallback', 'isolated-Codex-startup', 'native-sharp-DLL', 'prompt-library', 'nonpainting-and-ten-level-instructions', 'model-picker-and-signed-out-account-state', 'repeat-launch', 'graceful-stop', 'no-account-photo-log-backup-in-archive'] }));
 } finally {
   if (launched) await run(runtime, [launcher, '--stop', '--no-open'], { cwd: installed }).catch(() => {});
   await new Promise(resolve => barrier.close(resolve));

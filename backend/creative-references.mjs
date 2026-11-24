@@ -1,3 +1,4 @@
+import {modelKey} from '../public/model-options.js';
 import sharp from 'sharp';
 import {manualReferences,signature} from './creative-vision.mjs';
 const referenceKey=url=>{try{const u=new URL(url),note=u.pathname.match(/\/(?:explore|search_result)\/([^/?#]+)/);return note&&u.hostname.endsWith('xiaohongshu.com')?'xhs:'+note[1]:u.origin+u.pathname;}catch{return String(url);}};
@@ -10,9 +11,9 @@ export async function collectReferences(service,w,attempt,execution){
  if(old.collectionSignature===key){material=old.material||material;provenance=old.provenance||[];}
  const progress=async()=>{const partial={material,reference:candidates[0]?.assetId||null,candidates,provenance,searchPlan,collectionSignature:key,queries:{commons:query,xiaohongshu:platformQuery},target:config.referenceCount||5};await service.workflows.mutate(id,current=>{const n=current.steps.find(s=>s.id==='materials');if(n.token!==attempt.token)throw Error('参考采集已经过期。');n.output=partial;n.artifacts=candidates.map(r=>({id:r.assetId,type:'image',label:r.title}));Object.assign(n.attempts.at(-1),{output:partial,artifacts:n.artifacts});return {};});return partial;};
  if(config.autoMaterials&&!material&&config.aiSearch&&!query){
-  const oldKey=signature({source:source.source,characters:source.characters,material,manual,character:config.character,prompt:config.prompt,mode:config.mode});
+  const oldKey=signature({...modelKey(config.model),source:source.source,characters:source.characters,material,manual,character:config.character,prompt:config.prompt,mode:config.mode});
   if(old.searchPlan?.signature===oldKey)searchPlan=old.searchPlan;
-  else{if(!await service.bridge.account())throw Error('素材关键词规划需要先登录ChatGPT。');const image=await service.workflows.asset(id,source.source),ref=source.characters[0]?await service.workflows.asset(id,source.characters[0]):null;const result=await service.bridge.critique(image.file,ref?.file||null,'Inspect the source and character sheet. Return JSON {query:English Wikimedia search words,summary:Chinese explanation} for a coherent supporting background/prop. '+config.character+' '+config.prompt);searchPlan={signature:oldKey,query:String(result.query||'').slice(0,120),summary:String(result.summary||'').slice(0,600)};if(!searchPlan.query)throw Error('没有取得可用素材关键词。');await progress();}
+  else{if(!await service.bridge.account())throw Error('素材关键词规划需要先登录ChatGPT。');const image=await service.workflows.asset(id,source.source),ref=source.characters[0]?await service.workflows.asset(id,source.characters[0]):null;const control=await service.modelControl(id,execution,config.model);execution.job=control;let result;try{result=await service.bridge.critique(image.file,ref?.file||null,'Inspect the source and character sheet. Return JSON {query:English Wikimedia search words,summary:Chinese explanation} for a coherent supporting background/prop. '+config.character+' '+config.prompt,[],control);}finally{if(execution.job===control)execution.job=null;}searchPlan={signature:oldKey,model:config.model||null,resolvedModel:control.resolvedModel||null,query:String(result.query||'').slice(0,120),summary:String(result.summary||'').slice(0,600)};if(!searchPlan.query)throw Error('没有取得可用素材关键词。');await progress();}
   query=searchPlan.query;
  }
  if(execution.stop)throw Error('已停止，已采集的参考和关键词已保留。');
