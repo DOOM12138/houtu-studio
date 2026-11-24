@@ -272,3 +272,30 @@ test('large normalized PNG sources and results can be reused by local reference 
   assert.equal((await post('/api/jobs', { ...options, source: { jobId: '../private', kind: 'result' } })).status, 400);
   assert.equal((await post('/api/jobs', { ...options, source: { jobId: first.id, kind: '../auth.json' } })).status, 400);
 });
+
+test('style level survives the actual job, workflow input and service restart; legacy jobs inherit compatible levels',async t=>{
+  const {bridge,directory,post,origin,app}=await setup(t);bridge.signedIn=true;
+  const response=await post('/api/jobs',{...input,prompt:'保留人物身份。',style:'cos',strength:'light',paintLevel:9});
+  assert.equal(response.status,202);const job=await response.json();assert.equal(job.paintLevel,9);
+  assert.match(bridge.prompt,/厚涂程度9\/10/);
+  const flow=await(await fetch(origin+'/api/workflows/'+job.workflowId)).json();
+  assert.equal(flow.steps.find(x=>x.id==='source').output.options.paintLevel,9);
+  bridge.emit('notification','item/completed',{threadId:'thread-test',item:{type:'imageGeneration',status:'completed',result:pixel}});
+  bridge.emit('notification','turn/completed',{threadId:'thread-test',turn:{status:'completed'}});
+  await waitJob(origin,job.id,'done');
+  const photoResponse=await post('/api/jobs',{...input,prompt:'自然整理皮肤。',style:'photo',paintLevel:10});
+  assert.equal(photoResponse.status,202);const photo=await photoResponse.json();assert.equal(photo.style,'photo');
+  assert.match(bridge.prompt,/非厚涂摄影精修/);assert.doesNotMatch(bridge.prompt,/厚涂程度\d+\/10/);
+  bridge.emit('notification','item/completed',{threadId:'thread-test',item:{type:'imageGeneration',status:'completed',result:pixel}});
+  bridge.emit('notification','turn/completed',{threadId:'thread-test',turn:{status:'completed'}});
+  await waitJob(origin,photo.id,'done');
+  await app.close();
+  const photoFile=path.join(directory,'jobs',photo.id,'job.json');
+  const legacy=JSON.parse(await readFile(photoFile,'utf8'));delete legacy.paintLevel;legacy.strength='balanced';
+  await writeFile(photoFile,JSON.stringify(legacy));
+  const restarted=await createApp({directory,bridge:new FakeBridge()});await new Promise(r=>restarted.server.listen(0,'127.0.0.1',r));
+  try{const url='http://127.0.0.1:'+restarted.server.address().port;
+    const restored=await(await fetch(url+'/api/jobs/'+job.id)).json();assert.equal(restored.paintLevel,9);assert.equal(restored.style,'cos');
+    const restoredLegacy=await(await fetch(url+'/api/jobs/'+photo.id)).json();assert.equal(restoredLegacy.paintLevel,5);assert.equal(restoredLegacy.style,'photo');
+  }finally{await restarted.close();}
+});

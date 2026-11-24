@@ -10,7 +10,7 @@ import { stat, unlink } from 'node:fs/promises';
 import { CodexBridge } from './lib/codex.mjs';
 import { DEFAULT_PROMPT, paintingPrompt, decodeImage, normalizeEditOptions } from './lib/painting.mjs';
 import { prepareEditImage, finishEditImage, applyProtectionMask } from './lib/images.mjs';
-import { PRESETS } from './public/catalog.js';
+import { PRESETS, normalizePaintLevel } from './public/catalog.js';
 import { TemplateStore } from './lib/templates.mjs';
 import { buildPortable } from './scripts/build-portable.mjs';
 import { openBrowser } from './lib/platform.mjs';
@@ -27,7 +27,7 @@ import {useProjectEnvironment} from './lib/project-env.mjs';
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
 useProjectEnvironment(ROOT);
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.svg': 'image/svg+xml' };
-const publicJob = j => ({ id: j.id, status: j.status, strength: j.strength, prompt: j.prompt, preserve: j.preserve,
+const publicJob = j => ({ id: j.id, status: j.status, strength: j.strength, paintLevel: normalizePaintLevel(j.paintLevel,j.strength), prompt: j.prompt, preserve: j.preserve,
   operation: j.operation || 'full-body', style: j.style || 'anime', areas: j.areas, selection: j.selection || null,
   parentId: j.parentId || null, imageWidth: j.imageWidth, imageHeight: j.imageHeight,
   promptMode: j.promptMode || 'guided',
@@ -210,7 +210,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       if (req.method === 'POST') {
         if (req.headers.origin !== `http://${host}` || req.headers['x-paint-csrf'] !== csrf) return json(res, 403, { error: '请从本站页面发起操作。' });
       }
-      if (route === '/api/health' && req.method === 'GET') return json(res, 200, { app: 'houtu-studio', version: '1.7.0', instanceId, csrf });
+      if (route === '/api/health' && req.method === 'GET') return json(res, 200, { app: 'houtu-studio', version: '1.8.0', instanceId, csrf });
       if(route==='/api/portrait/source'&&req.method==='GET'){
         const auditId=url.searchParams.get('audit');if(auditId){const w=await workflows.get(auditId);if(w.kind!=='portrait-audit')throw new Error('不是人物检查工作流。');const assetId=w.steps[0].output?.imageAsset;if(!assetId)throw new Error('检查原图尚未保存。');return json(res,200,{workflowId:w.id,assetId,url:`/api/workflows/${w.id}/assets/${assetId}`,name:w.name,auditId:w.id,diagnosis:w.steps.find(n=>n.id==='diagnose').status==='done'?w.steps.find(n=>n.id==='diagnose').output:null});}
         const id=url.searchParams.get('workflow'),assetId=url.searchParams.get('asset');await resolvePicture({source:{kind:'workflow',workflowId:id,assetId}},{jobs,workflows});const w=await workflows.get(id);return json(res,200,{workflowId:id,assetId,url:`/api/workflows/${id}/assets/${assetId}`,name:w.name});

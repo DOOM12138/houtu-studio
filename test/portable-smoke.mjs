@@ -7,7 +7,8 @@ import { mkdir, readFile, stat, rm } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { powershell } from '../lib/platform.mjs';
 
-const archive = path.resolve(process.argv[2] || 'release/厚涂小站-1.7.0-Windows-x64.zip');
+const metadata = JSON.parse(await readFile(new URL('../package.json',import.meta.url),'utf8'));
+const archive = path.resolve(process.argv[2] || `release/厚涂小站-${metadata.version}-Windows-x64.zip`);
 const temporary = path.join(os.tmpdir(), `houtu-smoke-${randomUUID().slice(0,8)}`);
 const extracted = path.join(temporary, 'unpacked');
 const installed = path.join(temporary, '另一台电脑 test', 'HoutuStudio');
@@ -67,6 +68,9 @@ try {
   assert.ok(library.templates.length >= 3);
   const html = await (await fetch(origin)).text();
   assert.ok(html.includes('prompt-workshop') && html.includes('build-package'));
+  assert.ok(html.includes('id="paint-level"') && html.includes('自然摄影精修（非厚涂）'));
+  const styleCheck=await run(runtime,['--input-type=module','-e',"import {paintingPrompt} from './lib/painting.mjs'; const high=paintingPrompt({style:'cos',paintLevel:10}); const natural=paintingPrompt({style:'photo',paintLevel:10}); if(!high.includes('厚涂程度10/10')||natural.includes('厚涂程度10/10'))throw Error('Portable style control failed');console.log('style-controls-ok');"],{cwd:installed});
+  assert.match(styleCheck,/style-controls-ok/);
   assert.ok((await(await fetch(origin+'/color/')).text()).includes('mask-type'));
   assert.ok((await(await fetch(origin+'/workflows/')).text()).includes('workflow-detail'));
   assert.ok((await(await fetch(origin+'/creative/')).text()).includes('creative-run'));
@@ -96,7 +100,7 @@ try {
   assert.equal(JSON.parse(await readFile(path.join(installed, 'data', 'server.json'), 'utf8')).pid, record.pid);
   await run(runtime, [launcher, '--stop', '--no-open'], { cwd: installed }); launched = false;
   await assert.rejects(() => stat(path.join(installed, 'data', 'server.json')), { code: 'ENOENT' });
-  console.log(JSON.stringify({ result: 'PASS', version: manifest.version, bundledNode: manifest.nodeVersion, files: manifest.files.length + 1, templates: library.templates.length, tested: ['no-global-node-or-npm', 'default-install-stays-on-project-drive', 'agent-and-architecture-docs-bundled', 'fresh-Chinese-and-space-path-install', 'all-required-directories-installed', 'repackage-from-installed-copy', 'auto-port-fallback', 'isolated-Codex-startup', 'native-sharp-DLL', 'prompt-library', 'repeat-launch', 'graceful-stop', 'no-account-photo-log-backup-in-archive'] }));
+  console.log(JSON.stringify({ result: 'PASS', version: manifest.version, bundledNode: manifest.nodeVersion, files: manifest.files.length + 1, templates: library.templates.length, tested: ['no-global-node-or-npm', 'default-install-stays-on-project-drive', 'agent-and-architecture-docs-bundled', 'fresh-Chinese-and-space-path-install', 'all-required-directories-installed', 'repackage-from-installed-copy', 'auto-port-fallback', 'isolated-Codex-startup', 'native-sharp-DLL', 'prompt-library', 'nonpainting-and-ten-level-instructions', 'repeat-launch', 'graceful-stop', 'no-account-photo-log-backup-in-archive'] }));
 } finally {
   if (launched) await run(runtime, [launcher, '--stop', '--no-open'], { cwd: installed }).catch(() => {});
   await new Promise(resolve => barrier.close(resolve));

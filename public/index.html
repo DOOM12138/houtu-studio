@@ -72,27 +72,34 @@
           <div class="image-pane result-pane">
             <div class="pane-label"><span>精修结果</span></div>
             <div id="result-empty" class="result-empty"><span class="brush-icon" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m25 36 25-25a4.2 4.2 0 0 1 6 6L31 42M25 36l6 6M24 38c-7-3-12 2-11 9 0 4-4 7-7 7 10 4 25 1 24-10"/><path d="M18 46c-2 3-2 6-5 7"/></svg></span><p>人物细节，慢慢成形</p><span>精修整个人物，也可以只修一处。</span></div>
-            <div id="result-frame" class="image-frame" hidden><img id="result" alt="二次元厚涂生成结果"></div>
+            <div id="result-frame" class="image-frame" hidden><img id="result" alt="本次精修成品"></div>
             <div id="loading" class="loading-state" role="status" hidden><span class="paint-loader" aria-hidden="true"></span><strong id="loading-message">正在绘制</strong><span id="elapsed">已等待 0:00</span><small>图片生成需要一些时间，请保持网站运行。</small></div>
           </div>
         </div>
         <div id="comparison" class="comparison" hidden>
-          <img id="compare-result" alt="厚涂结果对比底图">
+          <img id="compare-result" alt="精修成品对比底图">
           <div id="compare-overlay" class="compare-overlay"><img id="compare-source" alt="原图对比覆盖层"></div>
-          <span class="compare-label before-label">原图</span><span class="compare-label after-label">厚涂</span><div id="compare-line" class="compare-line" aria-hidden="true"><span>↔</span></div>
-          <label class="visually-hidden" for="compare-range">调整原图与厚涂的对比分界</label><input id="compare-range" type="range" min="0" max="100" value="50">
+          <span class="compare-label before-label">原图</span><span class="compare-label after-label">成品</span><div id="compare-line" class="compare-line" aria-hidden="true"><span>↔</span></div>
+          <label class="visually-hidden" for="compare-range">调整原图与成品的对比分界</label><input id="compare-range" type="range" min="0" max="100" value="50">
         </div>
         <div class="workspace-footer"><span id="image-info">原图与作品保存在本机</span><div class="result-actions"><button id="to-color" class="text-button" type="button">进入调色</button><button id="reuse-result" class="text-button" type="button" hidden>细化这一版人物</button><button id="portrait-rollback" class="text-button" type="button" hidden>退回本轮输入</button><a id="download" class="text-button" href="#" download hidden>下载 <span aria-hidden="true">↓</span></a></div><span id="footer-hint">全人物精修保留原始取景</span></div>
       </section>
 
-      <aside class="settings" aria-label="厚涂设置">
+      <aside class="settings" aria-label="精修与风格设置">
         <h2 id="operation-title">整个人物精修</h2><p id="operation-description" class="settings-intro">从五官到服装，统一整个人物的细节与光影。</p>
-        <div class="style-field"><label for="edit-style">修图风格</label><select id="edit-style"><option value="anime">二次元厚涂</option><option value="cos">COS 质感厚涂</option><option value="natural">自然人物精修</option></select><p id="style-help" class="field-hint">动漫感、柔和色块与自然笔触</p></div>
+        <div class="style-field"><label for="edit-style">修图风格</label><select id="edit-style"><optgroup label="非厚涂精修"><option value="natural">保留原画风（非厚涂）</option><option value="photo">自然摄影精修（非厚涂）</option></optgroup><optgroup label="厚涂风格"><option value="anime" selected>二次元厚涂</option><option value="cos">COS 质感厚涂</option></optgroup></select><p id="style-help" class="field-hint">动漫感、柔和色块与自然笔触</p></div>
         <section id="portrait-panel" class="portrait-panel" hidden><h3>人物细化 · 本轮设置</h3><label for="portrait-profile">细化起点</label><select id="portrait-profile"><option value="gentle">保守细化</option><option value="texture">质感细化</option><option value="faceHair">五官与发丝</option><option value="handsOutfit">手部与服装</option><option value="custom">自定义／画面检查建议</option></select><div id="portrait-levels"></div><label for="portrait-texture">原有质感保留 <output id="portrait-texture-value">85</output> / 100</label><input id="portrait-texture" type="range" min="0" max="100" value="85"><label class="portrait-check"><input id="portrait-face-lock" type="checkbox" checked>锁定脸型、五官位置与神态</label><label class="portrait-check"><input id="portrait-protect-bg" type="checkbox" checked>人物蒙版保护背景与合成效果</label><label for="portrait-mask-file">自备人物蒙版 · 可选灰度PNG</label><input id="portrait-mask-file" type="file" accept="image/png"><button id="portrait-build-mask" class="text-button" type="button">分析／查看本轮人物蒙版</button><figure id="portrait-mask-view" hidden><img id="portrait-mask-preview" alt="本轮人物蒙版：白色会细化，黑色保留原图"><figcaption>白色可细化，黑色像素保留；自动分割不准确时可上传修正蒙版，或用局部选区。</figcaption></figure><div class="portrait-actions"><button id="portrait-audit" class="button" type="button">AI检查本轮输入人物</button><button id="portrait-apply-audit" class="text-button" type="button" disabled>采用检查建议</button></div><div id="portrait-audit-result" aria-live="polite"></div><p class="field-hint">部位等级、五官锁定和质感偏好会转成AI编辑指令，实际效果需检查。背景保护由蒙版合成执行；配合矩形选区可只修一处。</p></section>
-        <fieldset class="strength-field"><legend>精修程度</legend><div class="strength-options">
+        <div id="paint-field" class="paint-field">
+          <div class="paint-heading"><label for="paint-level">厚涂程度</label><output id="paint-value" for="paint-level">2 / 10</output></div>
+          <input id="paint-level" type="range" min="1" max="10" step="1" value="2" aria-describedby="paint-help">
+          <div class="paint-endpoints" aria-hidden="true"><span>1 · 轻微</span><span>10 · 浓厚</span></div>
+          <p id="paint-help" class="field-hint">轻度厚涂：细腻轻柔，只带少量厚涂感。</p>
+        </div>
+        <p id="nonpaint-help" class="nonpaint-help field-hint" hidden>厚涂已关闭。只做所选精修，保留原有质感与画风。</p>
+        <fieldset class="strength-field"><legend>精修力度</legend><div class="strength-options">
           <label><input type="radio" name="strength" value="light" checked><span><strong>轻柔</strong><small>贴近原图</small></span><span class="radio-mark" aria-hidden="true"></span></label>
           <label><input type="radio" name="strength" value="balanced"><span><strong>适中</strong><small>细节更明确</small></span><span class="radio-mark" aria-hidden="true"></span></label>
-          <label><input type="radio" name="strength" value="rich"><span><strong>浓厚</strong><small>增强塑形</small></span><span class="radio-mark" aria-hidden="true"></span></label>
+          <label><input type="radio" name="strength" value="rich"><span><strong>细致</strong><small>细节整理</small></span><span class="radio-mark" aria-hidden="true"></span></label>
         </div></fieldset>
         <button id="generate" class="button primary" type="button" disabled><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m5 14 9-9 2 2-9 9-3 1 1-3Z"/><path d="m11 3 1-2m4 11 2 1M4 7 2 6"/></svg><span>开始精修</span></button>
         <button id="cancel" class="button cancel-button" type="button" hidden>停止生成</button>

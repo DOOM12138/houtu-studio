@@ -1,5 +1,5 @@
 import {createPortraitTools} from './portrait-ui.js';
-import { PRESETS, STYLES, AREAS, DEFAULT_AREAS } from './catalog.js';
+import { PRESETS, STYLES, AREAS, DEFAULT_AREAS, PAINT_LEVELS, normalizePaintLevel } from './catalog.js';
 const $ = id => document.getElementById(id);
 const running = status => ['preparing', 'generating', 'cancelling'].includes(status);
 let state = {}, sourceData = '', currentJob = null, timer = null, historyJobs = [];
@@ -12,7 +12,7 @@ const hasSource = () => Boolean(sourceData || sourceReference);
 
 const selectedAreas = () => [...document.querySelectorAll('[name="area"]:checked')].map(el => el.value);
 const editOptions = () => ({ operation: $('prompt-mode').value === 'custom' ? 'custom' : operation, style: $('edit-style').value, prompt: $('prompt').value, promptMode: $('prompt-mode').value,
-  strength: document.querySelector('[name="strength"]:checked').value, preserve: $('preserve').checked,
+  strength: document.querySelector('[name="strength"]:checked').value, paintLevel:Number($('paint-level').value), preserve: $('preserve').checked,
   areas: operation==='portrait-polish'?Object.entries(portraitTools.options().levels).filter(([,n])=>n>0).map(([id])=>id):selectedAreas(), selection, parentId,...(operation==='portrait-polish'?{portrait:portraitTools.options()}:{}) });
 const portraitTools=createPortraitTools({api,getImage:()=>$('source'),getSource:()=>sourceReference?{source:sourceReference}:{image:sourceData},onChange:optionsChanged,onBusy:(value,type)=>{portraitChecking=value;portraitTaskType=type||'';updateControls();},feedback});
 
@@ -60,6 +60,7 @@ $('tool-filters').addEventListener('click', event => {
 });
 $('edit-style').addEventListener('change', () => { $('style-help').textContent = STYLES.find(s => s.id === $('edit-style').value).description; optionsChanged(); });
 $('area-options').addEventListener('change', optionsChanged);
+$('paint-level').addEventListener('input', optionsChanged);
 document.querySelectorAll('[name="strength"]').forEach(el => el.addEventListener('change', optionsChanged));
 $('preserve').addEventListener('change', optionsChanged);
 if (matchMedia('(max-width:1100px)').matches) $('tools-panel').open = false;
@@ -70,6 +71,14 @@ function optionsChanged() {
   $('prompt-label').textContent = custom ? '完整自定义提示词' : '补充修图描述';
   $('prompt-help').textContent = custom ? '直接使用这段指令，不追加工具与画风设置；局部选区仍然生效。' : '这段描述会和所选功能、画风、程度组合。';
   $('prompt-length').textContent = `${$('prompt').value.length} / 6000`;
+  const style = STYLES.find(s => s.id === $('edit-style').value);
+  const paintLevel = Number($('paint-level').value);
+  const paint = PAINT_LEVELS[paintLevel-1];
+  $('paint-field').hidden = custom || !style.painting;
+  $('nonpaint-help').hidden = custom || style.painting;
+  $('paint-value').value = `${paintLevel} / 10`;
+  $('paint-help').textContent = `${paint.name}：${paint.description}`;
+  $('paint-level').setAttribute('aria-valuetext', `${paintLevel}/10，${paint.name}`);
   updateControls();
   if ($('prompt-preview').open && state.csrf) refreshPrompt();
 }
@@ -114,7 +123,7 @@ function updateControls() {
   $('upload').disabled = working; $('replace').disabled = working; $('file').disabled = working;
   $('login').disabled = working; $('logout').disabled = working;
   $('prompt').disabled = working; $('preserve').disabled = working; $('reset-prompt').disabled = working || !state.defaultPrompt;
-  document.querySelectorAll('[name="strength"],[name="area"],#edit-style,#preserve').forEach(el => { el.disabled = working || custom; });
+  document.querySelectorAll('[name="strength"],[name="area"],#edit-style,#preserve,#paint-level').forEach(el => { el.disabled = working || custom; });
   document.querySelectorAll('#tool-list button,#tool-filters button,#tool-search,#prompt-mode,#save-template,#template-name,#template-select,#import-templates').forEach(el => { el.disabled = working; });
   $('update-template').disabled = working || !$('template-select').value;
   $('apply-template').disabled = working || !$('template-select').value;
@@ -346,7 +355,7 @@ function renderJob(job) {
   if (job.outputUrl && !working) {
     $('result').src = job.outputUrl;
     $('download').href = job.outputUrl + '?download=1';
-    $('download').download = job.operation==='portrait-polish'?`人物细化-第${job.round||1}轮.png`:'二次元厚涂.png';
+    $('download').download = job.operation==='portrait-polish'?`人物细化-第${job.round||1}轮.png`:STYLES.find(s=>s.id===job.style)?.painting?`厚涂-${normalizePaintLevel(job.paintLevel,job.strength)}级.png`:'人物精修-非厚涂.png';
   }
   if (!working) {
     clearInterval(timer); timer = null;
@@ -403,7 +412,7 @@ async function restoreJob(job) {
     $('prompt').value = job.prompt || state.defaultPrompt;
     $('prompt-mode').value = job.promptMode || 'guided';
     const strength = document.querySelector(`[name="strength"][value="${['light', 'balanced', 'rich'].includes(job.strength) ? job.strength : 'light'}"]`);
-    strength.checked = true; $('preserve').checked = job.preserve !== false;
+    strength.checked = true; $('paint-level').value = normalizePaintLevel(job.paintLevel,job.strength); $('preserve').checked = job.preserve !== false;
     $('edit-style').value = STYLES.some(s => s.id === job.style) ? job.style : 'anime';
     document.querySelectorAll('[name="area"]').forEach(el => { el.checked = (job.areas || DEFAULT_AREAS).includes(el.value); });
     selection = job.selection || null; parentId = job.parentId || null;
@@ -421,11 +430,11 @@ async function loadHistory() {
     for (const job of historyJobs) {
       const button = document.createElement('button'); button.type = 'button'; button.className = 'history-item';
       const stamp = new Date(job.created).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-      const strength = { light: '轻厚涂', balanced: '适中', rich: '浓厚' }[job.strength];
+      const strength = job.promptMode==='custom'?'自定义提示词':STYLES.find(s=>s.id===job.style)?.painting?`厚涂 ${normalizePaintLevel(job.paintLevel,job.strength)}/10`:'非厚涂精修';
       const tool = PRESETS.find(p => p.id === job.operation)?.name || '人物精修';
       button.setAttribute('aria-label', `打开 ${stamp} 的${tool}作品`);
       const img = document.createElement('img'); img.src = job.outputUrl; img.alt = `${strength}作品缩略图`; img.loading = 'lazy';
-      const label = document.createElement('span'); label.textContent = `${stamp} · ${tool}${job.selection ? ' · 局部' : ''}`;
+      const label = document.createElement('span'); label.textContent = `${stamp} · ${tool} · ${strength}${job.selection ? ' · 局部' : ''}`;
       button.append(img, label);
       button.addEventListener('click', async () => {
         if (busy || running(currentJob?.status)) return feedback('请先等待当前图片完成。');
@@ -466,6 +475,7 @@ $('apply-template').addEventListener('click', () => {
   $('prompt').value = template.text; $('prompt-mode').value = template.options.promptMode;
   $('edit-style').value = template.options.style; $('preserve').checked = template.options.preserve;
   document.querySelector(`[name="strength"][value="${template.options.strength}"]`).checked = true;
+  $('paint-level').value = normalizePaintLevel(template.options.paintLevel,template.options.strength);
   document.querySelectorAll('[name="area"]').forEach(el => { el.checked = template.options.areas.includes(el.value); });
   if(template.options.portrait)portraitTools.hydrate(template.options.portrait);setOperation(template.options.operation, { autoStyle: false });
   templateFeedback(`已应用「${template.name}」。原图与选区保留。`);
