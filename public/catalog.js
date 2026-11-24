@@ -12,7 +12,7 @@ export const AREAS = [
   { id: 'hair', name: '头发假发', instruction: '整理发束走向、发际线与碎发，用疏密有序的发束表现厚度，保留原发型与发色。' },
   { id: 'skin', name: '皮肤肤色', instruction: '统一脸、颈部、手臂和可见腿部的肤色与明暗，修整突兀瑕疵，保留皮肤或原画的自然纹理，不一味提白。' },
   { id: 'hands', name: '手部肢体', instruction: '检查可见手指、手腕、手臂和腿部的衔接与结构，只修正明显异常，不改变姿势、身体比例或肢体数量。' },
-  { id: 'outfit', name: '服装褶皱', instruction: '整理不合理的服装褶皱、接缝和轮廓，让褶皱顺应姿势与重力，保留设计、图案、覆盖范围与配色。' },
+  { id: 'outfit', name: '服装褶皱', instruction: '整理不合理的服装褶皱、接缝和轮廓，让褶皱顺应材质、姿势、重力与实际受力点。保留合理松量和必要压褶，腰头到衣摆连续衔接；保持印花、格纹、拉链、纽扣、版型、覆盖范围与配色，不把衣服抹平、拉花或融化。' },
   { id: 'accessories', name: '饰品材质', instruction: '细化原有饰品、发饰与道具结构，区分布料、皮革、金属和宝石的质感，不新增或删除配件。' },
   { id: 'light', name: '全身光影', instruction: '统一人物从头到脚可见区域的光源方向、冷暖、阴影软硬与环境反光，使人物与原背景自然协调。' },
 ];
@@ -20,6 +20,7 @@ export const DEFAULT_AREAS = AREAS.map(area => area.id);
 
 export const PRESETS = [
   {id:'portrait-polish',name:'人物二次精修',group:'人物精修',short:'沿用成品，细化人物',description:'在已有成品上细化五官、皮肤、发丝、手部与服装，保持当前风格；可用人物蒙版严格保护背景。',style:'natural',instruction:'在当前成品上进行保守的人物细化，保留已经完成的构图、风格、背景、调色和合成，只修整本轮明确选择的部位。'},
+  {id:'smooth-belly',name:'平滑瘦肚子',group:'人物精修',short:'自然收腹，衣褶顺势衔接',description:'轻柔修整腹部鼓起，平滑衔接腰侧与衣摆，同时考虑衣料松量、印花接缝和背景直线。',style:'natural',instruction:'只做自然平滑的腰腹收整，并协调服装褶皱与轮廓过渡。'},
   { id: 'full-body', name: '整个人物精修', group: '人物精修', short: '从五官到服装，整体协调', description: '精修原图中完整可见的人物，可分别选择五官、头发、皮肤、手部、服装和全身光影。', instruction: '对原图中完整可见的人物进行协调精修，覆盖已选的人物部位。保持全身或半身的原始取景，不把结果裁成头像，不补画画外身体，不改变头身比例、姿态或身体轮廓。' },
   { id: 'face', name: '面部精修', group: '人物精修', short: '五官衔接与面部体积', description: '整理面部结构与明暗，保留脸型、表情和人物身份。', instruction: AREAS[0].instruction },
   { id: 'eyes', name: '眼睛精修', group: '人物精修', short: '虹膜、睫毛与眼神光', description: '细化眼部层次与眼神，保留原眼型、瞳色和视线。', instruction: AREAS[1].instruction },

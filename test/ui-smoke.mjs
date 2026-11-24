@@ -18,7 +18,7 @@ try {
     await page.goto(site, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => document.querySelector('#prompt').value.length > 0);
     assert.equal(await page.locator('#generate').isDisabled(), true);
-    assert.equal(await page.locator('#tool-list button').count(), 23);
+    assert.equal(await page.locator('#tool-list button').count(), 24);
     const initial = await page.evaluate(() => ({ viewport: innerWidth, scroll: document.documentElement.scrollWidth }));
     assert.ok(initial.scroll <= initial.viewport, `${name} horizontal overflow: ${JSON.stringify(initial)}`);
     await page.screenshot({ path: path.join(out, `${name}.png`), fullPage: true });

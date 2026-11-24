@@ -1,3 +1,4 @@
+import {isBellyOperation,bellyOptions} from './belly-options.js';
 import {createSceneTools} from './scene-ui.js';
 import {isSceneOperation,isCleanupOperation} from './scene-options.js';
 import {createModelPicker} from './model-picker.js';
@@ -17,7 +18,7 @@ const hasSource = () => Boolean(sourceData || sourceReference);
 const selectedAreas = () => [...document.querySelectorAll('[name="area"]:checked')].map(el => el.value);
 const editOptions = () => ({ operation: $('prompt-mode').value === 'custom' ? 'custom' : operation, style: $('edit-style').value, model:modelPicker.value, prompt: $('prompt').value, promptMode: $('prompt-mode').value,
   strength: document.querySelector('[name="strength"]:checked').value, paintLevel:Number($('paint-level').value), preserve: $('preserve').checked,
-  scene:sceneTools.options(),areas: operation==='portrait-polish'?Object.entries(portraitTools.options().levels).filter(([,n])=>n>0).map(([id])=>id):selectedAreas(), selection, parentId,...(operation==='portrait-polish'?{portrait:portraitTools.options()}:{}) });
+  belly:bellyOptions({level:Number($('belly-level').value),fabric:$('belly-fabric').value,transition:$('belly-transition').value,scope:$('belly-scope').value},operation),scene:sceneTools.options(),areas: operation==='portrait-polish'?Object.entries(portraitTools.options().levels).filter(([,n])=>n>0).map(([id])=>id):selectedAreas(), selection, parentId,...(operation==='portrait-polish'?{portrait:portraitTools.options()}:{}) });
 const sceneTools=createSceneTools({getImage:()=>$('source'),onChange:optionsChanged,onBusy:value=>{portraitChecking=value;portraitTaskType=value?'mask':'';updateControls();},feedback});
 const portraitTools=createPortraitTools({api,getImage:()=>$('source'),getSource:()=>({...((sourceReference)?{source:sourceReference}:{image:sourceData}),model:modelPicker.value}),onChange:optionsChanged,onBusy:(value,type)=>{portraitChecking=value;portraitTaskType=type||'';updateControls();},feedback});
 
@@ -41,6 +42,7 @@ function renderTools() {
 }
 
 function setOperation(id, { autoStyle = true } = {}) {
+  const previousOperation=operation;
   const tool = PRESETS.find(item => item.id === id) || PRESETS[0];
   operation = tool.id;
   $('operation-title').textContent = tool.name; $('active-tool-name').textContent = tool.name;
@@ -48,6 +50,7 @@ function setOperation(id, { autoStyle = true } = {}) {
   $('areas-details').hidden = operation !== 'full-body';$('portrait-panel').hidden=operation!=='portrait-polish';
   if (autoStyle && tool.style) $('edit-style').value = tool.style;
   $('style-help').textContent = STYLES.find(style => style.id === $('edit-style').value).description;
+  if(autoStyle&&isBellyOperation(operation)&&previousOperation!==operation)hydrateBelly(undefined,operation);
   sceneTools.setOperation(operation,{reset:autoStyle});
   renderTools(); optionsChanged();
 }
@@ -80,11 +83,13 @@ function optionsChanged() {
   const style = STYLES.find(s => s.id === $('edit-style').value);
   const paintLevel = Number($('paint-level').value);
   const paint = PAINT_LEVELS[paintLevel-1];
-  const cleanup=isCleanupOperation(operation);
+  const cleanup=isCleanupOperation(operation),belly=isBellyOperation(operation);
+  $('belly-panel').hidden=custom||!belly;
+  $('belly-level-value').value=$('belly-level').value+' / 10';
   $('scene-panel').hidden=custom||!isSceneOperation(operation);
-  $('edit-style').closest('.style-field').hidden=cleanup&&!custom;
-  $('paint-field').hidden = custom || cleanup || !style.painting;
-  $('nonpaint-help').hidden = custom || cleanup || style.painting;
+  $('edit-style').closest('.style-field').hidden=(cleanup||belly)&&!custom;
+  $('paint-field').hidden = custom || cleanup || belly || !style.painting;
+  $('nonpaint-help').hidden = custom || cleanup || belly || style.painting;
   $('paint-value').value = `${paintLevel} / 10`;
   $('paint-help').textContent = `${paint.name}：${paint.description}`;
   $('paint-level').setAttribute('aria-valuetext', `${paintLevel}/10，${paint.name}`);
@@ -129,17 +134,18 @@ function updateControls() {
   $('scene-recompose').hidden=!scene||!currentJob?.rawAsset||currentJob.operation!==operation;
   $('scene-recompose-help').hidden=$('scene-recompose').hidden;
   $('scene-recompose').disabled=working;
-  document.querySelector('.strength-field').hidden=scene;
-  if(scene)$('preserve').checked=true;
+  $('belly-panel').inert=working||custom;
+  document.querySelector('.strength-field').hidden=scene||isBellyOperation(operation)&&!custom;
+  if(scene||isBellyOperation(operation)&&!custom)$('preserve').checked=true;
   $('generate').disabled = !modelPicker.valid() || !hasSource() || !state.account || working || !$('prompt').value.trim() || (!custom && ['full-body','portrait-polish'].includes(operation) && !editOptions().areas.length);
-  $('generate').querySelector('span').textContent = packing ? '打包中，稍后精修' : portraitChecking ? (portraitTaskType==='audit'?'正在检查人物…':'正在分析人物蒙版…') : working ? '正在精修…' : ready ? '先检查主体保护' : isCleanupOperation(operation)&&!custom ? '开始场照清理' : selection ? '精修选区' : '开始精修';
+  $('generate').querySelector('span').textContent = packing ? '打包中，稍后精修' : portraitChecking ? (portraitTaskType==='audit'?'正在检查人物…':'正在分析人物蒙版…') : working ? '正在精修…' : ready ? '先检查主体保护' : isCleanupOperation(operation)&&!custom ? '开始场照清理' : isBellyOperation(operation)&&!custom ? '开始平滑收腹' : selection ? '精修选区' : '开始精修';
   $('cancel').hidden = !running(currentJob?.status)&&!(portraitChecking&&portraitTaskType==='audit');
   $('cancel').disabled = currentJob?.status === 'cancelling';
   $('cancel').textContent = portraitChecking&&portraitTaskType==='audit'?'停止画面检查':currentJob?.status === 'cancelling' ? '正在停止…' : '停止生成';
   $('upload').disabled = working; $('replace').disabled = working; $('file').disabled = working;
   $('login').disabled = working; $('logout').disabled = working;
   $('prompt').disabled = working; $('preserve').disabled = working; $('reset-prompt').disabled = working || !state.defaultPrompt;
-  document.querySelectorAll('[name="strength"],[name="area"],#edit-style,#preserve,#paint-level').forEach(el => { el.disabled = working || custom || (isSceneOperation(operation)&&el.id==='preserve'); });
+  document.querySelectorAll('[name="strength"],[name="area"],#edit-style,#preserve,#paint-level').forEach(el => { el.disabled = working || custom || ((isSceneOperation(operation)||isBellyOperation(operation))&&el.id==='preserve'); });
   document.querySelectorAll('#tool-list button,#tool-filters button,#tool-search,#prompt-mode,#save-template,#template-name,#template-select,#import-templates').forEach(el => { el.disabled = working; });
   $('update-template').disabled = working || !$('template-select').value;
   $('apply-template').disabled = working || !$('template-select').value;
@@ -373,7 +379,7 @@ function renderJob(job) {
   if (job.outputUrl && !working) {
     $('result').src = job.outputUrl;
     $('download').href = job.outputUrl + '?download=1';
-    $('download').download = isSceneOperation(job.operation)?`${PRESETS.find(p=>p.id===job.operation).name.replaceAll('/','-')}.png`:job.operation==='portrait-polish'?`人物细化-第${job.round||1}轮.png`:STYLES.find(s=>s.id===job.style)?.painting?`厚涂-${normalizePaintLevel(job.paintLevel,job.strength)}级.png`:'人物精修-非厚涂.png';
+    $('download').download = isBellyOperation(job.operation)?`平滑瘦腹-${job.belly?.level||2}级.png`:isSceneOperation(job.operation)?`${PRESETS.find(p=>p.id===job.operation).name.replaceAll('/','-')}.png`:job.operation==='portrait-polish'?`人物细化-第${job.round||1}轮.png`:STYLES.find(s=>s.id===job.style)?.painting?`厚涂-${normalizePaintLevel(job.paintLevel,job.strength)}级.png`:'人物精修-非厚涂.png';
   }
   if (!working) {
     clearInterval(timer); timer = null;
@@ -436,6 +442,7 @@ async function restoreJob(job) {
     $('edit-style').value = STYLES.some(s => s.id === job.style) ? job.style : 'anime';
     document.querySelectorAll('[name="area"]').forEach(el => { el.checked = (job.areas || DEFAULT_AREAS).includes(el.value); });
     selection = job.selection || null; parentId = job.parentId || null;
+    hydrateBelly(job.belly,job.operation);
     sceneTools.hydrate(job.compositionMaskOverride?{...job.scene,protectSubject:Boolean(job.compositionMaskAsset)}:job.scene,job.operation);
     setOperation(job.operation || 'full-body', { autoStyle: false }); updateRegion();
     if(job.portrait){portraitTools.hydrate(job.portrait);$('portrait-profile').value='custom';}$('portrait-protect-bg').checked=job.operation==='portrait-polish'?Boolean(job.maskAsset):true;if(job.portraitAuditId){try{const audit=await api('/api/portrait/source?audit='+job.portraitAuditId);portraitTools.setAuditId(job.portraitAuditId);if(audit.diagnosis)portraitTools.showDiagnosis(audit.diagnosis,job.portraitAuditId);}catch{}}if(job.operation==='portrait-polish'&&job.maskAsset&&job.workflowId){$('portrait-protect-bg').checked=true;await portraitTools.loadMask(`/api/workflows/${job.workflowId}/assets/${job.maskAsset}`);}if(isSceneOperation(job.operation)){const mask=job.compositionMaskOverride?job.compositionMaskAsset:job.maskAsset;if(mask&&job.workflowId)await sceneTools.loadEditingMask(`/api/workflows/${job.workflowId}/assets/${mask}`);}
@@ -500,6 +507,7 @@ $('apply-template').addEventListener('click', () => {
   document.querySelector(`[name="strength"][value="${template.options.strength}"]`).checked = true;
   $('paint-level').value = normalizePaintLevel(template.options.paintLevel,template.options.strength);
   document.querySelectorAll('[name="area"]').forEach(el => { el.checked = template.options.areas.includes(el.value); });
+  hydrateBelly(template.options.belly,template.options.operation);
   sceneTools.hydrate(template.options.scene,template.options.operation);if(template.options.portrait)portraitTools.hydrate(template.options.portrait);setOperation(template.options.operation, { autoStyle: false });
   templateFeedback(`已应用「${template.name}」。原图与选区保留。`);
 });
@@ -585,3 +593,6 @@ $('scene-recompose').addEventListener('click',async()=>{
  if(!currentJob?.workflowId||$('scene-recompose').disabled)return;busy=true;feedback();updateControls();
  try{const mask=sceneTools.options().protectSubject?await sceneTools.buildMask():null;const workflow=await api('/api/workflows/'+currentJob.workflowId);const job=await api('/api/workflows/'+currentJob.workflowId+'/retry',{step:'compose',revision:workflow.revision,replaceProtection:true,protectionMask:mask});renderJob(job);watchJob();}catch(error){feedback(error.message);}finally{busy=false;updateControls();}
 });
+
+function hydrateBelly(input,id){if(!isBellyOperation(id))return;const value=bellyOptions(input,id);for(const key of ['level','fabric','transition','scope'])$('belly-'+key).value=value[key];}
+for(const id of ['belly-level','belly-fabric','belly-transition','belly-scope'])$(id).addEventListener(id==='belly-level'?'input':'change',optionsChanged);

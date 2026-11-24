@@ -149,8 +149,8 @@ test('job stores actual image event, blocks duplicates, and serves a download', 
   assert.deepEqual(await sharp(downloaded).raw().toBuffer(), await sharp(fixtureBytes).raw().toBuffer());
 });
 
-test('all 23 tools have distinct compiled tasks and full-person editing does not crop to a face', () => {
-  assert.equal(PRESETS.length, 23);
+test('all 24 tools have distinct compiled tasks and full-person editing does not crop to a face', () => {
+  assert.equal(PRESETS.length, 24);
   for (const preset of PRESETS) assert.ok(paintingPrompt({ ...input, operation: preset.id }).includes(`当前功能：${preset.name}`));
   const prompt = paintingPrompt({ ...input, operation: 'full-body', areas: ['hair', 'hands', 'outfit'] });
   assert.match(prompt, /不把结果裁成头像/);

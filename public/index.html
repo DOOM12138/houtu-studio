@@ -89,6 +89,15 @@
         <h2 id="operation-title">整个人物精修</h2><p id="operation-description" class="settings-intro">从五官到服装，统一整个人物的细节与光影。</p>
         <div id="model-picker"></div>
         <div class="style-field"><label for="edit-style">修图风格</label><select id="edit-style"><optgroup label="非厚涂精修"><option value="natural">保留原画风（非厚涂）</option><option value="photo">自然摄影精修（非厚涂）</option></optgroup><optgroup label="厚涂风格"><option value="anime" selected>二次元厚涂</option><option value="cos">COS 质感厚涂</option></optgroup></select><p id="style-help" class="field-hint">动漫感、柔和色块与自然笔触</p></div>
+        <section id="belly-panel" class="belly-panel" hidden><h3>腰腹与衣料</h3>
+          <label for="belly-level">瘦腹力度 <output id="belly-level-value">2 / 10</output></label><input id="belly-level" type="range" min="1" max="10" step="1" value="2">
+          <label for="belly-scope">调整范围</label><select id="belly-scope"><option value="belly">仅腹部平滑收整</option><option value="waist-belly">腹部与必要腰侧协调</option></select>
+          <label for="belly-fabric">腹部衣料</label><select id="belly-fabric"><option value="auto">按原图判断材质与版型</option><option value="fitted">贴身面料 · 保留合理张力</option><option value="loose">宽松衣料 · 保留松量与垂坠</option><option value="structured">硬挺制服／腰封／甲胄</option></select>
+          <label for="belly-transition">轮廓过渡</label><select id="belly-transition"><option value="wide">更宽平滑过渡（推荐）</option><option value="smooth">自然平滑过渡</option></select>
+          <p class="field-hint">褶皱顺着受力方向衔接，保留腰头、衣摆、印花、拉链和接缝。只修腰腹，沿用原画风。</p>
+          <p class="field-hint">建议在左侧框选包含腰腹上下与两侧余量的范围，不要只圈一小块鼓包。框外像素保持原图，框内宽羽化平滑衔接；不框选时由AI定位，不逐像素锁定其他区域。</p>
+          <p class="field-hint">力度为AI编辑偏好，不是固定缩窄百分比。已经自然平整的部位保持自然体积。</p>
+        </section>
         <section id="scene-panel" class="scene-panel" hidden><h3>场照与次元设置</h3>
           <label for="scene-subject">要保留的主体／同伴</label><textarea id="scene-subject" rows="2" maxlength="500" placeholder="例如：前景蓝发白衣的主角；一起保留右边持伞的同伴"></textarea>
           <p class="field-hint">说明用于指导AI；像素保护按下方蒙版执行。</p>

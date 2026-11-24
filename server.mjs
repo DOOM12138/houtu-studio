@@ -1,3 +1,4 @@
+import {isBellyOperation,bellyRegionOptions} from './public/belly-options.js';
 import {isSceneOperation} from './public/scene-options.js';
 import {AccountLedger,trackedBridge,accountSnapshot} from './backend/accounts.mjs';
 import {ImageLibrary} from './backend/library.mjs';
@@ -38,7 +39,7 @@ const publicJob = j => ({ id: j.id, status: j.status, account:accountSnapshot(j.
   promptMode: j.promptMode || 'guided',
   workflowId:j.workflowId||null, workflowStep:j.workflowStep||null, workflowToken:j.workflowToken||null, runId:j.runId||null,
   region:j.region||null,rawAsset:j.rawAsset||null,
-  scene:j.scene||null,compositionMaskOverride:Boolean(j.compositionMaskOverride),compositionMaskAsset:j.compositionMaskAsset||null,portrait:j.portrait||null,maskAsset:j.maskAsset||null,round:j.round||1,sourceWorkflowId:j.sourceWorkflowId||null,sourceAsset:j.sourceAsset||null,sourceStep:j.sourceStep||null,portraitAuditId:j.portraitAuditId||null,
+  belly:j.belly||null,scene:j.scene||null,compositionMaskOverride:Boolean(j.compositionMaskOverride),compositionMaskAsset:j.compositionMaskAsset||null,portrait:j.portrait||null,maskAsset:j.maskAsset||null,round:j.round||1,sourceWorkflowId:j.sourceWorkflowId||null,sourceAsset:j.sourceAsset||null,sourceStep:j.sourceStep||null,portraitAuditId:j.portraitAuditId||null,
   created: j.created, message: j.message, sourceUrl: `/images/${j.id}/source.${j.extension}`,
   outputUrl: j.output ? `/images/${j.id}/${j.output}` : null });
 
@@ -135,7 +136,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     const identityPaths=[];for(const [i,id]of (workflow.steps[0].output.referenceAssets||[]).entries()){const asset=await workflows.asset(job.workflowId,id),file=path.join(runDirectory,'identity-'+i+'.png');await writeFile(file,(await prepareEditImage(await readFile(asset.file),null)).source);identityPaths.push(file);}const identityHint=identityPaths.length?'\n附加原始图片／人设参考只用于保留人物身份、服装与配饰，不照搬其中的旧背景、旧调色或旧构图。当前图1成品是编辑目标。':'';bridge.begin(job,paintingPrompt(job)+identityHint,editPath,job.region?sourcePath:null,identityPaths).catch(error=>finish(job,'error',friendlyError(error.message),runId)).catch(()=>{});
   };
   const prepareJob=async(job,bytes)=>{
-    await startJobStep(job,'prepare');const prepared=await prepareEditImage(bytes,job.selection);job.region=prepared.region;job.imageWidth=prepared.width;job.imageHeight=prepared.height;if(job.maskAsset){const mask=await workflows.asset(job.workflowId,job.maskAsset);if(Math.abs(mask.width/mask.height-prepared.width/prepared.height)>.025)throw new Error('人物蒙版与本轮图片比例不符，请上传对应蒙版。');const stats=await (await import('sharp')).default(mask.file).flatten({background:'#000000'}).greyscale().stats();if(stats.channels[0].max===0)throw new Error('人物蒙版没有选中可编辑区域，请先修正。');}
+    await startJobStep(job,'prepare');const prepared=await prepareEditImage(bytes,job.selection,isBellyOperation(job.operation)?bellyRegionOptions(job.belly):undefined);job.region=prepared.region;job.imageWidth=prepared.width;job.imageHeight=prepared.height;if(job.maskAsset){const mask=await workflows.asset(job.workflowId,job.maskAsset);if(Math.abs(mask.width/mask.height-prepared.width/prepared.height)>.025)throw new Error('人物蒙版与本轮图片比例不符，请上传对应蒙版。');const stats=await (await import('sharp')).default(mask.file).flatten({background:'#000000'}).greyscale().stats();if(stats.channels[0].max===0)throw new Error('人物蒙版没有选中可编辑区域，请先修正。');}
     await writeFile(path.join(job.directory,'source.png'),prepared.source);if(prepared.editImage)await writeFile(path.join(job.directory,'input.png'),prepared.editImage);
     const source=await workflows.putAsset(job.workflowId,prepared.source,'image/png'),edit=prepared.editImage?await workflows.putAsset(job.workflowId,prepared.editImage,'image/png'):source;
     await doneJobStep(job,{sourceAsset:source.id,inputAsset:edit.id,region:prepared.region,width:prepared.width,height:prepared.height},[{id:source.id,label:'标准化完整原图',type:'image'},...(prepared.editImage?[{id:edit.id,label:'发送给模型的局部裁片',type:'image'}]:[])],'编辑输入已保存');
@@ -158,7 +159,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     } else throw new Error('客户端没有返回可下载的图片，请升级客户端后重试。');
     if(job.runId!==runId)throw new Error('这次执行已过期。');
     const raw=await workflows.putAsset(job.workflowId,bytes,item.result?.startsWith('data:image/jpeg')?'image/jpeg':'image/png');if(job.runId!==runId)throw new Error('这次执行已过期。');job.rawAsset=raw.id;
-    await doneJobStep(job,{rawAsset:raw.id,account:accountSnapshot(job.account),appVersion:'1.11.0',model:job.model||null,resolvedModel:job.resolvedModel||null},[{id:raw.id,label:'AI返回的原始出图（合成前）',type:'image'}],'原始生成图已保存，后续合成无需再次生成',runId);
+    await doneJobStep(job,{rawAsset:raw.id,account:accountSnapshot(job.account),appVersion:'1.12.0',model:job.model||null,resolvedModel:job.resolvedModel||null},[{id:raw.id,label:'AI返回的原始出图（合成前）',type:'image'}],'原始生成图已保存，后续合成无需再次生成',runId);
     await composeOutput(job,bytes,runId);
   };
 
@@ -222,7 +223,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       if (req.method === 'POST') {
         if (req.headers.origin !== `http://${host}` || req.headers['x-paint-csrf'] !== csrf) return json(res, 403, { error: '请从本站页面发起操作。' });
       }
-      if (route === '/api/health' && req.method === 'GET') return json(res, 200, { app: 'houtu-studio', version: '1.11.0', instanceId, csrf });
+      if (route === '/api/health' && req.method === 'GET') return json(res, 200, { app: 'houtu-studio', version: '1.12.0', instanceId, csrf });
       if(route==='/api/portrait/source'&&req.method==='GET'){
         const auditId=url.searchParams.get('audit');if(auditId){const w=await workflows.get(auditId);if(w.kind!=='portrait-audit')throw new Error('不是人物检查工作流。');const assetId=w.steps[0].output?.imageAsset;if(!assetId)throw new Error('检查原图尚未保存。');return json(res,200,{workflowId:w.id,assetId,url:`/api/workflows/${w.id}/assets/${assetId}`,name:w.name,auditId:w.id,diagnosis:w.steps.find(n=>n.id==='diagnose').status==='done'?w.steps.find(n=>n.id==='diagnose').output:null});}
         const id=url.searchParams.get('workflow'),assetId=url.searchParams.get('asset');await resolvePicture({source:{kind:'workflow',workflowId:id,assetId}},{jobs,workflows});const w=await workflows.get(id);return json(res,200,{workflowId:id,assetId,url:`/api/workflows/${id}/assets/${assetId}`,name:w.name});
@@ -330,7 +331,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
         try{await bridge.account();}catch{}
         const images=await library.refresh(jobs,workflows);
         const records=accounts.records().map(account=>({...account,images:images.filter(image=>image.account?.email.toLowerCase()===account.email.toLowerCase()).length}));
-        return json(res,200,{serverId:accounts.state.serverId,startedAt,created:accounts.state.created,machine:os.hostname(),version:'1.11.0',projectRoot:ROOT,dataRoot:path.resolve(directory),loginRoot:path.join(path.resolve(directory),'codex'),scope:'local',current:accounts.current(),accounts:records,images:images.length});
+        return json(res,200,{serverId:accounts.state.serverId,startedAt,created:accounts.state.created,machine:os.hostname(),version:'1.12.0',projectRoot:ROOT,dataRoot:path.resolve(directory),loginRoot:path.join(path.resolve(directory),'codex'),scope:'local',current:accounts.current(),accounts:records,images:images.length});
       }
       if(route==='/api/server/images'&&req.method==='GET'){await library.refresh(jobs,workflows);return json(res,200,library.list(url.searchParams,accounts.records()));}
       const thumbnail=/^\/api\/server\/thumbnails\/([a-f0-9]{64})$/.exec(route);
@@ -479,7 +480,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       } else if (req.method === 'GET' && route === '/models/selfie_multiclass_256x256.tflite') {
         file=path.join(ROOT,'models','selfie_multiclass_256x256.tflite');
       } else {
-        const files = { '/': 'index.html', '/app.js': 'app.js', '/catalog.js': 'catalog.js', '/style.css': 'style.css', '/favicon.svg': 'favicon.svg','/portrait-options.js':'portrait-options.js','/portrait-ui.js':'portrait-ui.js','/model-picker.js':'model-picker.js','/model-options.js':'model-options.js','/scene-options.js':'scene-options.js','/scene-ui.js':'scene-ui.js','/subject-mask.js':'subject-mask.js' };
+        const files = { '/': 'index.html', '/app.js': 'app.js', '/catalog.js': 'catalog.js', '/style.css': 'style.css', '/favicon.svg': 'favicon.svg','/portrait-options.js':'portrait-options.js','/portrait-ui.js':'portrait-ui.js','/model-picker.js':'model-picker.js','/model-options.js':'model-options.js','/scene-options.js':'scene-options.js','/belly-options.js':'belly-options.js','/scene-ui.js':'scene-ui.js','/subject-mask.js':'subject-mask.js' };
         if (!Object.hasOwn(files, route) || req.method !== 'GET') return json(res, 404, { error: '页面不存在。' });
         file = path.join(ROOT, 'public', files[route]);
       }
