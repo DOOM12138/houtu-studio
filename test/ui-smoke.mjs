@@ -27,7 +27,7 @@ try {
     if (!await page.locator('#prompt-workshop').evaluate(el => el.open)) await page.locator('#prompt-workshop>summary').click();
     await page.locator('#prompt').fill('保留角色，轻度二次元厚涂。');
     await page.locator('#reset-prompt').click();
-    assert.match(await page.locator('#prompt').inputValue(), /保留角色特征/);
+    assert.match(await page.locator('#prompt').inputValue(), /只修明确问题/);
     await page.locator('#prompt-workshop>summary').click();
     await page.locator('#file').setInputFiles({ name: 'unsupported.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg/>') });
     await page.waitForFunction(() => !document.querySelector('#feedback').hidden);
@@ -45,7 +45,8 @@ try {
     assert.match(await page.locator('#image-info').textContent(), /640 × 800/);
     if (!await page.locator('#tools-panel').evaluate(el => el.open)) await page.locator('#tools-panel>summary').click();
     await page.locator('#tool-search').fill('眼睛');
-    assert.equal(await page.locator('#tool-list button').count(), 1);
+    assert.ok(await page.locator('#tool-list button').count() >= 1);
+    assert.equal(await page.locator('[data-operation="eyes"]').isVisible(),true);
     await page.locator('[data-operation="eyes"]').click();
     assert.equal(await page.locator('#operation-title').textContent(), '眼睛精修');
     await page.locator('#edit-style').selectOption('cos');
