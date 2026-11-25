@@ -52,5 +52,26 @@
       "url": "https://raw.githubusercontent.com/openai/codex/rust-v0.172.0/LICENSE",
       "sha256": "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc"
     }
+  },
+  "libcxx": {
+    "ndkVersion": "27.3.13750724",
+    "release": "r27d",
+    "source": "https://dl.google.com/android/repository/android-ndk-r27d-linux.zip",
+    "abis": {
+      "arm64-v8a": {
+        "file": "android/native/arm64-v8a/libc++_shared.so",
+        "sha256": "d523468d62d9b603cb3354294d70d4b2feabf2c3f1e43b0c96c9aabf32813708",
+        "bytes": 1794776,
+        "archiveMember": "android-ndk-r27d/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so",
+        "load16KiBAligned": true
+      },
+      "x86_64": {
+        "file": "android/native/x86_64/libc++_shared.so",
+        "sha256": "3d8817f3a50515665b9152c620dedfd8509f84b68307f5f7ef20a75d9ae08f69",
+        "bytes": 1617608,
+        "archiveMember": "android-ndk-r27d/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android/libc++_shared.so",
+        "load16KiBAligned": true
+      }
+    }
   }
 }

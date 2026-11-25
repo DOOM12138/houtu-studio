@@ -9,6 +9,7 @@ for folder in ['assets','classes','dex','lib']: (WORK/folder).mkdir(exist_ok=Tru
 lock=json.loads((ROOT/'android/runtime-lock.json').read_text('utf-8'));archive=CACHE/'node-android.zip';assert hashlib.sha256(archive.read_bytes()).hexdigest()==lock['node']['sha256']
 with zipfile.ZipFile(archive) as z:
     data=z.read('bin/'+args.abi+'/libnode.so');native=WORK/'lib'/args.abi;native.mkdir(exist_ok=True);(native/'libnode.so').write_bytes(data)
+cxx=lock['libcxx']['abis'][args.abi];cxx_bytes=(ROOT/cxx['file']).read_bytes();assert hashlib.sha256(cxx_bytes).hexdigest()==cxx['sha256'];(native/'libc++_shared.so').write_bytes(cxx_bytes)
 with zipfile.ZipFile(CACHE/'jna.aar') as z:
     (WORK/'jna-classes.jar').write_bytes(z.read('classes.jar'));(native/'libjnidispatch.so').write_bytes(z.read('jni/'+args.abi+'/libjnidispatch.so'))
 entry=lock['codex']['archives']['aarch64' if args.abi=='arm64-v8a' else 'x86_64'];codex=CACHE/entry['file'];assert hashlib.sha256(codex.read_bytes()).hexdigest()==entry['sha256']
@@ -57,7 +58,7 @@ with zipfile.ZipFile(unsigned,'a',zipfile.ZIP_DEFLATED,compresslevel=6) as z:
     for p in sorted((WORK/'dex').glob('*.dex')):z.write(p,p.name)
     for p in sorted(native.glob('*.so')):z.write(p,'lib/'+args.abi+'/'+p.name)
 aligned=WORK/'aligned.apk';run(BT/'zipalign.exe','-f','-P','16','4',unsigned,aligned)
-signing=ROOT/'.cache/android-signing';signing.mkdir(parents=True,exist_ok=True);password=signing/'password';key=signing/'houtu.p12'
+signing=ROOT/'data/android-signing';signing.mkdir(parents=True,exist_ok=True);password=signing/'password';key=signing/'houtu.p12'
 if not password.exists():password.write_text(secrets.token_hex(32),encoding='ascii')
 env['HOUTU_ANDROID_STOREPASS']=password.read_text('ascii').strip()
 if not key.exists():run(JDK/'bin/keytool.exe','-genkeypair','-keystore',key,'-storetype','PKCS12','-storepass:env','HOUTU_ANDROID_STOREPASS','-keypass:env','HOUTU_ANDROID_STOREPASS','-alias','houtu','-keyalg','RSA','-keysize','3072','-validity','10000','-dname','CN=Houtu Studio, O=Houtu Studio')
