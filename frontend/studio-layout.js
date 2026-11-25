@@ -1,7 +1,7 @@
 const node=(tag,text,className)=>{const n=document.createElement(tag);if(text)n.textContent=text;if(className)n.className=className;return n;};
 
 // Reuse the existing editors and their event targets inside a photo-first shell.
-export function createStudioLayout({onNavigate,onSource,onSelection}={}){
+export function createStudioLayout({onNavigate,onSource,onSelection,onUndo,onRedo}={}){
  const $=id=>document.getElementById(id),workspace=$('studio-workspace');
  const sidebar=document.querySelector('.studio-sidebar'),library=node('details',null,'studio-project-library'),libraryTitle=node('summary','项目管理 · 新建与切换');library.id='studio-library';library.open=true;library.append(libraryTitle,...[...sidebar.children].filter(n=>n.tagName!=='DETAILS'));sidebar.prepend(library);const compact=matchMedia('(max-width:700px)');const projectOpened=()=>{if(!workspace.hidden)library.open=!compact.matches;};compact.addEventListener('change',projectOpened);
  document.body.classList.add('studio-shell');workspace.dataset.view='edit';try{document.documentElement.dataset.theme=localStorage.getItem('houtu-color-theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');}catch{}
@@ -11,7 +11,7 @@ export function createStudioLayout({onNavigate,onSource,onSelection}={}){
  const projectBar=node('div',null,'studio-project-bar'),projectInfo=node('div');projectInfo.append($('studio-project-title'),$('photo-count'));
  const views=node('div',null,'studio-view-switch');views.setAttribute('role','group');views.setAttribute('aria-label','照片显示方式');
  const grid=node('button','全部照片'),edit=node('button','单张精修');grid.id='studio-grid-view';edit.id='studio-edit-view';grid.type=edit.type='button';views.append(grid,edit);
- projectBar.append(projectInfo,views,photoPanel.querySelector('.studio-import'));projectBar.id='studio-project-bar';projectBar.hidden=true;workspace.before(projectBar);
+ const historyTools=node('div',null,'edit-history-tools'),undo=node('button','撤销'),redo=node('button','重做');undo.id='studio-undo';redo.id='studio-redo';undo.type=redo.type='button';undo.title='Ctrl+Z';redo.title='Ctrl+Shift+Z / Ctrl+Y';undo.onclick=()=>onUndo?.();redo.onclick=()=>onRedo?.();historyTools.append(undo,redo);projectBar.append(projectInfo,historyTools,views,photoPanel.querySelector('.studio-import'));projectBar.id='studio-project-bar';projectBar.hidden=true;workspace.before(projectBar);
  photoPanel.querySelector('.section-head').remove();
  const intakeHint=photoPanel.querySelector(':scope > p.hint');intakeHint.classList.add('studio-intake-hint');
  const center=node('div',null,'studio-center'),stage=node('div',null,'studio-stage-main'),empty=node('section',null,'studio-canvas-empty');empty.id='studio-canvas-empty';empty.append(node('h2','导入一组照片，开始精修'),node('p','原图始终保留。修好一张后，可把选中的参数同步给其他照片。'));
@@ -21,7 +21,8 @@ export function createStudioLayout({onNavigate,onSource,onSelection}={}){
  const recipe=document.querySelector('.studio-recipe'),sync=$('studio-sync'),run=document.querySelector('.studio-run');recipe.open=true;
  const inputs=node('section',null,'studio-panel');inputs.append(node('h2','当前照片的素材'),node('p','主体保护和参考图各自保存，不跨照片照搬。','hint'),$('studio-references'),$('studio-mask'));
  const steps=node('section',null,'studio-step-history');steps.append(node('h3','当前照片 · 每步产物'),$('detail-steps'));run.append(steps);
- for(const [id,label,content]of [['recipe','配方',recipe],['sync','同步',sync],['workflow','工作流',run],['inputs','蒙版',inputs]]){
+ const historyPane=node('section',null,'studio-panel');historyPane.append(node('h2','编辑历史'),node('p','配方草稿可以撤销；批量应用、同步和版本恢复按整次操作回退，不重新生成图片。','edit-history-scope'));for(const [id,title]of [['studio-recipe-history','当前配方草稿'],['studio-project-history','项目已保存操作'],['studio-version-history','当前照片的版本']]){const list=node('div',null,'edit-history-list');list.id=id;historyPane.append(node('h3',title),list);}
+ for(const [id,label,content]of [['recipe','配方',recipe],['sync','同步',sync],['workflow','工作流',run],['inputs','蒙版',inputs],['history','历史',historyPane]]){
   const button=node('button',label),panel=node('div',null,'studio-tabpanel');button.type='button';button.id='studio-tab-'+id;button.setAttribute('role','tab');button.setAttribute('aria-controls','studio-pane-'+id);panel.id='studio-pane-'+id;panel.setAttribute('role','tabpanel');panel.setAttribute('aria-labelledby',button.id);panel.tabIndex=0;panel.append(content);tabs.append(button);panels.set(id,panel);buttons.set(id,button);button.onclick=()=>showPanel(id);
  }
  tabs.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;const list=[...buttons.keys()],index=list.findIndex(id=>buttons.get(id)===document.activeElement);if(index<0)return;event.preventDefault();const next=event.key==='Home'?0:event.key==='End'?list.length-1:(index+(event.key==='ArrowLeft'?-1:1)+list.length)%list.length;showPanel(list[next]);buttons.get(list[next]).focus();});

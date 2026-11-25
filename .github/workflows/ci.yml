@@ -15,3 +15,4 @@ jobs:
       - run: npm test
       - run: npm run test:studio-ui
       - run: npm run test:uploads-ui
+      - run: npm run test:history-ui
