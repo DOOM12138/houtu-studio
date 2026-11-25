@@ -19,7 +19,7 @@ export async function buildTargetMask({image,operation,areas,portrait}){
    if(policy==='face')polygon(ctx,oval.map(i=>f[i]),width,height);
    if(policy==='eyes'||policy==='makeup'){for(const ids of eyes)polygon(ctx,ids.map(i=>f[i]),width,height,'white',Math.max(3,fh*.035));if(policy==='makeup'){for(const ids of brows)polygon(ctx,hull(ids.map(i=>f[i])),width,height,'white',Math.max(3,fh*.025));polygon(ctx,lips.map(i=>f[i]),width,height,'white',3);}}
    if(policy==='under-eyes')for(const ids of eyes){const r=bounds(ids.map(i=>f[i]));polygon(ctx,[{x:r.left,y:r.bottom},{x:r.right,y:r.bottom},{x:r.right,y:r.bottom+(b.bottom-b.top)*.09},{x:r.left,y:r.bottom+(b.bottom-b.top)*.09}],width,height,'white',2);}
-   if(policy==='iris'){for(const ids of [[469,470,471,472],[474,475,476,477]])polygon(ctx,ids.map(i=>f[i]),width,height,'white',1);}
+   if(policy==='iris'){for(const [index,ids]of [[469,470,471,472],[474,475,476,477]].entries()){const r=bounds(ids.map(i=>f[i])),opening=eyes[index].map(i=>f[i]);ctx.save();ctx.beginPath();opening.forEach((p,i)=>i?ctx.lineTo(p.x*width,p.y*height):ctx.moveTo(p.x*width,p.y*height));ctx.closePath();ctx.clip();ctx.fillStyle='white';ctx.beginPath();ctx.ellipse((r.left+r.right)*width/2,(r.top+r.bottom)*height/2,Math.max(1,(r.right-r.left)*width/2),Math.max(1,(r.bottom-r.top)*height/2),0,0,Math.PI*2);ctx.fill();ctx.restore();}}
    if(policy==='lips')polygon(ctx,lips.map(i=>f[i]),width,height,'white',2);
    if(policy==='nose')polygon(ctx,hull(nose.map(i=>f[i])),width,height,'white',3);
    if(policy==='teeth'){const opening=Math.abs(f[14].y-f[13].y)/(b.bottom-b.top);if(opening<.025)detected=false;else polygon(ctx,[78,95,88,178,87,14,317,402,318,324,308,415,310,311,312,13,82,81,80,191].map(i=>f[i]),width,height);}
@@ -33,7 +33,7 @@ export async function buildTargetMask({image,operation,areas,portrait}){
   }
  }
  const final=ctx.getImageData(0,0,width,height);if(facePolicy){const sem=await segment(img);for(let y=0;y<height;y++)for(let x=0;x<width;x++){const s=Math.min(sem.height-1,Math.floor(y*sem.height/height))*sem.width+Math.min(sem.width-1,Math.floor(x*sem.width/width)),i=(y*width+x)*4;if(sem.confidence[3][s]<.45)final.data[i]=final.data[i+1]=final.data[i+2]=0;}ctx.putImageData(final,0,0);}
- const pixels=final.data;let selected=0;for(let i=0;i<pixels.length;i+=4)if(pixels[i]>0)selected++;detected=detected&&selected>=Math.max(12,width*height*.00003);return {supported:true,found:detected,policy,version:TARGET_POLICY_VERSION,selectedPixels:selected,width,height,mask:detected?canvas.toDataURL('image/png'):null,note:'本机模型估算的可编辑部位；黑区保留。未可靠识别时需手动选区，不会按整图静默重画。'};
+ const pixels=final.data;let selected=0;for(let i=0;i<pixels.length;i+=4)if(pixels[i]>0)selected++;detected=detected&&selected>=Math.max(12,width*height*.00003);return {supported:true,found:detected,policy,version:TARGET_POLICY_VERSION,selectedPixels:selected,width,height,...(policy==='iris'?{shapeVersion:'iris-ellipse-v2'}:{}),mask:detected?canvas.toDataURL('image/png'):null,note:'本机模型估算的可编辑部位；黑区保留。未可靠识别时需手动选区，不会按整图静默重画。'};
 }
 
 if(typeof window!=='undefined')window.runTarget=buildTargetMask;
