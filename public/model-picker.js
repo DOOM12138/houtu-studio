@@ -1,12 +1,12 @@
 ﻿import {normalizeModel} from './model-options.js';
 
-// One picker per page. Restoring a task never silently substitutes another model.
-export function createModelPicker({mount,onChange=()=>{}}){
-  const key='houtu-selected-model';let selected=null,models=[],loading=false,disabled=false,signedIn=false,generation=0;
+// Separate selection keys keep planning and rendering model choices independent.
+export function createModelPicker({mount,onChange=()=>{},storageKey='houtu-selected-model',labelText='AI 主模型',noteText='用于读图分析与发起修图；内置绘图引擎由 ChatGPT 服务提供。'}){
+  const key=storageKey;let selected=null,models=[],loading=false,disabled=false,signedIn=false,generation=0;
   try{selected=normalizeModel(localStorage.getItem(key));}catch{}
   const label=document.createElement('label'),row=document.createElement('div'),select=document.createElement('select'),refresh=document.createElement('button'),status=document.createElement('p'),note=document.createElement('p');
-  mount.classList.add('model-picker');select.id=mount.id+'-select';label.htmlFor=select.id;label.textContent='AI 主模型';
-  row.className='model-picker-row';refresh.type='button';refresh.textContent='刷新列表';status.className='field-hint hint';status.setAttribute('role','status');note.className='field-hint hint';note.textContent='用于读图分析与发起修图；内置绘图引擎由 ChatGPT 服务提供。';
+  mount.classList.add('model-picker');select.id=mount.id+'-select';label.htmlFor=select.id;label.textContent=labelText;
+  row.className='model-picker-row';refresh.type='button';refresh.textContent='刷新列表';status.className='field-hint hint';status.setAttribute('role','status');note.className='field-hint hint';note.textContent=noteText;
   row.append(select,refresh);mount.append(label,row,status,note);
   function render(){
     select.replaceChildren(new Option('跟随客户端默认',''));

@@ -20,6 +20,8 @@ android/ 保存原生 Activity、文件选择／保存、更新签名验证及�
 
 ## 前端
 
+智能调度由frontend/studio-planner.js呈现，public/studio-planning.js共享参数、任务边界与规划指令；backend/studio-planner.mjs保存studio-plan工作流。原图预览和角色参考进入分析检查点，规划模型与跑图模型分开记录。本机路线使用浏览器内置MediaPipe观测和任务规则；ChatGPT路线调用既有只读分析桥。应用方案复用StudioService的版本创建和项目历史，不直接调用图片生成；实际跑图继续使用已有持久请求键、账号保护和两张并行队列。
+
 - public/：人物精修主页面、提示词编辑、部位工具、二次精修、版本与局部蒙版操作。
 - frontend/：调色与蒙版、特效与合成、工作流管理；engine.js 为共享调色引擎，masks.js 处理分割及蒙版，Web Worker 负责计算。
 - scripts/frontend.mjs：独立开发前端，默认 4319；同源代理连接 BACKEND_URL 指定的本机后端，避免将 API 开放给任意来源。

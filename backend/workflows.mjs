@@ -6,6 +6,7 @@ import {randomUUID,createHash} from 'node:crypto';
 import sharp from 'sharp';
 import {replaceFile} from '../lib/files.mjs';
 export const FLOW_STEPS={
+ 'studio-plan':[['source','规划输入与参考用途',[]],['analysis','逐张分析与任务拆分',['source']],['proposal','可执行方案与步骤预算',['analysis']],['apply','确认应用到照片新版本',['proposal']]],
  'image-import':[['source','原始图片只读存档',[]],['develop','本机显影与位图预览',['source']]],
  'manual-portrait':[['source','手动修图原图',[]],['edit','本机笔触与保护区',['source']],['export','原尺寸成片',['edit']]],
  pipeline:[['source','项目照片原图',[]]],

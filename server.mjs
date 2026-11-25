@@ -8,6 +8,7 @@ import {localAccessAllowed} from './lib/local-access.mjs';
 import {APP_VERSION} from './lib/app-version.mjs';
 import {exportProjectPhotos,backupProject,restoreProject} from './backend/studio-archive.mjs';
 import {StudioService} from './backend/studio.mjs';
+import {StudioPlanner} from './backend/studio-planner.mjs';
 import {recipeValue,recipeReport} from './backend/studio-recipe.mjs';
 import {safeName} from './backend/local-image.mjs';
 import sharp from 'sharp';
@@ -74,7 +75,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
   const accounts=new AccountLedger(directory);await accounts.load();
   const library=new ImageLibrary(directory);await library.load();
   const bridge = trackedBridge(suppliedBridge || new CodexBridge(home),accounts);
-  const startedAt=Date.now();let studio;const targetVision=suppliedVision||new TargetVision(()=>{const address=server.address();if(!address)throw Error('服务尚未启动。');return 'http://127.0.0.1:'+address.port;});
+  const startedAt=Date.now();let studio,planner;const targetVision=suppliedVision||new TargetVision(()=>{const address=server.address();if(!address)throw Error('服务尚未启动。');return 'http://127.0.0.1:'+address.port;});
   const csrf = randomBytes(32).toString('hex');
   const mobileDownloads=clientPlatform==='android'?new MobileDownloads(directory):null;await mobileDownloads?.load();
   const jobs = new Map();
@@ -275,6 +276,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     try{job=jobs.get(view.id);const w=await workflows.get(job.workflowId),generated=w.steps.find(n=>n.id==='generate');if(generated?.status!=='done'||!generated.output?.rawAsset)throw Error('原始出图尚未保存，请在子工作流确认生成状态。');await workflows.restart(w.id,'compose',w.revision);Object.assign(job,{runId:randomUUID(),status:'preparing',message:'复用AI原始图重新合成',localComposition:true,output:null,workflowToken:null,threadId:null,turnId:null,saving:null});managedJobs.delete(reservation);managedJobs.add(job.id);await persist(job);const runId=job.runId;Promise.resolve().then(async()=>{const raw=await workflows.asset(w.id,generated.output.rawAsset);await composeOutput(job,await readFile(raw.file),runId);await finish(job,'done','已复用原始出图完成合成',runId);}).catch(error=>finish(job,'error',friendlyError(error.message),runId)).catch(()=>{});return publicJob(job);}catch(error){if(job&&isRunning(job))await finish(job,'error',friendlyError(error.message));throw error;}finally{managedJobs.delete(reservation);}
   };
   studio=new StudioService({directory,workflows,adapter:{upscale:upscaleProcess,isBusy:()=>Boolean(active||activePackage||critiqueActive||managedJobs.size),startRetouch,findRequest:key=>{const job=findRequest(key);return job?publicJob(job):null;},getJob:id=>jobs.has(id)?publicJob(jobs.get(id)):null,recompose:recomposeManaged,authorize:async expected=>{if(!await bridge.account())throw Error('请先登录本站ChatGPT账号。');const control={account:expected};bridge.capture(control);return control.account;}}});await studio.load();
+  planner=new StudioPlanner({root:ROOT,studio,workflows,bridge,acquire:id=>{if(runtimeBusy()||login||isClosing)return false;active='planner-'+id;return true;},release:id=>{if(active==='planner-'+id)active=null;}});
 
   const updates=new SoftwareUpdates({root:ROOT,directory,cacheDirectory:suppliedBridge?path.join(directory,'.updates'):undefined,fetcher:updatesFetcher,
     reserve:()=>{if(isClosing||active||activePackage||critiqueActive||login||studio.active||studio.archiving||studio.queues.size||creative.running.size||pendingOperations||library.pendingThumbs.size)return false;active='software-update';return true;},
@@ -333,6 +335,15 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
         }finally{if(active===reservation)active=null;}
       }
       if(route==='/api/studio/projects'&&req.method==='GET')return json(res,200,{projects:studio.list(),active:studio.active?{projectId:studio.active.projectId,currentPhoto:studio.active.currentPhoto,currentStep:studio.active.currentStep}:null});
+      if(route==='/api/studio/planning/capabilities'&&req.method==='GET')return json(res,200,planner.capabilities());
+      const planningPreflight=/^\/api\/studio\/projects\/([a-f0-9-]{36})\/planning-preflight$/.exec(route);
+      if(planningPreflight&&req.method==='POST')return json(res,200,await planner.preflight(planningPreflight[1],await body(req,100000)));
+      const planningProject=/^\/api\/studio\/projects\/([a-f0-9-]{36})\/plans$/.exec(route);
+      if(planningProject&&req.method==='POST')return json(res,202,await planner.start(planningProject[1],await body(req,100000)));
+      const planningPreview=/^\/api\/studio\/projects\/([a-f0-9-]{36})\/photos\/([a-f0-9-]{36})\/planning-preview$/.exec(route);
+      if(planningPreview&&req.method==='GET'){const {photo}=await studio.photo(planningPreview[1],planningPreview[2]),a=await workflows.asset(photo.originalWorkflowId,photo.originalAsset),bytes=await sharp(a.file,{limitInputPixels:40000000}).rotate().flatten({background:'#ededed'}).resize({width:1200,height:1200,fit:'inside',withoutEnlargement:true}).jpeg({quality:88}).toBuffer();res.writeHead(200,{'Content-Type':'image/jpeg','Cache-Control':'no-store'});return res.end(bytes);}
+      const planningRoute=/^\/api\/studio\/plans\/([a-f0-9-]{36})(?:\/(retry|cancel|apply))?$/.exec(route);
+      if(planningRoute){const [,id,action]=planningRoute;if(req.method==='GET'&&!action)return json(res,200,await planner.view(id));if(req.method==='POST'&&action){const input=await body(req,4096);return json(res,action==='retry'?202:200,await planner[action](id,input));}}
       if(route==='/api/studio/projects'&&req.method==='POST')return json(res,201,await studio.create(await body(req,1000000)));
       if(route==='/api/studio/recipes'&&req.method==='GET')return json(res,200,{recipes:studio.recipeList()});
       if(route==='/api/studio/recipes'&&req.method==='POST')return json(res,201,await studio.saveRecipe(await body(req,1000000)));
@@ -588,14 +599,14 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
         file=path.join(ROOT,'frontend','workflows.html');
       } else if(req.method==='GET'&&(route==='/creative'||route==='/creative/')){
         file=path.join(ROOT,'frontend','creative.html');
-      } else if (req.method === 'GET' && /^\/color\/(app\.js|engine\.js|worker\.js|masks\.js|workflow-client\.js|workflows\.js|effects\.js|creative\.js|creative-multi\.js|server\.js|studio\.js|studio-layout\.(?:js|css)|lab\.js|tonal-looks\.js|tone-controls\.js|upscale\.js|updates\.js|style\.css)$/.test(route)) {
+      } else if (req.method === 'GET' && /^\/color\/(app\.js|engine\.js|worker\.js|masks\.js|workflow-client\.js|workflows\.js|effects\.js|creative\.js|creative-multi\.js|server\.js|studio\.js|studio-planner\.js|studio-layout\.(?:js|css)|lab\.js|tonal-looks\.js|tone-controls\.js|upscale\.js|updates\.js|style\.css)$/.test(route)) {
         file=path.join(ROOT,'frontend',path.basename(route));
       } else if (req.method === 'GET' && /^\/vision\/(vision_bundle\.mjs|wasm\/vision_wasm_(?:nosimd_)?internal\.(?:js|wasm))$/.test(route)) {
         file=path.join(ROOT,'node_modules','@mediapipe','tasks-vision',route.slice('/vision/'.length));
       } else if (req.method === 'GET' && /^\/models\/(selfie_multiclass_256x256\.tflite|face_landmarker\.task|hand_landmarker\.task)$/.test(route)) {
         file=path.join(ROOT,'models',path.basename(route));
       } else {
-        const files = { '/editor-history.js':'editor-history.js','/editor-history.css':'editor-history.css','/upload-limits.js':'upload-limits.js','/portrait':'portrait.html','/portrait/':'portrait.html','/ai':'index.html','/ai/':'index.html','/image-import.js':'image-import.js','/image-formats.js':'image-formats.js','/workspace.js':'workspace.js','/workspace.css':'workspace.css','/workflow-sections.js':'workflow-sections.js','/manual-portrait.js':'manual-portrait.js','/manual-portrait-worker.js':'manual-portrait-worker.js','/manual-portrait-engine.js':'manual-portrait-engine.js','/manual-portrait.css':'manual-portrait.css', '/android-shell.js':'android-shell.js','/android-shell.css':'android-shell.css','/superres-options.js':'superres-options.js', '/superres.css':'superres.css', '/editor-layout.css':'editor-layout.css', '/image-viewer.js':'image-viewer.js','/view-geometry.js':'view-geometry.js','/image-viewer.css':'image-viewer.css', '/update-notice.js':'update-notice.js','/update-notice.css':'update-notice.css', '/paint-profile.js':'paint-profile.js','/feature-expansion.js':'feature-expansion.js','/prompt-contract.js':'prompt-contract.js','/feature-ui.js':'feature-ui.js','/target-policy.js':'target-policy.js','/target-masks.js':'target-masks.js','/vision-target.html':'vision-target.html', '/': 'index.html', '/app.js': 'app.js', '/catalog.js': 'catalog.js', '/style.css': 'style.css', '/favicon.svg': 'favicon.svg','/portrait-options.js':'portrait-options.js','/portrait-ui.js':'portrait-ui.js','/model-picker.js':'model-picker.js','/model-options.js':'model-options.js','/scene-options.js':'scene-options.js','/belly-options.js':'belly-options.js','/scene-ui.js':'scene-ui.js','/subject-mask.js':'subject-mask.js' };
+        const files = { '/studio-planning.js':'studio-planning.js','/editor-history.js':'editor-history.js','/editor-history.css':'editor-history.css','/upload-limits.js':'upload-limits.js','/portrait':'portrait.html','/portrait/':'portrait.html','/ai':'index.html','/ai/':'index.html','/image-import.js':'image-import.js','/image-formats.js':'image-formats.js','/workspace.js':'workspace.js','/workspace.css':'workspace.css','/workflow-sections.js':'workflow-sections.js','/manual-portrait.js':'manual-portrait.js','/manual-portrait-worker.js':'manual-portrait-worker.js','/manual-portrait-engine.js':'manual-portrait-engine.js','/manual-portrait.css':'manual-portrait.css', '/android-shell.js':'android-shell.js','/android-shell.css':'android-shell.css','/superres-options.js':'superres-options.js', '/superres.css':'superres.css', '/editor-layout.css':'editor-layout.css', '/image-viewer.js':'image-viewer.js','/view-geometry.js':'view-geometry.js','/image-viewer.css':'image-viewer.css', '/update-notice.js':'update-notice.js','/update-notice.css':'update-notice.css', '/paint-profile.js':'paint-profile.js','/feature-expansion.js':'feature-expansion.js','/prompt-contract.js':'prompt-contract.js','/feature-ui.js':'feature-ui.js','/target-policy.js':'target-policy.js','/target-masks.js':'target-masks.js','/vision-target.html':'vision-target.html', '/': 'index.html', '/app.js': 'app.js', '/catalog.js': 'catalog.js', '/style.css': 'style.css', '/favicon.svg': 'favicon.svg','/portrait-options.js':'portrait-options.js','/portrait-ui.js':'portrait-ui.js','/model-picker.js':'model-picker.js','/model-options.js':'model-options.js','/scene-options.js':'scene-options.js','/belly-options.js':'belly-options.js','/scene-ui.js':'scene-ui.js','/subject-mask.js':'subject-mask.js' };
         if (!Object.hasOwn(files, route) || req.method !== 'GET') return json(res, 404, { error: '页面不存在。' });
         file = path.join(ROOT, 'public', files[route]);
       }
@@ -611,14 +622,14 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     studio.closing=true;if(studio.active)studio.active.stop=true;
     for(const state of creative.running.values())state.stop=true;
     await imageImports.close();await updates.close();await platform.close();
-    await bridge.stop(); for (const j of jobs.values()) clearTimeout(j.deadline);
+    await planner.close();await bridge.stop(); for (const j of jobs.values()) clearTimeout(j.deadline);
     await creative.drain();await studio.drain();await targetVision.close();if(portraitAuditTask)await Promise.allSettled([portraitAuditTask]);
     await Promise.allSettled([...jobWrites.values()]);
     await Promise.allSettled([accounts.queue,library.queue,...library.pendingThumbs.values()]);
     server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
     try { const record = JSON.parse(await readFile(path.join(directory, 'server.json'), 'utf8')); if (record.instanceId === instanceId) await unlink(path.join(directory, 'server.json')); } catch {}
   })();
-  return { server, bridge, studio, targetVision, updates, instanceId, close, isBusy:runtimeBusy };
+  return { server, bridge, studio, planner, targetVision, updates, instanceId, close, isBusy:runtimeBusy };
 }
 
 export function friendlyError(message = '') {
