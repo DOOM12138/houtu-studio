@@ -96,3 +96,10 @@ ONNX Runtime1.31.1 CPU，官方Node支持：https://onnxruntime.ai/docs/get-star
 移动 Node 来自 https://github.com/fogtape/nodejs-mobile/tree/v24.22.1-0 的社区适配，发布标记为 Prerelease。官方开源 Codex 0.172.0 源码 https://github.com/openai/codex/tree/3d86e43b075adeba2193ec5c22ac92f55afd82e6 经最小 Android/Bionic 兼容补丁构建；没有重新实现官方认证或图片工具。固定工具链、构建回执、平台补丁与双 ABI 摘要见 android/codex-source.json、codex-build-artifacts.json、runtime-lock.json 和构建依赖预发布。Node、Codex LICENSE/NOTICE、JNA/所选Apache2.0、libffi、匹配NDK的许可保留于 vendor-licenses/android-runtime 并随 APK 附送。
 
 手机图片处理使用 Sharp 0.35.5 WASM 与 ONNX Runtime Web 1.31.1 WASM；本地模型来源与桌面一致。设备合成保护、超分、重启、客户端握手与真实登录出图分别记录，编译成功不代表账号或审美验收。
+
+
+## RAW本机显影与格式转换（2026-11-25）
+
+libraw-wasm 1.6.0：https://github.com/ybouane/LibRaw-Wasm/tree/v1.6.0 。本站通过短生命周期Node Worker直接调用其WASM core；浏览器Worker facade不用于服务器。LibRaw 0.22.1 选择CDDL1.0许可，Little-CMS 2.19.1为MIT，libjpeg9f遵循IJG条款；不能将整个WASM标成封装层的ISC许可。完整对应源码、构建脚本、归档哈希和许可见vendor-licenses/raw/。
+
+Windows实拍格式验证：Canon EOS D60 CRW与DJI Mavic3 Pro DNG，来自https://github.com/tellodaniel/revelraw-sample-raw-files/releases/tag/v1 （来源清单标注raw.pixls.us CC0）。文件仅保留F盘私有测试目录，不进入公开Git和发布包。原创Bayer DNG测试夹具没有JPEG缩略图，用于验证实际传感器解码、位深和原片保留；没有训练基础模型。

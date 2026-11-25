@@ -67,7 +67,7 @@ export async function buildPortable({ root = ROOT, output, includePrompts = fals
       const pkg = JSON.parse(await readFile(path.join(root, relative, 'package.json'), 'utf8'));
       dependencies.push({ name: pkg.name, version: pkg.version, license: pkg.license || 'See bundled package license' });
     }
-    for (const required of ['runtime/codex-app-server.exe', 'node_modules/sharp/package.json','node_modules/onnxruntime-node/bin/napi-v6/win32/x64/onnxruntime_binding.node','node_modules/onnxruntime-node/bin/napi-v6/win32/x64/onnxruntime.dll','vendor-licenses/onnxruntime-1.31.1/LICENSE','vendor-licenses/directml-1.15.4/LICENSE.txt','vendor-licenses/dxc-1.8.2502.8/LICENSE-LLVM.txt']) if (!await exists(path.join(app, required))) throw new Error('缺少 Windows x64 生产依赖，请先完成 npm install。');
+    for (const required of ['runtime/codex-app-server.exe', 'node_modules/libraw-wasm/dist/libraw.js','node_modules/libraw-wasm/dist/libraw.wasm','vendor-licenses/raw/LibRaw-0.22.1.tar.gz','vendor-licenses/raw/LibRaw-LICENSE.CDDL.txt','node_modules/sharp/package.json','node_modules/onnxruntime-node/bin/napi-v6/win32/x64/onnxruntime_binding.node','node_modules/onnxruntime-node/bin/napi-v6/win32/x64/onnxruntime.dll','vendor-licenses/onnxruntime-1.31.1/LICENSE','vendor-licenses/directml-1.15.4/LICENSE.txt','vendor-licenses/dxc-1.8.2502.8/LICENSE-LLVM.txt']) if (!await exists(path.join(app, required))) throw new Error('缺少 Windows x64 生产依赖，请先完成 npm install。');
     const nativeFiles = await readdir(path.join(app, 'node_modules', '@img', 'sharp-win32-x64', 'lib'));
     if (!nativeFiles.some(name => name.endsWith('.node')) || !nativeFiles.some(name => name.endsWith('.dll'))) throw new Error('缺少图片处理的原生模块或 DLL。');
     let templateCount = 0;

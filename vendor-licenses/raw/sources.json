@@ -1,0 +1,21 @@
+{
+  "wrapper": "libraw-wasm 1.6.0",
+  "wrapperSource": "https://github.com/ybouane/LibRaw-Wasm/tree/v1.6.0",
+  "libraw": "0.22.1",
+  "lcms": "2.19.1",
+  "jpeg": "IJG 9f",
+  "emscripten": "5.0.7",
+  "selectedLibRawLicense": "CDDL-1.0",
+  "files": {
+    "LibRaw-0.22.1.tar.gz": "e676248284075605aa2697a66eeed7dc258820bd1d4988c724d29edffd726726",
+    "lcms2.19.1.tar.gz": "267705e278e2f7c2fb886c259dadcbaeb2be52748bcbc71c79f08aacacb7a709",
+    "jpegsrc.v9f.tar.gz": "04705c110cb2469caa79fb71fba3d7bf834914706e9641a4589485c1f832565b",
+    "compileLibraw.sh": "f84535fd5e68a4613c12a02c127658bc2b63a636dfc098ec5e0031834ba140a3",
+    "libraw_wrapper.cpp": "695574c35214d13fa3d5f17aa8b7b7a51443e266899dbc8e4c7c4e64283117de",
+    "build.js": "e629673b3fbbfc9d2ed7a7e5568577ad98c6b19be8c88d35b647b4dfd70ed73e",
+    "index.js": "cdbbdddd953b89c41942cf42f4764c786a9b35a00c25d7500c5c2e2fc080b0c7",
+    "worker.js": "f30239e3604a11a7bf7e415853e4a4a3688e99110e96974289667847b63f57f7",
+    "EMSCRIPTEN-LICENSE.txt": "620a78084fc7ca97c0b5dea9abf891f3ffcadfdbf305276f099c9c4e12fc1d86",
+    "libraw.wasm": "8947f7e668e488461c3e9defe7007583aa8477b4886aa603b36b407f2f0846ff"
+  }
+}

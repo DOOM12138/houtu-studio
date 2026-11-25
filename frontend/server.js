@@ -1,7 +1,7 @@
 ﻿import './updates.js';
 const $=id=>document.getElementById(id),mobile=document.documentElement.dataset.platform==='android';
 let page=1,total=0,requestId=0,timer;
-const names={pipeline:'照片配方',retouch:'人物精修',color:'调色成品',creative:'特效与合成'};
+const names={'manual-portrait':'人物手动修图',pipeline:'照片配方',retouch:'AI 人物精修',color:'调色成品',creative:'特效与合成'};
 const date=value=>value?new Date(value).toLocaleString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'尚未记录';
 async function get(url){const response=await fetch(url,{signal:AbortSignal.timeout(15000)});const data=await response.json();if(!response.ok)throw Error(data.error||'记录暂时无法读取，请重试。');return data;}
 function notice(text,error=false){$('server-notice').textContent=text;$('server-notice').classList.toggle('error',error);}
@@ -29,7 +29,7 @@ async function loadImages(){
   const card=document.createElement('article');card.className='server-image-card';const frame=document.createElement('a');frame.className='server-image-frame';frame.href=record.imageUrl;frame.target='_blank';frame.rel='noopener';frame.setAttribute('aria-label','查看 '+record.name+' 第'+record.version+'版');
   const image=document.createElement('img');image.src=record.thumbnailUrl;image.alt=record.name+' · 第'+record.version+'版';image.loading='lazy';image.decoding='async';image.onerror=()=>{image.hidden=true;frame.append(text('span','预览暂不可用，原始记录仍保留。'));};frame.append(image);card.append(frame);
   card.append(text('h3',record.name+' · 第'+record.version+'版'),text('p',names[record.kind]+' · '+date(record.created)+(record.status==='waiting'?' · 等待交付':''),'hint'));
-  card.append(text('p',record.account?(record.accountRole==='analysis'?'关联分析账号：':'修图账号：')+record.account.email:record.kind==='color'?'本机调色 · 未关联ChatGPT账号':'未记录账号','server-image-account'));
+  card.append(text('p',record.account?(record.accountRole==='analysis'?'关联分析账号：':'修图账号：')+record.account.email:['color','manual-portrait'].includes(record.kind)?'本机处理 · 未关联ChatGPT账号':'未记录账号','server-image-account'));
   if(record.model)card.append(text('p',(record.accountRole==='analysis'?'分析模型：':'主模型：')+record.model,'hint'));
   const actions=document.createElement('div');actions.className='server-image-actions';for(const [label,url]of [['继续精修',record.editUrl],['下载成品',record.downloadUrl],['步骤记录',record.workflowUrl]])if(url){const link=text('a',label);link.href=url;actions.append(link);}card.append(actions);$('server-images').append(card);
  }

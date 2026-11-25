@@ -126,6 +126,7 @@ public final class MainActivity extends Activity {
                 else if (value.equals(".txt") || value.equals(".cube")) value = "text/plain";
                 if (value.matches("[a-z0-9.+*-]+/[a-z0-9.+*-]+")) types.add(value);
               }
+            if (java.util.Arrays.toString(params.getAcceptTypes()).toLowerCase(java.util.Locale.ROOT).contains(".dng")) { types.clear(); types.add("*/*"); }
             String type = types.size() == 1 ? types.iterator().next() : "*/*";
             pick.setType(type);
             if (types.size() > 1)
@@ -173,7 +174,7 @@ public final class MainActivity extends Activity {
     nav = new LinearLayout(this);
     for (String[] item :
         new String[][] {
-          {"精修", "/"}, {"调色", "/color/"}, {"照片项目", "/studio/"}, {"超分4K", "/upscale/"}
+          {"人物修图", "/portrait/"}, {"调色", "/color/"}, {"AI修图", "/ai/"}, {"工作流", "/workflows/?section=ai"}
         }) {
       Button button = new Button(this);
       button.setText(item[0]);
@@ -272,7 +273,7 @@ public final class MainActivity extends Activity {
 
   void menu(View anchor) {
     PopupMenu p = new PopupMenu(this, anchor);
-    String[] titles = {"特效与合成", "工作流管理", "图片档案", "提示词实验室", "检查安卓版更新", "分享最近成片", "复制诊断"};
+    String[] titles = {"AI特效与合成", "工作流管理", "图片档案", "提示词实验室", "检查安卓版更新", "分享最近成片", "复制诊断", "照片项目", "超分4K"};
     for (int i = 0; i < titles.length; i++) p.getMenu().add(0, i, i, titles[i]);
     p.setOnMenuItemClickListener(
         item -> {
@@ -301,6 +302,12 @@ public final class MainActivity extends Activity {
                         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 startActivity(Intent.createChooser(share, "分享成片"));
               } else toast("保存一张成片后可分享。");
+              break;
+            case 7:
+              go("/studio/");
+              break;
+            case 8:
+              go("/upscale/");
               break;
             case 6:
               copy(

@@ -16,33 +16,33 @@ export class ImageLibrary{
   const all=await workflows.all(),images=[],covered=new Set();
   for(const w of all){
    if(w.pipelineParentId){if(w.jobId)covered.add(w.jobId);continue;}
-   const steps=w.kind==='pipeline'?['deliver']:w.kind==='retouch'?['compose']:w.kind==='color'?['export']:w.kind==='creative'?['deliver','render']:[];
-   const delivered=new Set(),legacyDelivered=new Set();if(w.kind==='creative')for(const a of w.steps.find(n=>n.id==='deliver')?.attempts||[])if(a.status==='done'&&a.output?.imageAsset){const input=a.inputs?.find(n=>n.step==='render')?.attempt;if(input)delivered.add(input);else legacyDelivered.add(a.output.imageAsset);}
+   const steps=w.kind==='pipeline'?['deliver']:w.kind==='retouch'?['compose']:w.kind==='manual-portrait'?['edit','export']:w.kind==='color'?['export']:w.kind==='creative'?['deliver','render']:[];
+   const delivered=new Set(),legacyDelivered=new Set();if(w.kind==='manual-portrait')for(const a of w.steps.find(n=>n.id==='export')?.attempts||[])if(a.status==='done'){const input=a.inputs?.find(n=>n.step==='edit')?.attempt;if(input)delivered.add(input);}if(w.kind==='creative')for(const a of w.steps.find(n=>n.id==='deliver')?.attempts||[])if(a.status==='done'&&a.output?.imageAsset){const input=a.inputs?.find(n=>n.step==='render')?.attempt;if(input)delivered.add(input);else legacyDelivered.add(a.output.imageAsset);}
    for(const step of steps){const n=w.steps.find(n=>n.id===step);if(!n)continue;
     const attempts=n.attempts.length?n.attempts:(n.status==='done'?[{id:'legacy',status:'done',output:n.output,ended:w.updated}]:[]);
     for(const [i,a]of attempts.entries()){
-     const asset=a.output?.imageAsset;if(a.status!=='done'||!HASH.test(asset||''))continue;if(step==='render'&&(delivered.has(a.id)||a.id==='legacy'&&legacyDelivered.has(asset)))continue;
+     const asset=a.output?.imageAsset;if(a.status!=='done'||!HASH.test(asset||''))continue;if((step==='render'||w.kind==='manual-portrait'&&step==='edit')&&(delivered.has(a.id)||a.id==='legacy'&&legacyDelivered.has(asset)))continue;
      const generated=w.kind==='retouch'?attemptFor(w,a,'generate'):null,rendered=step==='deliver'?attemptFor(w,a,'render'):null;
      const output=a.output,details=generated?.output||rendered?.output||output;
      const renderAttempt=rendered||a,layout=attemptFor(w,renderAttempt,'layout'),grade=attemptFor(w,a,'grade');
      const analysis=w.kind==='color'?(grade?attemptFor(w,grade,'analysis')?.output:null):layout?.output?.vision|| (layout?attemptFor(w,layout,'brief')?.output:null);
-     const renderAccount=w.kind==='color'||details.engine==='local-compositor'?null:clean(details.account)||clean(output.account);
+     const renderAccount=['color','manual-portrait'].includes(w.kind)||details.engine==='local-compositor'?null:clean(details.account)||clean(output.account);
      const analysisAccount=clean(analysis?.account),account=renderAccount||analysisAccount;
      const id=digest([w.id,step,a.id,asset].join('|')),job=jobs.get(w.jobId);
-     const record={id,kind:w.kind,workflowId:w.id,jobId:w.jobId||null,name:String(w.name||'已保存成品').slice(0,100),version:i+1,step,created:a.ended||a.started||w.updated,assetId:asset,account,accountRole:renderAccount?'image':analysisAccount?'analysis':'unknown',model:details.resolvedModel||details.model||analysis?.resolvedModel||analysis?.model||null,paintLevel:job?.paintLevel||null,style:job?.style||null,status:step==='render'?'waiting':'saved',imageUrl:'/api/workflows/'+w.id+'/assets/'+asset,downloadUrl:'/api/workflows/'+w.id+'/assets/'+asset+'?download',thumbnailUrl:'/api/server/thumbnails/'+id,workflowUrl:'/workflows/?id='+w.id,editUrl:'/?refineWorkflow='+w.id+'&refineAsset='+asset};
+     const record={id,kind:w.kind,workflowId:w.id,jobId:w.jobId||null,name:String(w.name||'已保存成品').slice(0,100),version:i+1,step,created:a.ended||a.started||w.updated,assetId:asset,account,accountRole:renderAccount?'image':analysisAccount?'analysis':'unknown',model:details.resolvedModel||details.model||analysis?.resolvedModel||analysis?.model||null,paintLevel:job?.paintLevel||null,style:job?.style||null,status:step==='render'?'waiting':'saved',imageUrl:'/api/workflows/'+w.id+'/assets/'+asset,downloadUrl:'/api/workflows/'+w.id+'/assets/'+asset+'?download',thumbnailUrl:'/api/server/thumbnails/'+id,workflowUrl:'/workflows/?id='+w.id,editUrl:w.kind==='manual-portrait'?'/portrait/?workflow='+w.id:'/ai/?refineWorkflow='+w.id+'&refineAsset='+asset};
      images.push(record);if(w.jobId)covered.add(w.jobId);
     }
    }
   }
   for(const job of jobs.values())if(job.status==='done'&&job.output&&!covered.has(job.id)&&UUID.test(job.id)&&/^result(?:-[a-f0-9-]{36})?\.(png|jpg|webp)$/.test(job.output)){
    const id=digest('job|'+job.id+'|'+job.output),url='/images/'+job.id+'/'+job.output;
-   images.push({id,kind:'retouch',jobId:job.id,name:'人物精修',version:job.round||1,created:job.created,account:clean(job.account),accountRole:clean(job.account)?'image':'unknown',model:job.resolvedModel||job.model||null,paintLevel:job.paintLevel||null,style:job.style||null,status:'saved',imageUrl:url,downloadUrl:url+'?download',thumbnailUrl:'/api/server/thumbnails/'+id,editUrl:'/?job='+job.id,workflowUrl:job.workflowId?'/workflows/?id='+job.workflowId:null,file:job.output});
+   images.push({id,kind:'retouch',jobId:job.id,name:'人物精修',version:job.round||1,created:job.created,account:clean(job.account),accountRole:clean(job.account)?'image':'unknown',model:job.resolvedModel||job.model||null,paintLevel:job.paintLevel||null,style:job.style||null,status:'saved',imageUrl:url,downloadUrl:url+'?download',thumbnailUrl:'/api/server/thumbnails/'+id,editUrl:'/ai/?job='+job.id,workflowUrl:job.workflowId?'/workflows/?id='+job.workflowId:null,file:job.output});
   }
   images.sort((a,b)=>b.created-a.created||a.id.localeCompare(b.id));this.records=new Map(images.map(r=>[r.id,r]));const signature=digest(JSON.stringify(images));if(signature!==this.signature){await this.write(images);this.signature=signature;}return images;
  });this.queue=next;return next;}
  list(params,accounts=[]){const query=String(params.get('q')||'').trim().slice(0,200).toLowerCase(),kind=params.get('kind'),account=params.get('account'),accountEmail=accounts.find(a=>a.id===account)?.email.toLowerCase(),page=Math.max(1,Math.min(100000,Math.floor(Number(params.get('page')))||1)),size=24;
   const all=[...this.records.values()],filtered=all.filter(r=>(!kind||r.kind===kind)&&(!account||(account==='unknown'?!r.account:r.account?.id===account||Boolean(accountEmail&&r.account?.email.toLowerCase()===accountEmail)))&&(!query||[r.name,r.account?.email,r.model,r.jobId,r.workflowId].some(v=>String(v||'').toLowerCase().includes(query))));
-  return {images:filtered.slice((page-1)*size,page*size),total:filtered.length,page,pageSize:size,totalAll:all.length,counts:Object.fromEntries(['retouch','color','creative','pipeline'].map(kind=>[kind,all.filter(r=>r.kind===kind).length]))};
+  return {images:filtered.slice((page-1)*size,page*size),total:filtered.length,page,pageSize:size,totalAll:all.length,counts:Object.fromEntries(['manual-portrait','retouch','color','creative','pipeline'].map(kind=>[kind,all.filter(r=>r.kind===kind).length]))};
  }
  async thumbnail(id,jobs,workflows){
   if(!HASH.test(id))throw Error('图片记录编号无效。');const record=this.records.get(id);if(!record)throw Object.assign(Error('图片记录不存在，请刷新图库。'),{status:404});

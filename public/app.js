@@ -1,3 +1,4 @@
+import {imageOrigin} from './image-import.js';
 import {createImageViewer} from './image-viewer.js';
 import {COS_PAINT_LEVELS,PAINT_EDIT_BRIEF} from './paint-profile.js';
 import {featureDefault,DEFAULT_EDIT_BRIEF} from './prompt-contract.js';
@@ -245,6 +246,7 @@ function splitMode(){photoView.setMode('side');}
 function sourceMode(){photoView.setMode('before');}
 
 async function setFile(file, reference = null) {
+  reference=reference||imageOrigin(file)?.source||null;
   if (!file || busy || portraitChecking || running(currentJob?.status)) return;
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) return feedback('请选择 PNG、JPG 或 WebP 图片。');
   if (!reference && file.size > 12 * 1024 * 1024) return feedback('图片超过 12 MB，请先缩小图片。');

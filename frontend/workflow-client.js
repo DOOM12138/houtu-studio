@@ -4,7 +4,7 @@ export class WorkflowClient{
  notify(w){if(this.current?.id===w.id&&w.revision<this.current.revision)return this.current;this.current=w;this.onChange(w);return w;}
  accept(attempt,w){this.active.delete(attempt.token);if(attempt.id===this.current?.id&&attempt.generation===this.generation)this.notify(w);}
  async load(id){const generation=++this.generation,w=await this.api('/api/workflows/'+id);return generation===this.generation?this.notify(w):w;}
- async create(name,parentId){await Promise.allSettled([...this.active.values()].map(a=>this.fail(a,'已切换原图，本次页面执行中止，可从此步骤重新开始。')));const generation=++this.generation,w=await this.api('/api/workflows',{name,parentId});return generation===this.generation?this.notify(w):w;}
+ async create(name,parentId,kind='color'){await Promise.allSettled([...this.active.values()].map(a=>this.fail(a,'已切换原图，本次页面执行中止，可从此步骤重新开始。')));const generation=++this.generation,w=await this.api('/api/workflows',{name,parentId,kind});return generation===this.generation?this.notify(w):w;}
  url(asset,id=this.current?.id){return `/api/workflows/${id}/assets/${asset}`;}
  async upload(blob,id=this.current?.id){const {csrf}=await this.api('/api/health');const r=await fetch(`/api/workflows/${id}/assets`,{method:'POST',headers:{'Content-Type':blob.type||'application/octet-stream','X-Paint-CSRF':csrf},body:blob});const data=await r.json();if(!r.ok)throw Error(data.error||'保存工作流产物失败。');return data;}
  enqueue(fn){const id=this.current?.id,generation=this.generation;if(!id)return Promise.resolve(null);const result=this.queue.catch(()=>{}).then(async()=>{if(this.current?.id!==id||generation!==this.generation)return null;return fn(id,generation);});this.queue=result;return result;}

@@ -9,6 +9,7 @@
     "fflate": "0.8.2",
     "onnxruntime-node": "npm:onnxruntime-web@1.31.1",
     "playwright-core": "1.65.1",
-    "sharp": "0.35.5"
+    "sharp": "0.35.5",
+    "libraw-wasm": "1.6.0"
   }
 }

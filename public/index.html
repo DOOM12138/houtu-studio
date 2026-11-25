@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <title>厚涂小站 · 人物精修与二次元厚涂</title>
+  <title>AI 修图 · 厚涂小站</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/style.css">
   <script type="module" src="/app.js"></script>
-<link rel="stylesheet" href="/update-notice.css"><script type="module" src="/update-notice.js"></script><link rel="stylesheet" href="/image-viewer.css"><link rel="stylesheet" href="/editor-layout.css"></head>
+<link rel="stylesheet" href="/update-notice.css"><script type="module" src="/update-notice.js"></script><link rel="stylesheet" href="/image-viewer.css"><link rel="stylesheet" href="/editor-layout.css"><link rel="stylesheet" href="/workspace.css"><script type="module" src="/workspace.js"></script></head>
 <body>
   <header class="topbar">
     <a class="brand" href="/" aria-label="厚涂小站首页"><span class="brand-mark" aria-hidden="true">涂</span><span>厚涂小站<span class="brand-note">自己的二次元画室</span></span></a>
@@ -23,7 +23,7 @@
   </header>
 
   <main>
-    <div class="page-heading"><div><h1>人物精修与厚涂</h1><p>从五官发丝到服装光影，把整个人物修得更协调。</p></div><span class="local-label"><span class="status-dot"></span>ChatGPT 本机工作台</span></div>
+    <div class="page-heading"><div><h1>AI 修图</h1><p>从五官发丝到服装光影，把整个人物修得更协调。</p></div><span class="local-label"><span class="status-dot"></span>ChatGPT 本机工作台</span></div>
     <section id="connection" class="connection-notice" aria-live="polite" hidden></section>
     <p class="field-hint"><a href="/lab/">提示词实验室 · 查看版本、真实样例与逐项验收</a></p><details id="prompt-workshop" class="prompt-workshop prompt-details" open>
       <summary>提示词编辑器<span>自己写，也可以保存成模板反复使用</span></summary>
@@ -65,7 +65,7 @@
             <input id="file" class="visually-hidden" type="file" accept="image/png,image/jpeg,image/webp" aria-label="选择原图">
             <button id="upload" class="upload-target" type="button" aria-label="上传原图，或将图片拖到这里">
               <span class="upload-icon"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="8" y="10" width="32" height="28" rx="4"/><circle cx="18" cy="20" r="3"/><path d="m9 33 9-8 7 6 6-6 9 8M33 5v10m-5-5h10"/></svg></span>
-              <strong>把原图放在这里</strong><span>点击选择，或拖入图片</span><small>PNG / JPG / WebP · 最大 12 MB</small>
+              <strong>把原图放在这里</strong><span>点击选择，或拖入图片</span><small>JPG / PNG / WebP · RAW等本机转换</small>
             </button>
             <div id="source-frame" class="image-frame" hidden><img id="source" alt="待精修的完整原图"><canvas id="selection-canvas" aria-label="局部精修选区，可拖动绘制矩形，也可用上方比例输入框设置"></canvas></div>
           </div>

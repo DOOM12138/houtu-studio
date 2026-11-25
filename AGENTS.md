@@ -34,3 +34,5 @@
 - 安卓升级沿用项目长期签名，私钥只存私有 data/android-signing 与受控发布 secrets；清理缓存、打包、项目备份和公开提交均排除签名。运行时或客户端移植保持 Android 的 SELinux/seccomp，不以关闭系统安全机制解决兼容问题。
 
 - Windows宿主、安装器、体积优化或桌面更新改动先读desktop/README.md。EXE与SDK放已有runtime白名单；安装前核对空闲和实例，卸载按程序清单保留data；更新需验证真实宿主释放DLL和重开，不能把网页测试当作EXE验收。
+
+- 三个工作区与手动/AI边界见public/docs/WORKSPACES.md；RAW格式、原片/16位母版/8位编辑位图与限制见public/docs/IMAGE_FORMATS.md。人物手动修图和普通调色不得读模型账号或发AI请求；全部AI操作单列。新增工作流kind不改写既有历史，跨工具继续携带来源。

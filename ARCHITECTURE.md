@@ -10,6 +10,14 @@ android/ 保存原生 Activity、文件选择／保存、更新签名验证及�
 
 移动工作台的全部页面、私有图像和 API 都要求原生生成的本机密钥；POST继续核对同源和CSRF。Windows安装／打包操作不在安卓执行。移动客户端的官方账号凭据属于手机本应用，不读取桌面或Cindy凭据。
 
+## 工作区与图片来源
+
+`/portrait/` 是 `public/manual-portrait*` 的本机像素编辑器；`/color/` 是普通本机调色；`/ai/` 复用原AI编辑器，旧 `/` 保持兼容，`/ai/color/` 单列既有AI调色建议。`public/workspace.js` 安装共享导航，`workflow-sections.js` 分类但不改历史kind和操作编号。管理页在筛选后取最近100条。
+
+`backend/image-imports.mjs` 保留RAW等原始文件并记录 `image-import` 工作流，短生命周期Worker用LibRaw或图像库转成16位母版和8位sRGB编辑位图。`public/image-import.js` 将转换后的File送回各页面原有导入逻辑，并携带来源引用。RAW原片不覆盖；显影失败可从原记录重新开始。格式与限制见public/docs/IMAGE_FORMATS.md。
+
+`manual-portrait` 保存 source/edit/export，笔触是归一化向量；预览与完整尺寸导出使用同一引擎。手动编辑和普通调色不访问模型账户；AI动作只在AI入口启动。工作流依赖、历史尝试及AI未知状态处理规则继续沿用。
+
 ## 前端
 
 - public/：人物精修主页面、提示词编辑、部位工具、二次精修、版本与局部蒙版操作。

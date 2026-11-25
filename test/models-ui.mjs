@@ -41,7 +41,7 @@ try{
  await page.waitForSelector('#reuse-result:not([hidden])');assert.equal(bridge.images,1);await page.goto(origin+'/?job='+job.id);await page.waitForFunction(()=>document.querySelector('#model-picker-select').value==='test-vision-a');
  for(const [width,theme] of [[1440,'light'],[320,'dark']]){await page.setViewportSize({width,height:1000});await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.locator('.settings').screenshot({path:path.join(out,'retouch-'+width+'-'+theme+'.png')});}
  let expected=A;
- for(const [route,id] of [['/creative/','creative-model-picker'],['/color/','color-model-picker']]){
+ for(const [route,id] of [['/creative/','creative-model-picker'],['/ai/color/','color-model-picker']]){
    await page.goto(origin+route);await page.waitForFunction(id=>document.querySelectorAll('#'+id+' select option').length===3,id);assert.equal(await page.locator('#'+id+' select').inputValue(),expected);await page.locator('#'+id+' select').selectOption(B);expected=B;assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.locator('#'+id).screenshot({path:path.join(out,id+'-320.png')});
  }
  assert.deepEqual(errors,[]);console.log('PASS model UI: signed-out state, real catalog-shaped options, custom mode, templates, unavailable model preservation, refresh errors, request and history restore, three pages at 320px');
