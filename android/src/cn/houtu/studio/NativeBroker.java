@@ -1,20 +1,253 @@
 package cn.houtu.studio;
-import android.content.*;import android.webkit.*;import org.json.*;import java.net.*;import java.io.*;import java.nio.charset.StandardCharsets;import java.util.*;import java.util.concurrent.*;
+
+import android.content.*;
+import android.webkit.*;
+import java.io.*;
+import java.net.*;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.concurrent.*;
+import org.json.*;
+
 final class NativeBroker {
- final Context context;final String secret=RuntimeHost.random();final ExecutorService pool=new ThreadPoolExecutor(0,16,30,TimeUnit.SECONDS,new SynchronousQueue<Runnable>());ServerSocket api,proxy;volatile WebMessagePort visionPort;final Map<String,Pending> pending=new ConcurrentHashMap<>();
- static final class Pending{final CountDownLatch done=new CountDownLatch(1);String value,error;}
- NativeBroker(Context c){context=c;}
- void start()throws IOException{api=new ServerSocket(0,16,InetAddress.getByName("127.0.0.1"));proxy=new ServerSocket(0,16,InetAddress.getByName("127.0.0.1"));pool.execute(()->accept(api,false));pool.execute(()->accept(proxy,true));}
- String origin(){return "http://127.0.0.1:"+api.getLocalPort();}String proxyUrl(){return "http://houtu:"+secret+"@127.0.0.1:"+proxy.getLocalPort();}
- void accept(ServerSocket server,boolean tunnel){while(!server.isClosed())try{Socket s=server.accept();try{pool.execute(()->handle(s,tunnel));}catch(RejectedExecutionException e){s.close();}}catch(IOException e){break;}}
- static String line(InputStream in)throws IOException{ByteArrayOutputStream b=new ByteArrayOutputStream();int n;while((n=in.read())!=-1){if(n==10)break;if(n!=13)b.write(n);if(b.size()>16384)throw new IOException("Header too large");}return b.toString("US-ASCII");}
- void handle(Socket socket,boolean tunnel){try(Socket s=socket){s.setSoTimeout(5000);InputStream in=s.getInputStream();OutputStream out=s.getOutputStream();String first=line(in);Map<String,String> headers=new HashMap<>();for(int i=0;i<64;i++){String h=line(in);if(h.isEmpty())break;int p=h.indexOf(':');if(p>0)headers.put(h.substring(0,p).toLowerCase(Locale.ROOT),h.substring(p+1).trim());}
-  if(tunnel){String auth="Basic "+android.util.Base64.encodeToString(("houtu:"+secret).getBytes(StandardCharsets.UTF_8),android.util.Base64.NO_WRAP);if(!auth.equals(headers.get("proxy-authorization"))||!first.startsWith("CONNECT ")){out.write("HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm=Houtu\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.US_ASCII));return;}s.setSoTimeout(180000);String dest=first.split(" ")[1];int p=dest.lastIndexOf(':');String host=dest.substring(0,p).toLowerCase(Locale.ROOT);int port=Integer.parseInt(dest.substring(p+1));if(port!=443||!allowed(host))throw new IOException("Proxy target rejected");try(Socket remote=new Socket()){remote.connect(new InetSocketAddress(host,port),20000);remote.setSoTimeout(180000);out.write("HTTP/1.1 200 Connection Established\r\n\r\n".getBytes(StandardCharsets.US_ASCII));out.flush();Future<?> upstream=pool.submit(()->{try{RuntimeHost.copy(in,remote.getOutputStream(),3L*1024*1024*1024);}catch(IOException ignored){}try{remote.shutdownOutput();}catch(IOException ignored){}});try{RuntimeHost.copy(remote.getInputStream(),out,3L*1024*1024*1024);}finally{upstream.cancel(true);}}return;}
-  if(!("Bearer "+secret).equals(headers.get("authorization")))throw new IOException("Native bridge authorization required");s.setSoTimeout(150000);String path=first.split(" ")[1];int length=Integer.parseInt(headers.getOrDefault("content-length","0"));if(length<0||length>80*1024*1024)throw new IOException("Native request too large");byte[] bytes=new byte[length];int offset=0,n;while(offset<length&&(n=in.read(bytes,offset,length-offset))>0)offset+=n;if(offset!=length)throw new IOException("Incomplete native request");JSONObject input=length==0?new JSONObject():new JSONObject(new String(bytes,StandardCharsets.UTF_8));JSONObject result;
-  if(path.equals("/vision"))result=vision(input);else if(path.equals("/platform/open")){RuntimeHost.main.post(()->{if(RuntimeHost.activity!=null)RuntimeHost.activity.openExternal("https://www.xiaohongshu.com/");});result=new JSONObject().put("opened",true).put("mode","system-browser");}else if(path.equals("/platform/status"))result=new JSONObject().put("open",false).put("message","在手机浏览器查看参考后，可通过系统照片选择器导入原图或截图。");else throw new IOException("Native operation unavailable");respond(out,200,result.toString());
- }catch(Throwable e){android.util.Log.w("HoutuNative",e.getClass().getSimpleName());}}
- static boolean allowed(String host){for(String d:new String[]{"openai.com","chatgpt.com","oaiusercontent.com","oaistatic.com","blob.core.windows.net"})if(host.equals(d)||host.endsWith("."+d))return true;return false;}
- static void respond(OutputStream out,int status,String value)throws IOException{byte[] b=value.getBytes(StandardCharsets.UTF_8);out.write(("HTTP/1.1 "+status+" OK\r\nContent-Type: application/json\r\nContent-Length: "+b.length+"\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));out.write(b);out.flush();}
- JSONObject vision(JSONObject input)throws Exception{for(int i=0;i<100&&visionPort==null;i++)Thread.sleep(100);if(visionPort==null)throw new IOException("本机识别引擎尚未就绪，请重开页面。");String id=UUID.randomUUID().toString();Pending p=new Pending();pending.put(id,p);RuntimeHost.main.post(()->{try{visionPort.postMessage(new WebMessage(new JSONObject().put("id",id).put("input",input).toString()));}catch(Exception e){p.error=e.getMessage();p.done.countDown();}});try{if(!p.done.await(120,TimeUnit.SECONDS))throw new IOException("本机范围识别超时。");if(p.error!=null)throw new IOException(p.error);return new JSONObject(p.value);}finally{pending.remove(id);}}
- void attach(WebView view,String origin){if(visionPort!=null){visionPort.close();visionPort=null;}String nonce="houtu-engine-"+RuntimeHost.random();view.evaluateJavascript("window.addEventListener('message',function receive(e){if(e.data!=="+JSONObject.quote(nonce)+"||e.ports.length!==1||(e.source&&e.source!==window))return;window.removeEventListener('message',receive);let p=e.ports[0];p.onmessage=async e=>{let q=JSON.parse(e.data);try{let result=await window.runTarget(q.input);p.postMessage(JSON.stringify({id:q.id,result}));}catch(e){p.postMessage(JSON.stringify({id:q.id,error:e.message}));}};p.postMessage('ready');});",unused->{WebMessagePort[] ports=view.createWebMessageChannel();ports[0].setWebMessageCallback(new WebMessagePort.WebMessageCallback(){public void onMessage(WebMessagePort port,WebMessage message){try{if(message.getData().equals("ready")){visionPort=port;return;}JSONObject r=new JSONObject(message.getData());Pending p=pending.get(r.optString("id"));if(p!=null){p.error=r.has("error")?r.optString("error"):null;p.value=r.optJSONObject("result")==null?"{}":r.getJSONObject("result").toString();p.done.countDown();}}catch(Exception ignored){}}});view.postWebMessage(new WebMessage(nonce,new WebMessagePort[]{ports[1]}),android.net.Uri.parse(origin));});}
+  final Context context;
+  final String secret = RuntimeHost.random();
+  final ExecutorService pool =
+      new ThreadPoolExecutor(0, 16, 30, TimeUnit.SECONDS, new SynchronousQueue<Runnable>());
+  ServerSocket api, proxy;
+  volatile WebMessagePort visionPort;
+  final Map<String, Pending> pending = new ConcurrentHashMap<>();
+
+  static final class Pending {
+    final CountDownLatch done = new CountDownLatch(1);
+    String value, error;
+  }
+
+  NativeBroker(Context c) {
+    context = c;
+  }
+
+  void start() throws IOException {
+    api = new ServerSocket(0, 16, InetAddress.getByName("127.0.0.1"));
+    proxy = new ServerSocket(0, 16, InetAddress.getByName("127.0.0.1"));
+    pool.execute(() -> accept(api, false));
+    pool.execute(() -> accept(proxy, true));
+  }
+
+  String origin() {
+    return "http://127.0.0.1:" + api.getLocalPort();
+  }
+
+  String proxyUrl() {
+    return "http://houtu:" + secret + "@127.0.0.1:" + proxy.getLocalPort();
+  }
+
+  void accept(ServerSocket server, boolean tunnel) {
+    while (!server.isClosed())
+      try {
+        Socket s = server.accept();
+        try {
+          pool.execute(() -> handle(s, tunnel));
+        } catch (RejectedExecutionException e) {
+          s.close();
+        }
+      } catch (IOException e) {
+        break;
+      }
+  }
+
+  static String line(InputStream in) throws IOException {
+    ByteArrayOutputStream b = new ByteArrayOutputStream();
+    int n;
+    while ((n = in.read()) != -1) {
+      if (n == 10) break;
+      if (n != 13) b.write(n);
+      if (b.size() > 16384) throw new IOException("Header too large");
+    }
+    return b.toString("US-ASCII");
+  }
+
+  void handle(Socket socket, boolean tunnel) {
+    try (Socket s = socket) {
+      s.setSoTimeout(5000);
+      InputStream in = s.getInputStream();
+      OutputStream out = s.getOutputStream();
+      String first = line(in);
+      Map<String, String> headers = new HashMap<>();
+      for (int i = 0; i < 64; i++) {
+        String h = line(in);
+        if (h.isEmpty()) break;
+        int p = h.indexOf(':');
+        if (p > 0)
+          headers.put(h.substring(0, p).toLowerCase(Locale.ROOT), h.substring(p + 1).trim());
+      }
+      if (tunnel) {
+        String auth =
+            "Basic "
+                + android.util.Base64.encodeToString(
+                    ("houtu:" + secret).getBytes(StandardCharsets.UTF_8),
+                    android.util.Base64.NO_WRAP);
+        if (!auth.equals(headers.get("proxy-authorization")) || !first.startsWith("CONNECT ")) {
+          out.write(
+              "HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm=Houtu\r\nConnection: close\r\n\r\n"
+                  .getBytes(StandardCharsets.US_ASCII));
+          return;
+        }
+        s.setSoTimeout(180000);
+        String dest = first.split(" ")[1];
+        int p = dest.lastIndexOf(':');
+        String host = dest.substring(0, p).toLowerCase(Locale.ROOT);
+        int port = Integer.parseInt(dest.substring(p + 1));
+        if (port != 443 || !allowed(host)) throw new IOException("Proxy target rejected");
+        try (Socket remote = new Socket()) {
+          remote.connect(new InetSocketAddress(host, port), 20000);
+          remote.setSoTimeout(180000);
+          out.write(
+              "HTTP/1.1 200 Connection Established\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+          out.flush();
+          Future<?> upstream =
+              pool.submit(
+                  () -> {
+                    try {
+                      RuntimeHost.copy(in, remote.getOutputStream(), 3L * 1024 * 1024 * 1024);
+                    } catch (IOException ignored) {
+                    }
+                    try {
+                      remote.shutdownOutput();
+                    } catch (IOException ignored) {
+                    }
+                  });
+          try {
+            RuntimeHost.copy(remote.getInputStream(), out, 3L * 1024 * 1024 * 1024);
+          } finally {
+            upstream.cancel(true);
+          }
+        }
+        return;
+      }
+      if (!("Bearer " + secret).equals(headers.get("authorization")))
+        throw new IOException("Native bridge authorization required");
+      s.setSoTimeout(150000);
+      String path = first.split(" ")[1];
+      int length = Integer.parseInt(headers.getOrDefault("content-length", "0"));
+      if (length < 0 || length > 80 * 1024 * 1024)
+        throw new IOException("Native request too large");
+      byte[] bytes = new byte[length];
+      int offset = 0, n;
+      while (offset < length && (n = in.read(bytes, offset, length - offset)) > 0) offset += n;
+      if (offset != length) throw new IOException("Incomplete native request");
+      JSONObject input =
+          length == 0
+              ? new JSONObject()
+              : new JSONObject(new String(bytes, StandardCharsets.UTF_8));
+      JSONObject result;
+      if (path.equals("/vision")) result = vision(input);
+      else if (path.equals("/platform/open")) {
+        RuntimeHost.main.post(
+            () -> {
+              if (RuntimeHost.activity != null)
+                RuntimeHost.activity.openExternal("https://www.xiaohongshu.com/");
+            });
+        result = new JSONObject().put("opened", true).put("mode", "system-browser");
+      } else if (path.equals("/platform/status"))
+        result =
+            new JSONObject().put("open", false).put("message", "在手机浏览器查看参考后，可通过系统照片选择器导入原图或截图。");
+      else throw new IOException("Native operation unavailable");
+      respond(out, 200, result.toString());
+    } catch (Throwable e) {
+      android.util.Log.w("HoutuNative", e.getClass().getSimpleName());
+    }
+  }
+
+  static boolean allowed(String host) {
+    for (String d :
+        new String[] {
+          "openai.com",
+          "chatgpt.com",
+          "oaiusercontent.com",
+          "oaistatic.com",
+          "blob.core.windows.net"
+        }) if (host.equals(d) || host.endsWith("." + d)) return true;
+    return false;
+  }
+
+  static void respond(OutputStream out, int status, String value) throws IOException {
+    byte[] b = value.getBytes(StandardCharsets.UTF_8);
+    out.write(
+        ("HTTP/1.1 "
+                + status
+                + " OK\r\nContent-Type: application/json\r\nContent-Length: "
+                + b.length
+                + "\r\nConnection: close\r\n\r\n")
+            .getBytes(StandardCharsets.US_ASCII));
+    out.write(b);
+    out.flush();
+  }
+
+  JSONObject vision(JSONObject input) throws Exception {
+    for (int i = 0; i < 100 && visionPort == null; i++) Thread.sleep(100);
+    if (visionPort == null) throw new IOException("本机识别引擎尚未就绪，请重开页面。");
+    String id = UUID.randomUUID().toString();
+    Pending p = new Pending();
+    pending.put(id, p);
+    RuntimeHost.main.post(
+        () -> {
+          try {
+            visionPort.postMessage(
+                new WebMessage(new JSONObject().put("id", id).put("input", input).toString()));
+          } catch (Exception e) {
+            p.error = e.getMessage();
+            p.done.countDown();
+          }
+        });
+    try {
+      if (!p.done.await(120, TimeUnit.SECONDS)) throw new IOException("本机范围识别超时。");
+      if (p.error != null) throw new IOException(p.error);
+      return new JSONObject(p.value);
+    } finally {
+      pending.remove(id);
+    }
+  }
+
+  void attach(WebView view, String origin) {
+    if (visionPort != null) {
+      visionPort.close();
+      visionPort = null;
+    }
+    String nonce = "houtu-engine-" + RuntimeHost.random();
+    view.evaluateJavascript(
+        "window.addEventListener('message',function receive(e){if(e.data!=="
+            + JSONObject.quote(nonce)
+            + "||e.ports.length!==1||(e.source&&e.source!==window))return;window.removeEventListener('message',receive);let"
+            + " p=e.ports[0];p.onmessage=async e=>{let q=JSON.parse(e.data);try{let result=await"
+            + " window.runTarget(q.input);p.postMessage(JSON.stringify({id:q.id,result}));}catch(e){p.postMessage(JSON.stringify({id:q.id,error:e.message}));}};p.postMessage('ready');});",
+        unused -> {
+          WebMessagePort[] ports = view.createWebMessageChannel();
+          ports[0].setWebMessageCallback(
+              new WebMessagePort.WebMessageCallback() {
+                public void onMessage(WebMessagePort port, WebMessage message) {
+                  try {
+                    if (message.getData().equals("ready")) {
+                      visionPort = port;
+                      return;
+                    }
+                    JSONObject r = new JSONObject(message.getData());
+                    Pending p = pending.get(r.optString("id"));
+                    if (p != null) {
+                      p.error = r.has("error") ? r.optString("error") : null;
+                      p.value =
+                          r.optJSONObject("result") == null
+                              ? "{}"
+                              : r.getJSONObject("result").toString();
+                      p.done.countDown();
+                    }
+                  } catch (Exception ignored) {
+                  }
+                }
+              });
+          view.postWebMessage(
+              new WebMessage(nonce, new WebMessagePort[] {ports[1]}),
+              android.net.Uri.parse(origin));
+        });
+  }
 }
