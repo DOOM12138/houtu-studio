@@ -90,5 +90,5 @@ export function createStudioAgent({mount,api,context,notify,onRefresh,onPreview}
   }catch(error){message(error.message,true);}
  }
  function update(){const c=context(),parent=c.workflow?.id,children=Object.values(c.workflow?.agentChildren||{});if(parent!==currentParent){ticket++;currentParent=parent;currentChild=children[0]?.childWorkflowId||null;view=null;rendered='';selectedPreview=null;previewEnabled=true;trace.replaceChildren();if(currentChild)void poll();}if(!openedQuery&&c.project)void openQuery();updateControls();}
- setInterval(()=>{if(currentChild&&(view?.running||['running','pausing'].includes(context().project?.queue.state)||!view))void poll();},1500);update();return {update,clearPreview:()=>{selectedPreview=null;previewEnabled=false;}};
+ setInterval(()=>{if(currentChild&&(view?.running||['running','pausing'].includes(view?.parentQueue)||['running','pausing'].includes(context().project?.queue.state)||!view))void poll();},1500);update();return {update,clearPreview:()=>{selectedPreview=null;previewEnabled=false;}};
 }
