@@ -1,0 +1,56 @@
+name: Build Android native image client
+on:
+  workflow_dispatch:
+  push:
+    branches: ['feat/android-standalone']
+    paths: ['scripts/build-android-codex.py', 'android/codex-source.json', '.github/workflows/android-codex.yml']
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64-linux-android, aarch64-linux-android]
+    steps:
+      - uses: actions/checkout@v4
+        with: {path: studio}
+      - uses: actions/checkout@v4
+        with:
+          repository: openai/codex
+          ref: 3d86e43b075adeba2193ec5c22ac92f55afd82e6
+          path: upstream
+          persist-credentials: false
+      - name: Prepare Android toolchain
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal --target ${{ matrix.target }}
+          sdkmanager 'ndk;27.3.13750724'
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends protobuf-compiler libclang-dev cmake pkg-config
+      - uses: actions/cache@v4
+        id: native-cache
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            upstream/codex-rs/target
+          key: codex-android-0.172-${{ matrix.target }}-${{ hashFiles('studio/scripts/build-android-codex.py') }}
+          restore-keys: codex-android-0.172-${{ matrix.target }}-
+      - name: Build the image-capable upstream app-server
+        run: python3 studio/scripts/build-android-codex.py --source upstream --ndk "$ANDROID_HOME/ndk/27.3.13750724" --target ${{ matrix.target }} --output native-output
+      - uses: actions/cache/save@v4
+        if: always() && steps.native-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            upstream/codex-rs/target
+          key: codex-android-0.172-${{ matrix.target }}-${{ hashFiles('studio/scripts/build-android-codex.py') }}
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: native-codex-${{ matrix.target }}
+          path: native-output
+          retention-days: 7
