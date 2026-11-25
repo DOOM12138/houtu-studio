@@ -6,6 +6,18 @@ import {localOptions,exportOptions} from './local-image.mjs';
 import {settings,BUILTINS} from '../frontend/engine.js';
 import {isSceneOperation} from '../public/scene-options.js';
 const cleanName=(value,fallback)=>String(value||fallback).trim().slice(0,80)||fallback;
+// Replace matching slots without moving the target's unrelated steps.
+export function mergeRecipeStages(target,source,categories){
+ const stages=[],remaining=new Map(categories.map(type=>[type,source.filter(s=>s.type===type)]));
+ for(let index=0;index<target.length;index++){
+  const stage=target[index],items=remaining.get(stage.type);
+  if(!items){stages.push(stage);continue;}
+  if(items.length)stages.push(items.shift());
+  if(!target.slice(index+1).some(s=>s.type===stage.type)){stages.push(...items);items.length=0;}
+ }
+ for(const type of categories){const items=remaining.get(type);if(!items.length)continue;const at=['local','retouch'].includes(type)?0:stages.length-1;stages.splice(at,0,...items);}
+ return stages;
+}
 export function recipeValue(input={}){
  if(!input||typeof input!=='object'||Array.isArray(input))throw Error('流程配方格式无效。');
  if(!Array.isArray(input.stages)||input.stages.length<1||input.stages.length>12)throw Error('流程配方需要1–12个步骤。');

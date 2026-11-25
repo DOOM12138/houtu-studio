@@ -85,7 +85,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
   const packages = new Map();
   let activePackage = null, latestPackage = null;
   const packageView = value => value && ({ id: value.id, status: value.status, message: value.message, bytes: value.bytes, sha256: value.sha256, downloadUrl: value.status === 'done' ? `/downloads/package/${value.id}` : null });
-  let active = null, pendingOperations=0;
+  let active = null, pendingOperations=0;const managedJobs=new Set();
   let critiqueActive = false;let portraitAuditControl=null,portraitAuditTask=null,isClosing=false,closingPromise=null;
   let login = null, loginStartedAt = 0;
   let loginError = '';
@@ -118,7 +118,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     await persist({...job,status,message,workflowToken:job.workflowToken===token?null:job.workflowToken});
     if(job.runId!==runId)return;
     job.status=status;job.message=message;if(job.workflowToken===token)job.workflowToken=null;
-    if (active === job.id) active = null;
+    if (active === job.id) active = null;managedJobs.delete(job.id);
   };
 
   const startJobStep=async(job,step,runId=job.runId)=>{if(job.runId!==runId||!isRunning(job))throw new Error('这次执行已过期。');const attempt=await workflows.begin(job.workflowId,step);if(job.runId!==runId||!isRunning(job))throw new Error('这次执行已过期。');job.workflowStep=step;job.workflowToken=attempt.token;await persist(job);};
@@ -199,8 +199,8 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     if (method === 'account/login/completed') {
       login = null; loginError = params.success ? '' : '登录未完成，请重新登录。';
     }
-    const job = jobs.get(active);
-    if (!isRunning(job) || params.threadId !== job.threadId) return;
+    const job = [...jobs.values()].find(j=>isRunning(j)&&j.threadId&&j.threadId===params.threadId);
+    if (!job) return;
     if (method === 'turn/started') job.turnId = params.turn.id;
     if(method==='item/completed'&&params.item?.type==='agentMessage'&&typeof params.item.text==='string')job.imageReply=params.item.text.slice(0,2000);
     if (method === 'item/started' && params.item?.type === 'imageGeneration') {
@@ -224,8 +224,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     }
   });
   bridge.on('disconnected', () => {
-    const job = jobs.get(active);
-    if (job) finish(job, 'error', '本机图片服务已断开，请刷新网页后重试。').catch(() => {});
+    for(const job of jobs.values())if(isRunning(job)&&!job.localComposition&&(job.threadId||job.workflowStep==='generate')){const runId=job.runId;Promise.resolve(job.saving).then(()=>finish(job,job.output?'done':'error',job.output?'原始出图与合成已保存；图片服务随后断开。':'本机图片服务已断开，请核对已保存步骤后恢复。',runId)).catch(error=>finish(job,'error',friendlyError(error.message),runId)).catch(()=>{});}
     login = null;
   });
 
@@ -246,8 +245,8 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
   const startRetouch=async(input,{requestKey=null,pipelineParentId=null,expectedAccount=null,managed=false}={})=>{
     if(requestKey){if(!/^[a-f0-9]{64}$/.test(requestKey))throw Error('流程请求标识无效。');const existing=findRequest(requestKey);if(existing)return publicJob(existing);}
     const imageRuntime=bridge.imageRuntimeStatus?.();if(imageRuntime?.ready===false)throw Object.assign(Error(imageRuntime.message),{status:409});
-    if(active||activePackage||critiqueActive||(studio?.active||studio?.archiving)&&!managed)throw Object.assign(Error('工作台已有任务，请先暂停或等待完成。'),{status:409});
-    active='reserved';let job;try{
+    if(active||activePackage||critiqueActive||managed&&(!studio?.active||managedJobs.size>=2)||!managed&&(managedJobs.size||studio?.active||studio?.archiving))throw Object.assign(Error('工作台已有任务，请先暂停或等待完成。'),{status:409});
+    const reservation=Symbol('managed-image');if(managed)managedJobs.add(reservation);else active='reserved';let job;try{
           const options = normalizeEditOptions(input),tool=PRESETS.find(p=>p.id===options.operation),references=referenceInputs(input.references);if(tool.output==='outpaint'&&input.protectionMask)throw Error('扩图使用原图全区域保护，不需要额外人物蒙版。');if(tool.referenceRole&&references.some(r=>!['any','style','result-guide',tool.referenceRole].includes(r.role)))throw Error('参考图角色与当前功能不一致，请重新选择。');if(tool.referenceRole&&!references.some(r=>r.role==='any'||r.role===tool.referenceRole))throw Error('此功能需要参考图，请先添加1–5张功能参考图。');if(tool.needsTarget&&!options.selection&&!options.task.target.trim())throw Error('请指定要转换的部位，或先框选编辑区域。');
           if(isSceneOperation(options.operation)&&!options.scene.protectSubject&&input.protectionMask)throw Error('关闭主体像素保护时请不要提交保护蒙版。');
           if(isSceneOperation(options.operation)&&options.scene.protectSubject&&!input.protectionMask)throw Error('请先分析主体保护或上传蒙版，也可关闭像素保护后按AI语义清理。');
@@ -264,7 +263,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
             created: Date.now(), status: 'preparing', message: '正在准备原图…', prompt: input.prompt,
             ...options,promptVersion:tool.promptRevision||PROMPT_VERSION,workflowId:workflow.id,runId:randomUUID(),region:null,sourceWorkflowId:resolved.parentWorkflowId,sourceAsset:resolved.sourceAsset,sourceStep:resolved.sourceStep,round:options.parentId?(jobs.get(options.parentId)?.round||1)+1:1,portraitAuditId:input.portraitAuditId||null };
           await mkdir(job.directory);
-          jobs.set(id, job); active = id; await persist(job);
+          jobs.set(id, job);if(managed){managedJobs.delete(reservation);managedJobs.add(id);}else active=id;await persist(job);
           await startJobStep(job,'source');
           const featureReferences=[];for(const ref of references){const normalized=await prepareEditImage(ref.bytes,null),asset=await workflows.putAsset(workflow.id,normalized.source,'image/png');featureReferences.push({assetId:asset.id,title:ref.title,role:ref.role==='any'?(tool.referenceRole||'any'):ref.role});}
           job.featureReferences=featureReferences;const source=await workflows.putAsset(workflow.id,image.bytes,'image/png');let targetMaskAsset=null;if(input.targetMask){if(tool.fullFrame)throw Error('独立输出、扩图和放大不使用原位编辑蒙版。');targetMaskAsset=(await workflows.putAsset(workflow.id,await checkedTargetMask(input,image.bytes),'image/png')).id;job.targetMaskAsset=targetMaskAsset;}
@@ -272,13 +271,13 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
           await prepareJob(job,image.bytes);await generateJob(job);
 
       return publicJob(job);
-    }catch(error){if(job&&isRunning(job))await finish(job,'error',friendlyError(error.message));throw error;}finally{if(active==='reserved')active=null;}
+    }catch(error){if(job&&isRunning(job))await finish(job,'error',friendlyError(error.message));throw error;}finally{managedJobs.delete(reservation);if(!managed&&active==='reserved')active=null;}
   };
   const recomposeManaged=async view=>{
-    if(active||activePackage||critiqueActive)throw Object.assign(Error('工作台正忙，请稍后恢复。'),{status:409});active='reserved';let job;
-    try{job=jobs.get(view.id);const w=await workflows.get(job.workflowId),generated=w.steps.find(n=>n.id==='generate');if(generated?.status!=='done'||!generated.output?.rawAsset)throw Error('原始出图尚未保存，请在子工作流确认生成状态。');await workflows.restart(w.id,'compose',w.revision);Object.assign(job,{runId:randomUUID(),status:'preparing',message:'复用AI原始图重新合成',output:null,workflowToken:null,threadId:null,turnId:null,saving:null});active=job.id;await persist(job);const runId=job.runId;Promise.resolve().then(async()=>{const raw=await workflows.asset(w.id,generated.output.rawAsset);await composeOutput(job,await readFile(raw.file),runId);await finish(job,'done','已复用原始出图完成合成',runId);}).catch(error=>finish(job,'error',friendlyError(error.message),runId)).catch(()=>{});return publicJob(job);}finally{if(active==='reserved')active=null;}
+    if(active||activePackage||critiqueActive||managedJobs.size>=2)throw Object.assign(Error('工作台正忙，请稍后恢复。'),{status:409});const reservation=Symbol('managed-compose');managedJobs.add(reservation);let job;
+    try{job=jobs.get(view.id);const w=await workflows.get(job.workflowId),generated=w.steps.find(n=>n.id==='generate');if(generated?.status!=='done'||!generated.output?.rawAsset)throw Error('原始出图尚未保存，请在子工作流确认生成状态。');await workflows.restart(w.id,'compose',w.revision);Object.assign(job,{runId:randomUUID(),status:'preparing',message:'复用AI原始图重新合成',localComposition:true,output:null,workflowToken:null,threadId:null,turnId:null,saving:null});managedJobs.delete(reservation);managedJobs.add(job.id);await persist(job);const runId=job.runId;Promise.resolve().then(async()=>{const raw=await workflows.asset(w.id,generated.output.rawAsset);await composeOutput(job,await readFile(raw.file),runId);await finish(job,'done','已复用原始出图完成合成',runId);}).catch(error=>finish(job,'error',friendlyError(error.message),runId)).catch(()=>{});return publicJob(job);}catch(error){if(job&&isRunning(job))await finish(job,'error',friendlyError(error.message));throw error;}finally{managedJobs.delete(reservation);}
   };
-  studio=new StudioService({directory,workflows,adapter:{upscale:upscaleProcess,isBusy:()=>Boolean(active||activePackage||critiqueActive),startRetouch,findRequest:key=>{const job=findRequest(key);return job?publicJob(job):null;},getJob:id=>jobs.has(id)?publicJob(jobs.get(id)):null,recompose:recomposeManaged,authorize:async expected=>{if(!await bridge.account())throw Error('请先登录本站ChatGPT账号。');const control={account:expected};bridge.capture(control);return control.account;}}});await studio.load();
+  studio=new StudioService({directory,workflows,adapter:{upscale:upscaleProcess,isBusy:()=>Boolean(active||activePackage||critiqueActive||managedJobs.size),startRetouch,findRequest:key=>{const job=findRequest(key);return job?publicJob(job):null;},getJob:id=>jobs.has(id)?publicJob(jobs.get(id)):null,recompose:recomposeManaged,authorize:async expected=>{if(!await bridge.account())throw Error('请先登录本站ChatGPT账号。');const control={account:expected};bridge.capture(control);return control.account;}}});await studio.load();
 
   const updates=new SoftwareUpdates({root:ROOT,directory,cacheDirectory:suppliedBridge?path.join(directory,'.updates'):undefined,fetcher:updatesFetcher,
     reserve:()=>{if(isClosing||active||activePackage||critiqueActive||login||studio.active||studio.archiving||studio.queues.size||creative.running.size||pendingOperations||library.pendingThumbs.size)return false;active='software-update';return true;},
@@ -342,8 +341,10 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       if(route==='/api/studio/recipes'&&req.method==='POST')return json(res,201,await studio.saveRecipe(await body(req,1000000)));
       if(route==='/api/studio/validate'&&req.method==='POST'){const recipe=recipeValue(await body(req,1000000));return json(res,200,{recipe,report:recipeReport(recipe)});}
       if(route==='/api/studio/restore'&&req.method==='POST')return json(res,201,await restoreProject(studio,await body(req,210*1024*1024)));
-      const studioRoute=/^\/api\/studio\/projects\/([a-f0-9-]{36})(?:\/(recipe|run|pause|delivery|backup|photos)(?:\/([a-f0-9-]{36})(?:\/(mask|references|fork|thumbnail))?)?)?$/.exec(route);
+      const studioRoute=/^\/api\/studio\/projects\/([a-f0-9-]{36})(?:\/(recipe|run|pause|delivery|backup|photos|sync-preview|sync)(?:\/([a-f0-9-]{36})(?:\/(mask|references|fork|thumbnail))?)?)?$/.exec(route);
       if(studioRoute){const [,id,action,photoId,photoAction]=studioRoute;
+        if(req.method==='POST'&&action==='sync-preview')return json(res,200,await studio.syncPlan(id,await body(req,1000000)));
+        if(req.method==='POST'&&action==='sync')return json(res,200,await studio.syncPhotos(id,await body(req,1000000)));
         if(req.method==='GET'&&!action)return json(res,200,await studio.view(id));
         if(req.method==='GET'&&photoId&&!photoAction)return json(res,200,await studio.photo(id,photoId));
         if(req.method==='GET'&&photoAction==='thumbnail'){const detail=await studio.photo(id,photoId),asset=await workflows.asset(detail.photo.originalWorkflowId,detail.photo.originalAsset);const bytes=await sharp(asset.file,{limitInputPixels:40000000}).rotate().resize({width:360,height:360,fit:'inside',withoutEnlargement:true}).webp({quality:75}).toBuffer();res.writeHead(200,{'Content-Type':'image/webp','Content-Length':bytes.length});res.end(bytes);return;}
@@ -416,7 +417,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
                 let mask=null;if(input.protectionMask){const decoded=decodeImage(input.protectionMask);if(decoded.extension!=='png')throw Error('主体保护蒙版需要PNG格式。');mask=(await workflows.putAsset(id,decoded.bytes,'image/png')).id;}
                 maskUpdate={compositionMaskOverride:true,compositionMaskAsset:mask};
               }
-              await workflows.restart(id,input.step,input.revision);if(input.step!=='compose'){job.task={...w.steps[0].output.options.task};job.targetMaskOverride=false;job.compositionTargetMaskAsset=null;job.compositionMaskOverride=false;job.compositionMaskAsset=null;}if(taskUpdate)job.task=taskUpdate;if(targetUpdate)Object.assign(job,targetUpdate);if(maskUpdate)Object.assign(job,maskUpdate);Object.assign(job,{runId:randomUUID(),status:'preparing',message:'从所选步骤继续执行…',output:null,workflowToken:null,threadId:null,turnId:null,saving:null});active=job.id;await persist(job);const runId=job.runId;
+              await workflows.restart(id,input.step,input.revision);if(input.step!=='compose'){job.task={...w.steps[0].output.options.task};job.targetMaskOverride=false;job.compositionTargetMaskAsset=null;job.compositionMaskOverride=false;job.compositionMaskAsset=null;}if(taskUpdate)job.task=taskUpdate;if(targetUpdate)Object.assign(job,targetUpdate);if(maskUpdate)Object.assign(job,maskUpdate);Object.assign(job,{runId:randomUUID(),status:'preparing',message:'从所选步骤继续执行…',localComposition:input.step==='compose',output:null,workflowToken:null,threadId:null,turnId:null,saving:null});active=job.id;await persist(job);const runId=job.runId;
               Promise.resolve().then(async()=>{if(input.step==='compose'){const asset=await workflows.asset(id,upstream.output.rawAsset);await composeOutput(job,await readFile(asset.file),runId);await finish(job,'done','已复用原始出图完成合成，没有再次调用AI。',runId);}else{if(input.step==='prepare'){const asset=await workflows.asset(id,upstream.output.imageAsset);await prepareJob(job,await readFile(asset.file));}await generateJob(job);}}).catch(e=>finish(job,'error',friendlyError(e.message),runId)).catch(()=>{});
               return json(res,202,publicJob(job));
             }finally{if(active==='reserved')active=null;}

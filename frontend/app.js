@@ -176,3 +176,9 @@ else if(flowParams.get('fromWorkflow')){try{const parent=await api('/api/workflo
 if(location.hash==='#from-retouch'){try{const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('houtu-handoff',1);r.onupgradeneeded=()=>r.result.createObjectStore('images');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});const tx=db.transaction('images','readonly'),value=await new Promise((resolve,reject)=>{const r=tx.objectStore('images').get('current');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});db.close();if(value?.blob)await openFile(new File([value.blob],value.name||'精修结果.png',{type:value.blob.type||'image/png'}));}catch(e){notice('未读取到精修图片，请手动打开图片。',true);}}
 
 adviceLink.onclick=safe(async event=>{if(!original||!flow.current)return;event.preventDefault();await flowReady;await saveEditing();location.href=adviceLink.href;});
+
+// Hand off saved global parameters; each target keeps its own pixels and masks.
+const syncColorButton=document.createElement('button');syncColorButton.id='sync-project-color';syncColorButton.type='button';syncColorButton.textContent='同步调色到项目所选照片';syncColorButton.hidden=true;document.querySelector('.workflow-strip .section-head>div')?.append(syncColorButton);
+async function syncColorProject(){const parentId=flow.current?.parentId;if(!parentId)return null;const parent=await api('/api/workflows/'+parentId);return parent.kind==='pipeline'?parent.projectId:null;}
+syncColorButton.onclick=safe(async()=>{await flushEditing();const projectId=await syncColorProject();if(!projectId)throw Error('请从照片项目进入调色后再同步。');location.href='/studio/?project='+encodeURIComponent(projectId)+'&syncColor='+flow.current.id;});
+if(!AI_COLOR_MODE)flowReady.then(()=>syncColorProject()).then(id=>{syncColorButton.hidden=!id;}).catch(()=>{});
