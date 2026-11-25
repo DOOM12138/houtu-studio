@@ -1,3 +1,4 @@
+import {rawFixture} from './helpers/raw-fixture.mjs';
 import path from 'node:path';
 import os from 'node:os';
 import net from 'node:net';
@@ -74,6 +75,8 @@ try {
 
   const health = await (await fetch(origin + '/api/health')).json();
   assert.equal(health.instanceId, record.instanceId); assert.equal(health.version, manifest.version);
+  const originalRaw=rawFixture(),rawResponse=await fetch(origin+'/api/image-imports?name=portable-sensor.dng',{method:'POST',headers:{Origin:origin,'X-Paint-CSRF':health.csrf,'Content-Type':'application/octet-stream'},body:originalRaw});assert.equal(rawResponse.status,201,await rawResponse.clone().text());const importedRaw=await rawResponse.json();assert.deepEqual(Buffer.from(await(await fetch(origin+importedRaw.originalUrl)).arrayBuffer()),originalRaw);assert.equal(new Uint8Array(await(await fetch(origin+importedRaw.masterUrl)).arrayBuffer())[24],16);for(const route of ['/portrait/','/ai/','/ai/color/','/workspace.js','/manual-portrait-worker.js','/image-import.js'])assert.equal((await fetch(origin+route)).status,200,route);
+
   const serverInfo=await(await fetch(origin+'/api/server/status')).json();
   assert.equal(path.resolve(serverInfo.dataRoot),path.join(installed,'data'));
   assert.equal(serverInfo.current.status,'signedOut');assert.deepEqual(serverInfo.accounts,[]);
