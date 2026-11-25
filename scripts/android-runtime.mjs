@@ -1,0 +1,9 @@
+import fs from 'node:fs/promises';import path from 'node:path';import {createHash} from 'node:crypto';import {execFile} from 'node:child_process';import {promisify} from 'node:util';import {fileURLToPath} from 'node:url';
+const root=fileURLToPath(new URL('../',import.meta.url)),cache=path.join(root,'.cache/android');await fs.mkdir(cache,{recursive:true});
+const lock=JSON.parse(await fs.readFile(path.join(root,'android/runtime-lock.json'),'utf8'));
+async function download(url,file,expected){try{const b=await fs.readFile(file);if(!expected||createHash('sha256').update(b).digest('hex')===expected)return;}catch{}const temporary=file+'.part';await promisify(execFile)(process.platform==='win32'?'curl.exe':'curl',['--fail','--location','--retry','2','--connect-timeout','15','--max-time','300','--silent','--show-error','--output',temporary,url],{cwd:root,windowsHide:true,timeout:320000});const hash=createHash('sha256').update(await fs.readFile(temporary)).digest('hex');if(expected&&hash!==expected)throw Error('SHA256 mismatch '+url);await fs.rename(temporary,file);console.log(JSON.stringify({file,sha256:hash}));}
+await download(lock.node.url,path.join(cache,'node-android.zip'),lock.node.sha256);
+await download(lock.jna.url,path.join(cache,'jna.aar'),lock.jna.sha256);
+for(const [key,license]of Object.entries(lock.licenses))await download(license.url,path.join(cache,key+'-LICENSE'),license.sha256);
+for(const archive of Object.values(lock.codex.archives))await download(archive.url,path.join(cache,archive.file),archive.sha256);
+const target=path.join(root,'.cache/android-node');await fs.mkdir(target,{recursive:true});await fs.copyFile(path.join(root,'android/node-package.json'),path.join(target,'package.json'));console.log('Android runtime archives ready; install locked JavaScript dependencies in .cache/android-node.');

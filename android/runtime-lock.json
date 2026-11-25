@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "node": {
+    "version": "24.22.1-0",
+    "source": "https://github.com/fogtape/nodejs-mobile/tree/v24.22.1-0",
+    "url": "https://github.com/fogtape/nodejs-mobile/releases/download/v24.22.1-0/nodejs-mobile-android-24.22.1-0.zip",
+    "sha256": "d6fd9f610fe5d81fede8f0d400c5a62723247725a19831835f15abf4f0604250",
+    "upstream": "https://github.com/nodejs-mobile/nodejs-mobile",
+    "prerelease": true
+  },
+  "codex": {
+    "version": "0.172.0",
+    "packages": [
+      "@openai/codex-linux-arm64",
+      "@openai/codex-linux-x64"
+    ],
+    "archives": {
+      "aarch64": {
+        "url": "https://github.com/openai/codex/releases/download/rust-v0.172.0/codex-app-server-aarch64-unknown-linux-musl.tar.gz",
+        "file": "codex-app-server-aarch64.tar.gz",
+        "sha256": "0eebb5d265b0d03bb7fe1ab86b53ea78e4a21a0b3e6d3f2de576ae46d97082d0",
+        "member": "codex-app-server-aarch64-unknown-linux-musl",
+        "elfSha256": "936426ca8ecc5690fc74d800203339607ee793c130d8cbf00d2d37b6f188e7b7"
+      },
+      "x86_64": {
+        "url": "https://github.com/openai/codex/releases/download/rust-v0.172.0/codex-app-server-x86_64-unknown-linux-musl.tar.gz",
+        "file": "codex-app-server-x86_64.tar.gz",
+        "sha256": "9675313ed4bec5e1dcc99a399cb6eee4b7bc269536a36a6a2df207202737c9d7",
+        "member": "codex-app-server-x86_64-unknown-linux-musl",
+        "elfSha256": "655bd2929df7731b065db1b9c2e6ecbf9acff22fac882f4239fab303757ac8c7"
+      }
+    }
+  },
+  "abis": [
+    "arm64-v8a",
+    "x86_64"
+  ],
+  "minSdk": 29,
+  "targetSdk": 36,
+  "applicationId": "cn.houtu.studio",
+  "jna": {
+    "version": "5.19.1",
+    "url": "https://repo.maven.apache.org/maven2/net/java/dev/jna/jna/5.19.1/jna-5.19.1.aar",
+    "sha256": "b57125cb7d16253f0d65a80f7d3a4c3664effa711b8bdbb7f87fb572ce1624ed"
+  },
+  "licenses": {
+    "node": {
+      "url": "https://raw.githubusercontent.com/fogtape/nodejs-mobile/v24.22.1-0/LICENSE",
+      "sha256": "c373dabed995013e091b1908996a69a1647ef19d400e6c1fd4b7fb06d8bc0f66"
+    },
+    "codex": {
+      "url": "https://raw.githubusercontent.com/openai/codex/rust-v0.172.0/LICENSE",
+      "sha256": "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc"
+    }
+  }
+}

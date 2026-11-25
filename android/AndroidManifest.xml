@@ -1,0 +1,16 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="cn.houtu.studio" android:versionCode="12100" android:versionName="1.21.0">
+ <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="36"/>
+ <uses-permission android:name="android.permission.INTERNET"/>
+ <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+ <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+ <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+ <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+ <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+ <application android:label="厚涂小站" android:theme="@style/AppTheme" android:icon="@drawable/app_icon" android:allowBackup="false" android:largeHeap="true" android:extractNativeLibs="true" android:usesCleartextTraffic="false" android:networkSecurityConfig="@xml/network_security" android:supportsRtl="true">
+  <activity android:name=".MainActivity" android:exported="true" android:windowSoftInputMode="adjustResize" android:configChanges="orientation|screenSize|keyboardHidden|uiMode">
+   <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+  </activity>
+  <service android:name=".RuntimeService" android:exported="false" android:foregroundServiceType="dataSync"/>
+  <provider android:name=".UpdateProvider" android:authorities="cn.houtu.studio.updates" android:exported="false" android:grantUriPermissions="true"/>
+ </application>
+</manifest>

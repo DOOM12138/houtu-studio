@@ -1,5 +1,6 @@
 import {superresModels} from './backend/super-resolution.mjs';
 import {SoftwareUpdates} from './backend/software-updates.mjs';
+import {localAccessAllowed} from './lib/local-access.mjs';
 import {APP_VERSION} from './lib/app-version.mjs';
 import {exportProjectPhotos,backupProject,restoreProject} from './backend/studio-archive.mjs';
 import {StudioService} from './backend/studio.mjs';
@@ -61,14 +62,15 @@ const publicJob = j => ({ requestKey:j.requestKey||null,pipelineParentId:j.pipel
   created: j.created, message: j.message, sourceUrl: `/images/${j.id}/source.${j.extension}`,
   outputUrl: j.output ? `/images/${j.id}/${j.output}` : null });
 
-export async function createApp({ directory = path.join(ROOT, 'data'), bridge: suppliedBridge, packageBuilder = buildPortable, composeImage = finishEditImage, platform: suppliedPlatform,targetAnalyzer:suppliedTargetAnalyzer,upscaleProcess,updatesFetcher,automaticUpdateChecks=!suppliedBridge } = {}) {
+export async function createApp({ directory = path.join(ROOT, 'data'), bridge: suppliedBridge, packageBuilder = buildPortable, composeImage = finishEditImage, platform: suppliedPlatform,targetAnalyzer:suppliedTargetAnalyzer,upscaleProcess,updatesFetcher,automaticUpdateChecks=!suppliedBridge, localAccessToken=null, vision:suppliedVision=null, clientPlatform='desktop' } = {}) {
+  if(clientPlatform==='android'&&(typeof localAccessToken!=='string'||localAccessToken.length<16))throw Error('手机工作台缺少本机访问密钥。');
   const home = path.join(directory, 'codex');
   const jobsDirectory = path.join(directory, 'jobs');
   await mkdir(jobsDirectory, { recursive: true });await mkdir(home,{recursive:true});
   const accounts=new AccountLedger(directory);await accounts.load();
   const library=new ImageLibrary(directory);await library.load();
   const bridge = trackedBridge(suppliedBridge || new CodexBridge(home),accounts);
-  const startedAt=Date.now();let studio;const targetVision=new TargetVision(()=>{const address=server.address();if(!address)throw Error('服务尚未启动。');return 'http://127.0.0.1:'+address.port;});
+  const startedAt=Date.now();let studio;const targetVision=suppliedVision||new TargetVision(()=>{const address=server.address();if(!address)throw Error('服务尚未启动。');return 'http://127.0.0.1:'+address.port;});
   const csrf = randomBytes(32).toString('hex');
   const jobs = new Map();
   const instanceId = randomUUID();
@@ -279,6 +281,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
   if(automaticUpdateChecks)updates.startAutomatic();
   const server = http.createServer(async (req, res) => {
     const host = req.headers.host || '';
+    if(!localAccessAllowed(req.headers,localAccessToken))return json(res,401,{error:'请从本应用打开本机工作台。'});
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('Cache-Control', 'no-store');
@@ -287,7 +290,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     let trackedOperation=false;
     try {
       const url = new URL(req.url, `http://${host}`);
-      const route = url.pathname;if(isClosing&&!['/api/health','/api/shutdown'].includes(route))return json(res,503,{error:'网站正在停止，请稍后重开。'});
+      const route = url.pathname;if(clientPlatform==='android'&&(route==='/api/packages'||route.startsWith('/downloads/package/')||/^\/api\/updates\/(prepare|apply|rollback)$/.test(route)))return json(res,409,{error:'安卓版请使用应用菜单中的安卓版更新。'});if(isClosing&&!['/api/health','/api/shutdown'].includes(route))return json(res,503,{error:'网站正在停止，请稍后重开。'});
       if (!['GET', 'POST'].includes(req.method)) return json(res, 405, { error: '不支持的请求。' });
       if(req.method==='POST'&&(studio.active||studio.archiving)&&!route.startsWith('/api/studio/')&&route!=='/api/shutdown'&&!route.startsWith('/api/updates/')&&!/^\/api\/jobs\/[a-f0-9-]{36}\/cancel$/.test(route))return json(res,409,{error:'照片流程正在运行，请先完成本步并暂停。'});
       if (req.method === 'POST') {
@@ -341,7 +344,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       }
       const studioDownload=/^\/api\/studio\/downloads\/([a-f0-9-]{36})$/.exec(route);
       if(studioDownload&&req.method==='GET'){const receipt=JSON.parse(await readFile(path.join(studio.directory,'exports',studioDownload[1]+'.json'),'utf8')),file=path.join(studio.directory,'exports',studioDownload[1]+(receipt.kind==='backup'?'.jsondata':'.zip'));res.writeHead(200,{'Content-Type':receipt.kind==='backup'?'application/json':'application/zip','Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(receipt.name)}`,'Content-Length':(await stat(file)).size});await pipeline(createReadStream(file),res);return;}
-      if (route === '/api/health' && req.method === 'GET') return json(res, 200, { app: 'houtu-studio', version: APP_VERSION, instanceId, csrf });
+      if (route === '/api/health' && req.method === 'GET') return json(res, 200, { app: 'houtu-studio', version: APP_VERSION, instanceId, csrf, clientPlatform });
       if(route==='/api/portrait/source'&&req.method==='GET'){
         const auditId=url.searchParams.get('audit');if(auditId){const w=await workflows.get(auditId);if(w.kind!=='portrait-audit')throw new Error('不是人物检查工作流。');const assetId=w.steps[0].output?.imageAsset;if(!assetId)throw new Error('检查原图尚未保存。');return json(res,200,{workflowId:w.id,assetId,url:`/api/workflows/${w.id}/assets/${assetId}`,name:w.name,auditId:w.id,diagnosis:w.steps.find(n=>n.id==='diagnose').status==='done'?w.steps.find(n=>n.id==='diagnose').output:null});}
         const id=url.searchParams.get('workflow'),assetId=url.searchParams.get('asset');await resolvePicture({source:{kind:'workflow',workflowId:id,assetId}},{jobs,workflows});const w=await workflows.get(id);return json(res,200,{workflowId:id,assetId,url:`/api/workflows/${id}/assets/${assetId}`,name:w.name});
@@ -574,11 +577,11 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       } else if (req.method === 'GET' && /^\/models\/(selfie_multiclass_256x256\.tflite|face_landmarker\.task|hand_landmarker\.task)$/.test(route)) {
         file=path.join(ROOT,'models',path.basename(route));
       } else {
-        const files = { '/superres-options.js':'superres-options.js', '/superres.css':'superres.css', '/editor-layout.css':'editor-layout.css', '/image-viewer.js':'image-viewer.js','/view-geometry.js':'view-geometry.js','/image-viewer.css':'image-viewer.css', '/update-notice.js':'update-notice.js','/update-notice.css':'update-notice.css', '/paint-profile.js':'paint-profile.js','/feature-expansion.js':'feature-expansion.js','/prompt-contract.js':'prompt-contract.js','/feature-ui.js':'feature-ui.js','/target-policy.js':'target-policy.js','/target-masks.js':'target-masks.js','/vision-target.html':'vision-target.html', '/': 'index.html', '/app.js': 'app.js', '/catalog.js': 'catalog.js', '/style.css': 'style.css', '/favicon.svg': 'favicon.svg','/portrait-options.js':'portrait-options.js','/portrait-ui.js':'portrait-ui.js','/model-picker.js':'model-picker.js','/model-options.js':'model-options.js','/scene-options.js':'scene-options.js','/belly-options.js':'belly-options.js','/scene-ui.js':'scene-ui.js','/subject-mask.js':'subject-mask.js' };
+        const files = { '/android-shell.js':'android-shell.js','/android-shell.css':'android-shell.css','/superres-options.js':'superres-options.js', '/superres.css':'superres.css', '/editor-layout.css':'editor-layout.css', '/image-viewer.js':'image-viewer.js','/view-geometry.js':'view-geometry.js','/image-viewer.css':'image-viewer.css', '/update-notice.js':'update-notice.js','/update-notice.css':'update-notice.css', '/paint-profile.js':'paint-profile.js','/feature-expansion.js':'feature-expansion.js','/prompt-contract.js':'prompt-contract.js','/feature-ui.js':'feature-ui.js','/target-policy.js':'target-policy.js','/target-masks.js':'target-masks.js','/vision-target.html':'vision-target.html', '/': 'index.html', '/app.js': 'app.js', '/catalog.js': 'catalog.js', '/style.css': 'style.css', '/favicon.svg': 'favicon.svg','/portrait-options.js':'portrait-options.js','/portrait-ui.js':'portrait-ui.js','/model-picker.js':'model-picker.js','/model-options.js':'model-options.js','/scene-options.js':'scene-options.js','/belly-options.js':'belly-options.js','/scene-ui.js':'scene-ui.js','/subject-mask.js':'subject-mask.js' };
         if (!Object.hasOwn(files, route) || req.method !== 'GET') return json(res, 404, { error: '页面不存在。' });
         file = path.join(ROOT, 'public', files[route]);
       }
-      const bytes = await readFile(file);
+      let bytes = await readFile(file);if(clientPlatform==='android'&&path.extname(file)==='.html')bytes=Buffer.from(bytes.toString('utf8').replace('<head>','<head><script src="/android-shell.js"></script><link rel="stylesheet" href="/android-shell.css">'));
       res.writeHead(200, { 'Content-Type': ({'.mjs':'text/javascript; charset=utf-8','.wasm':'application/wasm'})[path.extname(file)] || MIME[path.extname(file)] || 'application/octet-stream' }); res.end(bytes);
     } catch (error) {
       if (!res.headersSent) json(res, error.code === 'ENOENT' ? 404 : error.status || 400, { error: friendlyError(error.message),...(error.workflowId?{workflowId:error.workflowId}:{}) });
@@ -597,7 +600,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
     try { const record = JSON.parse(await readFile(path.join(directory, 'server.json'), 'utf8')); if (record.instanceId === instanceId) await unlink(path.join(directory, 'server.json')); } catch {}
   })();
-  return { server, bridge, studio, targetVision, updates, instanceId, close };
+  return { server, bridge, studio, targetVision, updates, instanceId, close, isBusy:()=>Boolean(active||activePackage||critiqueActive||studio.active||studio.archiving) };
 }
 
 export function friendlyError(message = '') {

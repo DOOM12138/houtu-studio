@@ -1,4 +1,5 @@
 ﻿import path from 'node:path';
+import {archivePortable} from '../lib/mobile-archive.mjs';
 import {spawn} from 'node:child_process';
 import {randomUUID,createHash} from 'node:crypto';
 import {mkdir,readFile,writeFile,copyFile,rm,stat,readdir} from 'node:fs/promises';
@@ -11,7 +12,7 @@ import {FLOW_STEPS} from './workflows.mjs';
 import sharp from 'sharp';
 const ROOT=fileURLToPath(new URL('../',import.meta.url));
 export async function hashFile(file){const hash=createHash('sha256');for await(const bytes of createReadStream(file))hash.update(bytes);return hash.digest('hex');}
-export async function archiveFolder(source,target){await new Promise((resolve,reject)=>{const child=spawn(powershell(),['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.join(ROOT,'scripts','archive.ps1'),'-Source',source,'-Destination',target],{cwd:ROOT,windowsHide:true,stdio:['ignore','ignore','pipe']});child.stderr.resume();child.on('error',reject);child.on('exit',code=>code===0?resolve():reject(Error('项目压缩失败，请检查目录和磁盘空间。')));});}
+export async function archiveFolder(source,target){if(process.platform==='android')return archivePortable(source,target);await new Promise((resolve,reject)=>{const child=spawn(powershell(),['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.join(ROOT,'scripts','archive.ps1'),'-Source',source,'-Destination',target],{cwd:ROOT,windowsHide:true,stdio:['ignore','ignore','pipe']});child.stderr.resume();child.on('error',reject);child.on('exit',code=>code===0?resolve():reject(Error('项目压缩失败，请检查目录和磁盘空间。')));});}
 async function exportProjectPhotosInternal(studio,id,photoIds){
  const project=await studio.get(id),selected=photoIds||project.photos.filter(photo=>photo.selected&&photo.flag!=='reject').map(photo=>photo.id);if(!Array.isArray(selected)||!selected.length||selected.some(value=>!project.photos.some(photo=>photo.id===value)))throw Error('请选择需要导出的照片。');
  const archiveId=randomUUID(),temporary=path.join(ROOT,'tmp','studio-delivery-'+archiveId),output=path.join(studio.directory,'exports',archiveId+'.zip');await mkdir(temporary,{recursive:true});const names=new Set();let count=0;

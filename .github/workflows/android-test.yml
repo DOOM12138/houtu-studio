@@ -1,0 +1,72 @@
+name: Validate standalone Android
+on:
+  workflow_dispatch:
+  push:
+    branches: ['feat/android-standalone']
+permissions:
+  contents: read
+concurrency:
+  group: android-test-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '25.2.1'}
+      - uses: actions/setup-java@v4
+        with: {distribution: 'temurin', java-version: '21'}
+      - run: npm ci
+      - name: Install Android SDK build components
+        shell: pwsh
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .cache/android
+            .cache/android-node
+          key: android-runtime-${{ hashFiles('android/runtime-lock.json', 'android/node-package-lock.json') }}
+      - name: Build isolated x86_64 test APK
+        shell: pwsh
+        run: node scripts/project-node.mjs scripts/build-android.mjs --abi x86_64 --sdk $env:ANDROID_HOME --jdk $env:JAVA_HOME --probe --debug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-test-apk
+          path: release/*-Android-x86_64-test.apk
+          retention-days: 3
+  device:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '25.2.1'}
+      - uses: actions/download-artifact@v4
+        with: {name: android-test-apk, path: release}
+      - run: npm ci
+      - name: Enable KVM for isolated Android emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          target: google_apis
+          profile: pixel_7
+          ram-size: 4096M
+          heap-size: 512M
+          disk-size: 4096M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          script: node scripts/project-node.mjs test/android-smoke.mjs release/houtu-studio-1.21.0-Android-x86_64-test.apk
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-device-report
+          path: tmp/android-device-report
+          retention-days: 7
