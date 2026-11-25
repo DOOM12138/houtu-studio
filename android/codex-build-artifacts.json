@@ -1,0 +1,10 @@
+{
+  "repository": "DOOM12138/houtu-studio",
+  "runId": 45540107727,
+  "workflow": ".github/workflows/android-codex.yml",
+  "commit": "7ba313c1cd1c5446e6d77c533a91328dbce52fed",
+  "artifacts": {
+    "x86_64": {"id": 14990378467, "sha256": "6e697000918606350ae840d321699ad160b8dbfe12cac36960ad8fc1589a7c84"},
+    "aarch64": {"id": 14991316514, "sha256": "d33c36cd74fc616f52b1cd762969499bf3268cebeb0499d39f5c0d8a059a2988"}
+  }
+}

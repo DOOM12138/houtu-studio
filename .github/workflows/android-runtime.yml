@@ -1,0 +1,44 @@
+name: Preserve verified Android native runtime
+on:
+  workflow_dispatch:
+  push:
+    branches: ['feat/android-standalone']
+    paths: ['.github/workflows/android-runtime.yml']
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: android-runtime-0.172.0-r1
+  cancel-in-progress: false
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: DOOM12138/houtu-studio
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify the exact source build receipt
+        run: |
+          gh api repos/DOOM12138/houtu-studio/actions/runs/45540107727 > build-run.json
+          python3 -c "import json; r=json.load(open('build-run.json')); p=json.load(open('android/codex-build-artifacts.json')); assert r['conclusion']=='success' and r['head_sha']==p['commit'] and r['path']==p['workflow']"
+      - name: Download the two immutable build artifacts
+        run: |
+          gh api repos/DOOM12138/houtu-studio/actions/artifacts/14990378467/zip > x64.zip
+          gh api repos/DOOM12138/houtu-studio/actions/artifacts/14991316514/zip > arm64.zip
+      - name: Verify both ELF files and make persistent runtime packages
+        run: python3 scripts/package-android-client.py --x64 x64.zip --arm64 arm64.zip
+      - name: Upload the prepared draft and publish as a build dependency
+        run: |
+          test "$(gh release view android-runtime-v0.172.0-r1 --json isDraft --jq .isDraft)" = true
+          gh release upload android-runtime-v0.172.0-r1 release/android-client-runtime/*
+          gh release view android-runtime-v0.172.0-r1 --json assets > uploaded.json
+          python3 -c "import json,pathlib; a=json.load(open('uploaded.json'))['assets']; p=pathlib.Path('release/android-client-runtime'); assert {x['name']:x['size'] for x in a}=={f.name:f.stat().st_size for f in p.iterdir()}"
+          gh release edit android-runtime-v0.172.0-r1 --draft=false --prerelease --latest=false
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-native-runtime-manifest
+          path: release/android-client-runtime/manifest.json
+          retention-days: 30
