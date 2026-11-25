@@ -1,5 +1,5 @@
 import fs from 'node:fs/promises';import path from 'node:path';import {fileURLToPath} from 'node:url';import {createHash} from 'node:crypto';
-const root=process.env.HOUTU_RUNTIME_ROOT||fileURLToPath(new URL('../',import.meta.url));process.chdir(root);await fs.mkdir(path.join(root,'tmp'),{recursive:true});
+const root=await fs.realpath(process.env.HOUTU_RUNTIME_ROOT||fileURLToPath(new URL('../',import.meta.url)));process.chdir(root);await fs.mkdir(path.join(root,'tmp'),{recursive:true});
 try{
  const sharp=(await import('sharp')).default;sharp.concurrency(1);sharp.cache({memory:24,files:8,items:16});
  const {createApp}=await import('../server.mjs'),{CodexBridge}=await import('../lib/codex.mjs'),{personMaskIntegrity}=await import('../backend/mask-integrity.mjs');

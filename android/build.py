@@ -1,6 +1,7 @@
 """Build the standalone APK from pinned local runtime archives; never reads user data."""
-import argparse,hashlib,json,os,pathlib,secrets,shutil,subprocess,tarfile,zipfile,sys
+import argparse,hashlib,json,os,pathlib,secrets,shutil,subprocess,tarfile,zipfile,sys,re
 ROOT=pathlib.Path(__file__).resolve().parent.parent
+VERSION=json.loads((ROOT/'package.json').read_text('utf-8'))['version'];parts=[int(v) for v in VERSION.split('.')];assert len(parts)==3 and parts[1]<100 and parts[2]<100;VERSION_CODE=parts[0]*10000+parts[1]*100+parts[2]
 parser=argparse.ArgumentParser();parser.add_argument('--abi',choices=['arm64-v8a','x86_64'],default='arm64-v8a');parser.add_argument('--sdk',default=os.environ.get('ANDROID_SDK_ROOT',os.environ.get('ANDROID_HOME','')));parser.add_argument('--jdk',default=os.environ.get('JAVA_HOME',''));parser.add_argument('--probe',action='store_true');parser.add_argument('--debug',action='store_true');args=parser.parse_args()
 SDK=pathlib.Path(args.sdk);JDK=pathlib.Path(args.jdk);BT=SDK/'build-tools/36.0.0';ANDROID=SDK/'platforms/android-36/android.jar';WORK=ROOT/'tmp/android-build'/args.abi;CACHE=ROOT/'.cache/android';DEPS=ROOT/'.cache/android-node/node_modules'
 if not ANDROID.is_file() or not (JDK/'bin/java.exe').is_file():raise SystemExit('Android SDK 36 and a JDK 21 path are required; use --sdk and --jdk.')
@@ -45,7 +46,7 @@ def run(*cmd):
     if result.stdout:sys.stdout.buffer.write(result.stdout);sys.stdout.flush()
     result.check_returncode()
 resources=WORK/'resources.zip';run(BT/'aapt2.exe','compile','--dir',ROOT/'android/res','-o',resources)
-manifest=(ROOT/'android/AndroidManifest.xml').read_text('utf-8')
+manifest=(ROOT/'android/AndroidManifest.xml').read_text('utf-8');manifest=re.sub(r'android:versionCode="[^"]+"','android:versionCode="'+str(VERSION_CODE)+'"',manifest);manifest=re.sub(r'android:versionName="[^"]+"','android:versionName="'+VERSION+'"',manifest)
 if args.debug:manifest=manifest.replace('<application ','<application android:debuggable="true" ')
 (WORK/'AndroidManifest.xml').write_text(manifest,encoding='utf-8')
 unsigned=WORK/'unsigned.apk';run(BT/'aapt2.exe','link','-o',unsigned,'-I',ANDROID,'--manifest',WORK/'AndroidManifest.xml','-A',WORK/'assets',resources)
@@ -62,6 +63,9 @@ signing=ROOT/'data/android-signing';signing.mkdir(parents=True,exist_ok=True);pa
 if not password.exists():password.write_text(secrets.token_hex(32),encoding='ascii')
 env['HOUTU_ANDROID_STOREPASS']=password.read_text('ascii').strip()
 if not key.exists():run(JDK/'bin/keytool.exe','-genkeypair','-keystore',key,'-storetype','PKCS12','-storepass:env','HOUTU_ANDROID_STOREPASS','-keypass:env','HOUTU_ANDROID_STOREPASS','-alias','houtu','-keyalg','RSA','-keysize','3072','-validity','10000','-dname','CN=Houtu Studio, O=Houtu Studio')
-version='1.21.0';output=ROOT/'release'/('houtu-studio-'+version+'-Android-'+args.abi+('-test' if args.debug else '')+'.apk');output.parent.mkdir(exist_ok=True)
+version=VERSION;output=ROOT/'release'/('houtu-studio-'+version+'-Android-'+args.abi+('-test' if args.debug else '')+'.apk');output.parent.mkdir(exist_ok=True)
+if env.get('HOUTU_ANDROID_RELEASE')=='1':
+    cert=subprocess.run([str(JDK/'bin/keytool.exe'),'-exportcert','-keystore',str(key),'-alias','houtu','-storepass:env','HOUTU_ANDROID_STOREPASS'],cwd=ROOT,env=env,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE).stdout
+    expected=json.loads((ROOT/'android/signing-certificate.json').read_text('utf-8'))['sha256'];assert hashlib.sha256(cert).hexdigest()==expected,'Official Android signing certificate mismatch'
 run(BT/'apksigner.bat','sign','--ks',key,'--ks-key-alias','houtu','--ks-pass','env:HOUTU_ANDROID_STOREPASS','--key-pass','env:HOUTU_ANDROID_STOREPASS','--out',output,aligned);run(BT/'apksigner.bat','verify','--verbose','--print-certs',output)
 print(json.dumps({'apk':str(output),'sha256':hashlib.sha256(output.read_bytes()).hexdigest(),'bytes':output.stat().st_size,'abi':args.abi,'standalone':True,'files':count}))

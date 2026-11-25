@@ -3,7 +3,7 @@ import path from 'node:path';import fs from 'node:fs/promises';import {fileURLTo
 import {SR_MODELS,SR_VERSION,superresOptions,superresDimensions} from '../public/superres-options.js';import {projectEnvironment} from '../lib/project-env.mjs';import {fileHash,inside} from './update-package.mjs';
 const ROOT=fileURLToPath(new URL('../',import.meta.url)),hash=b=>createHash('sha256').update(b).digest('hex');
 export async function superresModels(){return {version:SR_VERSION,runtime:process.platform==='android'?'onnxruntime-web 1.31.1 · Android CPU/WASM':'onnxruntime-node 1.31.1 · CPU',local:true,models:await Promise.all(SR_MODELS.map(async m=>{let ready=false;try{ready=await fileHash(path.join(ROOT,'models/superres',m.file))===m.sha256;}catch{}return {...m,ready,license:'BSD-3-Clause'};}))};}
-export async function superresProcess(bytes,input,{directory,onProgress=()=>{},cancelled=()=>false,timeoutMs=45*60*1000,tileSize=192}={}){
+export async function superresProcess(bytes,input,{directory,onProgress=()=>{},cancelled=()=>false,timeoutMs=45*60*1000,tileSize=process.platform==='android'?96:192}={}){
  if(!Buffer.isBuffer(bytes)||bytes.length>110*1024*1024)throw Error('超分输入文件超过110MB或格式无效。');const options=superresOptions(input),model=SR_MODELS.find(m=>m.id===options.model);if(options.engineVersion!==SR_VERSION||options.modelSha256!==model.sha256)throw Error('此配方记录了其他模型或引擎版本；请明确建立使用当前模型的新版本，不能静默替换。');
  if(!directory)throw Error('缺少超分工作流目录。');if(cancelled())throw Object.assign(Error('本机超分已暂停。'),{code:'SR_CANCELLED'});
  const base=path.resolve(directory);if(!inside(ROOT,base))throw Error('超分工作目录必须在项目内。');let prefix=ROOT;

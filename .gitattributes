@@ -19,3 +19,4 @@
 vendor-licenses/** -whitespace
 
 *.onnx binary
+*.so binary

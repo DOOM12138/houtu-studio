@@ -8,6 +8,8 @@
 /.impeccable/
 /runtime/
 /node_modules/
+__pycache__/
+*.pyc
 /defaults/
 *.log
 .env
