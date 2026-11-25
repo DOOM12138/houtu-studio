@@ -5,8 +5,8 @@ const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text)n.textCo
 const label=(text,control)=>{const l=node('label',text);l.append(control);return l;};
 const select=(id,items,value)=>{const s=node('select');s.id=id;for(const [v,t]of items)s.append(new Option(t,v));s.value=value;return s;};
 export function createStudioPlanner({mount,api,context,notify,onApplied,onRecipe,onRun}){
- const panel=node('details',null,'studio-planner');panel.id='studio-planner';panel.append(node('summary','智能调度 · 识别、拆分与跑图'));
- const intro=node('p','为所选1–5张原图分别安排流程，保留旧版本。先规划不生成图片，也可规划后连续跑图。','hint');panel.append(intro);
+ const panel=node('details',null,'studio-planner');panel.id='studio-planner';panel.append(node('summary','经典配方规划 · 识别与拆分'));
+ const intro=node('p','经典配方保留原来的视觉模型＋规则／云端规划路线。按显卡配置自动调度、由本地视觉Agent检查的功能在“Agent”面板。这里仍可为1–5张原图规划旧版配方，保留旧版本。','hint');panel.append(intro);
  const form=node('div',null,'studio-planner-form');
  const provider=select('planner-provider',[['auto','按电脑能力选择'],['local','本机视觉模型＋规则'],['chatgpt','ChatGPT审美规划']],'auto');
  const providerHint=node('p','展开后检测本机模型与内存。','hint');providerHint.id='planner-capacity';

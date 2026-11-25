@@ -1,5 +1,7 @@
 # 前后端与运行边界
 
+GPU路由：`backend/agent-hardware.mjs`通过`scripts/probe-agent-gpu.ps1`的DXGI 64位显存和nvidia-smi读实际资源；`backend/local-retouch-agent.mjs`管理项目独立、锁定版本的Ollama/Qwen3-VL，真实GPU驻留验证和JSON/权限边界；`backend/agent-cloud.mjs`提供无本地模型的云端蒙版和细节增强。所有调用仍进入RetouchAgents检查点、图片请求账本与勾选范围校验；旧版配置不强制迁移。
+
 本项目是个人本机图片工作台。桌面默认一个进程在 127.0.0.1:4317 同时托管静态页面与 JSON API，面向本机用户。安卓版在手机内部运行同一前后端协议，使用私有随机端口和原生注入的本机访问密钥。
 
 Windows 1.22的桌面宿主在desktop/Host.cs，安装构建及生命周期边界见desktop/README.md。运行库全部放已有runtime目录以兼容ZIP校验；桌面更新等待宿主释放DLL后替换并恢复窗口，data仍在程序根目录保留。

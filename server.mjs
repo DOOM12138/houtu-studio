@@ -10,6 +10,8 @@ import {exportProjectPhotos,backupProject,restoreProject} from './backend/studio
 import {StudioService} from './backend/studio.mjs';
 import {StudioPlanner} from './backend/studio-planner.mjs';
 import {RetouchAgents} from './backend/retouch-agents.mjs';
+import {AgentHardware} from './backend/agent-hardware.mjs';
+import {LocalRetouchAgent} from './backend/local-retouch-agent.mjs';
 import {recipeValue,recipeReport} from './backend/studio-recipe.mjs';
 import {safeName} from './backend/local-image.mjs';
 import sharp from 'sharp';
@@ -68,7 +70,7 @@ const publicJob = j => ({ requestKey:j.requestKey||null,pipelineParentId:j.pipel
   created: j.created, message: j.message, sourceUrl: `/images/${j.id}/source.${j.extension}`,
   outputUrl: j.output ? `/images/${j.id}/${j.output}` : null });
 
-export async function createApp({ directory = path.join(ROOT, 'data'), bridge: suppliedBridge, packageBuilder = buildPortable, composeImage = finishEditImage, platform: suppliedPlatform,targetAnalyzer:suppliedTargetAnalyzer,upscaleProcess,updatesFetcher,automaticUpdateChecks=!suppliedBridge, localAccessToken=null, vision:suppliedVision=null, clientPlatform='desktop',agentMask,agentSearch,agentFetchAsset } = {}) {
+export async function createApp({ directory = path.join(ROOT, 'data'), bridge: suppliedBridge, packageBuilder = buildPortable, composeImage = finishEditImage, platform: suppliedPlatform,targetAnalyzer:suppliedTargetAnalyzer,upscaleProcess,updatesFetcher,automaticUpdateChecks=!suppliedBridge, localAccessToken=null, vision:suppliedVision=null, clientPlatform='desktop',agentMask,agentSearch,agentFetchAsset,agentHardware,localRetouchAgent } = {}) {
   if(clientPlatform==='android'&&(typeof localAccessToken!=='string'||localAccessToken.length<16))throw Error('手机工作台缺少本机访问密钥。');
   const home = path.join(directory, 'codex');
   const jobsDirectory = path.join(directory, 'jobs');
@@ -280,7 +282,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
   };
   studio=new StudioService({directory,workflows,adapter:{upscale:upscaleProcess,isBusy:()=>Boolean(active||activePackage||critiqueActive||managedJobs.size),startRetouch,findRequest:key=>{const job=findRequest(key);return job?publicJob(job):null;},getJob:id=>jobs.has(id)?publicJob(jobs.get(id)):null,recompose:recomposeManaged,authorize:async expected=>{if(!await bridge.account())throw Error('请先登录本站ChatGPT账号。');const control={account:expected};bridge.capture(control);return control.account;}}});await studio.load();
   planner=new StudioPlanner({root:ROOT,studio,workflows,bridge,acquire:id=>{if(runtimeBusy()||login||isClosing)return false;active='planner-'+id;return true;},release:id=>{if(active==='planner-'+id)active=null;}});
-  agents=new RetouchAgents({studio,workflows,bridge,platform,mask:agentMask,search:agentSearch,fetchAsset:agentFetchAsset,upscale:upscaleProcess,
+  agents=new RetouchAgents({studio,workflows,bridge,platform,mask:agentMask,search:agentSearch,fetchAsset:agentFetchAsset,upscale:upscaleProcess,hardware:agentHardware||new AgentHardware(),localAgent:localRetouchAgent||new LocalRetouchAgent({root:ROOT,directory:path.join(directory,'local-agent')}),
    acquirePrepare:id=>{if(runtimeBusy()||login||isClosing)return false;active='agent-'+id;return true;},releasePrepare:id=>{if(active==='agent-'+id)active=null;},
    render:{findRequest:key=>{const j=findRequest(key);return j?publicJob(j):null;},getJob:id=>jobs.has(id)?publicJob(jobs.get(id)):null,
     capacity:owner=>agents.owns(owner)&&studio.active?.projectId===owner.projectId&&!active&&!activePackage&&!critiqueActive&&managedJobs.size<2,
@@ -345,6 +347,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
           return json(res,201,{projectId:project.id,photoId:photo.id,workflowId:photo.workflowId,url:'/upscale/?project='+project.id});
         }finally{if(active===reservation)active=null;}
       }
+      if(route==='/api/retouch-agent-capabilities'&&req.method==='GET')return json(res,200,await agents.capabilities({refresh:url.searchParams.get('refresh')==='1',model:url.searchParams.get('model')||'auto'}));
       if(route==='/api/studio/projects'&&req.method==='GET')return json(res,200,{projects:studio.list(),active:studio.active?{projectId:studio.active.projectId,currentPhoto:studio.active.currentPhoto,currentStep:studio.active.currentStep}:null});
       const agentCreate=/^\/api\/studio\/projects\/([a-f0-9-]{36})\/agents$/.exec(route);
       if(agentCreate&&req.method==='POST')return json(res,202,await agents.start(agentCreate[1],await body(req,100000)));
