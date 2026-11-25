@@ -1,0 +1,35 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
+import {createHash} from 'node:crypto';
+import {fileURLToPath} from 'node:url';
+import sharp from 'sharp';
+import {projectEnvironment} from '../lib/project-env.mjs';
+const exec=promisify(execFile),root=fileURLToPath(new URL('../',import.meta.url));
+export async function desktopTools(){
+ const environment=projectEnvironment(root),cache=path.join(root,'.cache/desktop'),lock=JSON.parse(await fs.readFile(path.join(root,'desktop/runtime-lock.json')));await fs.mkdir(cache,{recursive:true});
+ for(const entry of Object.values(lock)){const file=path.join(cache,entry.file);let valid=false;try{valid=createHash('sha256').update(await fs.readFile(file)).digest('hex')===entry.sha256;}catch{}if(!valid){await exec('curl.exe',['--fail','--location','--retry','2','--connect-timeout','15','--max-time','180','--silent','--show-error','--output',file+'.part',entry.url],{cwd:root,env:environment,windowsHide:true});if(createHash('sha256').update(await fs.readFile(file+'.part')).digest('hex')!==entry.sha256)throw Error('Desktop tool checksum mismatch: '+entry.file);await fs.rename(file+'.part',file);}}
+ for(const [file,folder]of [['webview2.nupkg','webview2'],['nsis-3.13.zip','nsis'],['codex-app-server.zip','codex']]){try{await fs.access(path.join(cache,folder));}catch{await exec('python',['-m','zipfile','-e',path.join(cache,file),path.join(cache,folder)],{cwd:root,env:environment,windowsHide:true});}}
+ const bootstrap=path.join(cache,'MicrosoftEdgeWebview2Setup.exe');try{await fs.access(bootstrap);}catch{await exec('curl.exe',['--fail','--location','--connect-timeout','15','--max-time','120','--silent','--show-error','--output',bootstrap,'https://go.microsoft.com/fwlink/p/?LinkId=2124703'],{cwd:root,env:environment,windowsHide:true});}
+ await exec('powershell.exe',['-NoProfile','-NonInteractive','-Command',"$s=Get-AuthenticodeSignature -LiteralPath '.cache/desktop/MicrosoftEdgeWebview2Setup.exe'; if($s.Status -ne 'Valid' -or $s.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation'){throw 'Invalid Microsoft WebView2 bootstrap signature'}"],{cwd:root,env:environment,windowsHide:true});
+ return {cache,environment,bootstrap,compiler:path.join(process.env.WINDIR||'C:/Windows','Microsoft.NET/Framework64/v4.0.30319/csc.exe'),nsis:path.join(cache,'nsis/nsis-3.13/makensis.exe')};
+}
+export async function buildDesktop(){
+ const tool=await desktopTools(),output=path.join(root,'runtime'),sdk=path.join(tool.cache,'webview2/lib/net462'),version=JSON.parse(await fs.readFile(path.join(root,'package.json'))).version;
+ await fs.mkdir(output,{recursive:true});
+ const png=await sharp(path.join(root,'public/favicon.svg')).resize(256,256).png().toBuffer(),header=Buffer.alloc(22);header.writeUInt16LE(1,2);header.writeUInt16LE(1,4);header.writeUInt16LE(1,10);header.writeUInt16LE(32,12);header.writeUInt32LE(png.length,14);header.writeUInt32LE(22,18);const icon=path.join(tool.cache,'houtu.ico');await fs.writeFile(icon,Buffer.concat([header,png]));
+ const assembly=path.join(root,'tmp/desktop-assembly.cs');await fs.writeFile(assembly,'[assembly:System.Reflection.AssemblyTitle("厚涂小站")][assembly:System.Reflection.AssemblyProduct("厚涂小站")][assembly:System.Reflection.AssemblyVersion("'+version+'.0")][assembly:System.Reflection.AssemblyFileVersion("'+version+'.0")]');
+ const args=['/nologo','/target:winexe','/platform:x64','/optimize+','/utf8output','/out:'+path.join(output,'HoutuStudio.exe'),'/win32manifest:'+path.join(root,'desktop/host.manifest'),'/win32icon:'+icon,...['System.dll','System.Core.dll','System.Drawing.dll','System.Windows.Forms.dll','System.Net.Http.dll','System.Web.Extensions.dll'].map(f=>'/reference:'+f),...['Microsoft.Web.WebView2.Core.dll','Microsoft.Web.WebView2.WinForms.dll'].map(f=>'/reference:'+path.join(sdk,f)),assembly,path.join(root,'desktop/Host.cs')];
+ await exec(tool.compiler,args,{cwd:root,env:tool.environment,windowsHide:true,maxBuffer:1024*1024});
+ for(const file of ['Microsoft.Web.WebView2.Core.dll','Microsoft.Web.WebView2.WinForms.dll'])await fs.copyFile(path.join(sdk,file),path.join(output,file));
+ await fs.copyFile(path.join(tool.cache,'webview2/runtimes/win-x64/native/WebView2Loader.dll'),path.join(output,'WebView2Loader.dll'));
+ const codex=path.join(tool.cache,'codex/codex-app-server-x86_64-pc-windows-msvc.exe'),lock=JSON.parse(await fs.readFile(path.join(root,'desktop/runtime-lock.json')));if(createHash('sha256').update(await fs.readFile(codex)).digest('hex')!==lock.codex.elfSha256)throw Error('Official client binary checksum mismatch');await fs.copyFile(codex,path.join(output,'codex-app-server.exe'));
+ await fs.copyFile(tool.bootstrap,path.join(output,'MicrosoftEdgeWebview2Setup.exe'));
+ await fs.copyFile(path.join(root,'desktop/HoutuStudio.exe.config'),path.join(output,'HoutuStudio.exe.config'));
+ const license=path.join(root,'vendor-licenses/desktop');await fs.mkdir(license,{recursive:true});for(const file of ['LICENSE.txt','NOTICE.txt'])await fs.copyFile(path.join(tool.cache,'webview2',file),path.join(license,'WebView2-'+file));await fs.copyFile(path.join(tool.cache,'nsis/nsis-3.13/COPYING'),path.join(license,'NSIS-COPYING.txt'));
+ const files={};for(const name of ['HoutuStudio.exe','HoutuStudio.exe.config','Microsoft.Web.WebView2.Core.dll','Microsoft.Web.WebView2.WinForms.dll','WebView2Loader.dll','MicrosoftEdgeWebview2Setup.exe','codex-app-server.exe'])files[name]=createHash('sha256').update(await fs.readFile(path.join(output,name))).digest('hex');await fs.writeFile(path.join(output,'desktop-build.json'),JSON.stringify({version,files},null,2));
+ console.log(JSON.stringify({desktop:path.join(output,'HoutuStudio.exe'),version,exeBytes:(await fs.stat(path.join(output,'HoutuStudio.exe'))).size}));return tool;
+}
+export async function ensureDesktopRuntime(directory=root){const version=JSON.parse(await fs.readFile(path.join(directory,'package.json'))).version;try{const build=JSON.parse(await fs.readFile(path.join(directory,'runtime/desktop-build.json')));if(build.version!==version)throw Error('Desktop version changed');for(const [name,hash]of Object.entries(build.files)){if(!/^[a-z0-9.-]+$/i.test(name)||createHash('sha256').update(await fs.readFile(path.join(directory,'runtime',name))).digest('hex')!==hash)throw Error('Desktop runtime changed');}return;}catch{}if(path.resolve(directory)!==path.resolve(root))throw Error('缺少与当前版本匹配的桌面运行环境，请使用完整安装包。');await buildDesktop();}
+if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))await buildDesktop();

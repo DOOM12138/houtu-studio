@@ -21,10 +21,10 @@ if (-not $NoShortcut) {
   $shell = New-Object -ComObject WScript.Shell
   $desktop = [Environment]::GetFolderPath('Desktop')
   $shortcut = $shell.CreateShortcut((Join-Path $desktop '厚涂小站.lnk'))
-  $shortcut.TargetPath = Join-Path $installRoot '启动网站.cmd'
+  $shortcut.TargetPath = if (Test-Path -LiteralPath (Join-Path $installRoot 'runtime/HoutuStudio.exe')) { Join-Path $installRoot 'runtime/HoutuStudio.exe' } else { Join-Path $installRoot '启动网站.cmd' }
   $shortcut.WorkingDirectory = $installRoot
   $shortcut.Description = '人物精修与二次元厚涂'
   $shortcut.Save()
 }
 Write-Output ('Deployed to: ' + $installRoot)
-if (-not $NoLaunch) { & (Join-Path $installRoot 'runtime/node.exe') (Join-Path $installRoot 'launcher.mjs') }
+if (-not $NoLaunch) { if (Test-Path -LiteralPath (Join-Path $installRoot 'runtime/HoutuStudio.exe')) { Start-Process -FilePath (Join-Path $installRoot 'runtime/HoutuStudio.exe') -WorkingDirectory $installRoot -WindowStyle Hidden } else { & (Join-Path $installRoot 'runtime/node.exe') (Join-Path $installRoot 'launcher.mjs') } }

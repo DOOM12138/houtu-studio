@@ -6,6 +6,10 @@ set "TMP=%~dp0tmp"
 set "TMPDIR=%~dp0tmp"
 set "npm_config_cache=%~dp0.cache\npm"
 if not exist "%TEMP%" mkdir "%TEMP%"
+if exist "%~dp0runtime\HoutuStudio.exe" (
+  start "" /D "%~dp0" "%~dp0runtime\HoutuStudio.exe"
+  exit /b
+)
 if exist "%~dp0runtime\node.exe" (
   "%~dp0runtime\node.exe" "%~dp0launcher.mjs"
   if errorlevel 1 pause
