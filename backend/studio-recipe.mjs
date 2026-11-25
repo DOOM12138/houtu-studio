@@ -5,6 +5,7 @@ import {normalizeModel} from '../public/model-options.js';
 import {localOptions,exportOptions} from './local-image.mjs';
 import {settings,BUILTINS} from '../frontend/engine.js';
 import {isSceneOperation} from '../public/scene-options.js';
+import {agentOptions,agentBudget} from '../public/retouch-agent-options.js';
 const cleanName=(value,fallback)=>String(value||fallback).trim().slice(0,80)||fallback;
 // Replace matching slots without moving the target's unrelated steps.
 export function mergeRecipeStages(target,source,categories){
@@ -24,12 +25,13 @@ export function recipeValue(input={}){
  let enabled=0;const stages=input.stages.map((stage,index)=>{
   if(!stage||typeof stage!=='object')throw Error('流程步骤无效。');const type=stage.type;let options;
   if(type==='retouch'){options=normalizeEditOptions({...stage.options,model:null,parentId:null});if(stage.enabled!==false&&isSceneOperation(options.operation)&&options.scene.protectSubject&&enabled>0)throw Error('使用主体保护的场照步骤请放在第一步，后续图像变动后需重新确认蒙版。');}
+  else if(type==='agent')options=agentOptions(stage.options);
   else if(type==='upscale')options=superresOptions(stage.options);
   else if(type==='local')options=localOptions(stage.options);
   else if(type==='grade'){if(stage.options?.layers?.length)throw Error('流程全局调色不自动重算照片专属蒙版，请进入调色工作台使用局部图层。');options={settings:settings(stage.options?.settings||stage.options||{}),look:toneChoice(stage.options?.look)};}
   else if(type==='export')options=exportOptions(stage.options);
   else throw Error('不支持的流程步骤。');
-  if(stage.enabled!==false)enabled++;return {id:type==='export'&&index===input.stages.length-1?'deliver':'stage'+(index+1),name:cleanName(stage.name,{retouch:'AI精修',upscale:'本机超分4K',local:'本机图像处理',grade:'全局调色',export:'导出成片'}[type]),type,enabled:stage.enabled!==false,options};
+  if(stage.enabled!==false)enabled++;return {id:type==='export'&&index===input.stages.length-1?'deliver':'stage'+(index+1),name:cleanName(stage.name,{agent:'修图Agent',retouch:'AI精修',upscale:'本机超分4K',local:'本机图像处理',grade:'全局调色',export:'导出成片'}[type]),type,enabled:stage.enabled!==false,options};
  });
  if(stages.at(-1).type!=='export'||stages.slice(0,-1).some(stage=>stage.type==='export'))throw Error('导出需要作为最后一步，且只能有一个导出步骤。');
  if(!stages.at(-1).enabled)throw Error('导出步骤不能关闭。');
@@ -50,4 +52,4 @@ export const RECIPE_SEEDS=[
  {name:'本机4K超分 · 真人／COS',stages:[{type:'upscale',name:'真人／COS 4K超分',options:{model:'general-x4v3-dn50',longEdge:4096,amount:75,preserveColor:true}},finish]},
  {name:'本机4K超分 · 二次元',stages:[{type:'upscale',name:'二次元4K超分',options:{model:'animevideov3',longEdge:4096,amount:75,preserveColor:true}},finish]},
 ].map((input,index)=>({id:'builtin-'+(index+1),builtin:true,...recipeValue(input)}));
-export const recipeReport=recipe=>({steps:recipe.stages.length,aiSteps:recipe.stages.filter(stage=>stage.enabled&&stage.type==='retouch').length,localSteps:recipe.stages.filter(stage=>stage.enabled&&stage.type!=='retouch').length,requiresSubjectMask:recipe.stages.some(stage=>stage.enabled&&stage.type==='retouch'&&stage.options.scene?.protectSubject),freeWebsite:true});
+export const recipeReport=recipe=>({steps:recipe.stages.length,aiSteps:recipe.stages.filter(stage=>stage.enabled&&stage.type==='retouch').length+recipe.stages.filter(s=>s.enabled&&s.type==='agent').reduce((n,s)=>n+agentBudget(s.options).imageSteps,0),localSteps:recipe.stages.filter(stage=>stage.enabled&&!['retouch','agent'].includes(stage.type)).length,requiresSubjectMask:recipe.stages.some(stage=>stage.enabled&&stage.type==='retouch'&&stage.options.scene?.protectSubject),freeWebsite:true});

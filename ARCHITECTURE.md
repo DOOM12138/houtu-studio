@@ -28,6 +28,8 @@ android/ 保存原生 Activity、文件选择／保存、更新签名验证及�
 
 ## 后端
 
+`RetouchAgents`是pipeline中agent步骤的后台执行器，子工作流kind为retouch-agent，批次为agent-batch。选项与动态图定义在public/retouch-agent-options.js，方法库在retouch-agent-knowledge.js。父Studio队列持有执行槽位，受托图片调用用进程内owner对象校验后进入已有managed retouch请求账本；HTTP不能伪造忙锁豁免。逐张准备日志、分支意图签名、指向提交后回执恢复及备份绑定重建共同避免重复跑图。图像文件保持不可变，copyAsset使用内容地址校验与硬链接，写入新图产生新地址。
+
 - server.mjs：本机 HTTP 路由、会话与 CSRF、精修任务、图片和产物交接、打包入口。
 - backend/：工作流持久化、调色预设、公开参考检索、创作合成、多图视觉分析、小红书独立浏览器、人物检查与精修来源链。
 - lib/：官方 Codex 客户端桥接、图片裁切与蒙版合成、提示词模板、平台进程与原子文件操作、项目临时环境。

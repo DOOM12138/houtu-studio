@@ -9,6 +9,7 @@ import {APP_VERSION} from './lib/app-version.mjs';
 import {exportProjectPhotos,backupProject,restoreProject} from './backend/studio-archive.mjs';
 import {StudioService} from './backend/studio.mjs';
 import {StudioPlanner} from './backend/studio-planner.mjs';
+import {RetouchAgents} from './backend/retouch-agents.mjs';
 import {recipeValue,recipeReport} from './backend/studio-recipe.mjs';
 import {safeName} from './backend/local-image.mjs';
 import sharp from 'sharp';
@@ -67,7 +68,7 @@ const publicJob = j => ({ requestKey:j.requestKey||null,pipelineParentId:j.pipel
   created: j.created, message: j.message, sourceUrl: `/images/${j.id}/source.${j.extension}`,
   outputUrl: j.output ? `/images/${j.id}/${j.output}` : null });
 
-export async function createApp({ directory = path.join(ROOT, 'data'), bridge: suppliedBridge, packageBuilder = buildPortable, composeImage = finishEditImage, platform: suppliedPlatform,targetAnalyzer:suppliedTargetAnalyzer,upscaleProcess,updatesFetcher,automaticUpdateChecks=!suppliedBridge, localAccessToken=null, vision:suppliedVision=null, clientPlatform='desktop' } = {}) {
+export async function createApp({ directory = path.join(ROOT, 'data'), bridge: suppliedBridge, packageBuilder = buildPortable, composeImage = finishEditImage, platform: suppliedPlatform,targetAnalyzer:suppliedTargetAnalyzer,upscaleProcess,updatesFetcher,automaticUpdateChecks=!suppliedBridge, localAccessToken=null, vision:suppliedVision=null, clientPlatform='desktop',agentMask,agentSearch,agentFetchAsset } = {}) {
   if(clientPlatform==='android'&&(typeof localAccessToken!=='string'||localAccessToken.length<16))throw Error('手机工作台缺少本机访问密钥。');
   const home = path.join(directory, 'codex');
   const jobsDirectory = path.join(directory, 'jobs');
@@ -75,7 +76,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
   const accounts=new AccountLedger(directory);await accounts.load();
   const library=new ImageLibrary(directory);await library.load();
   const bridge = trackedBridge(suppliedBridge || new CodexBridge(home),accounts);
-  const startedAt=Date.now();let studio,planner;const targetVision=suppliedVision||new TargetVision(()=>{const address=server.address();if(!address)throw Error('服务尚未启动。');return 'http://127.0.0.1:'+address.port;});
+  const startedAt=Date.now();let studio,planner,agents;const targetVision=suppliedVision||new TargetVision(()=>{const address=server.address();if(!address)throw Error('服务尚未启动。');return 'http://127.0.0.1:'+address.port;});
   const csrf = randomBytes(32).toString('hex');
   const mobileDownloads=clientPlatform==='android'?new MobileDownloads(directory):null;await mobileDownloads?.load();
   const jobs = new Map();
@@ -240,8 +241,9 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
   };
 
   const findRequest=requestKey=>[...jobs.values()].find(job=>job.requestKey===requestKey);
-  const startRetouch=async(input,{requestKey=null,pipelineParentId=null,expectedAccount=null,managed=false}={})=>{
+  const startRetouch=async(input,{requestKey=null,pipelineParentId=null,expectedAccount=null,managed=false,isCancelled=null}={})=>{
     if(requestKey){if(!/^[a-f0-9]{64}$/.test(requestKey))throw Error('流程请求标识无效。');const existing=findRequest(requestKey);if(existing)return publicJob(existing);}
+    if(isCancelled?.())throw Object.assign(Error('Agent已取消，未创建新的图片请求。'),{status:409});
     const imageRuntime=bridge.imageRuntimeStatus?.();if(imageRuntime?.ready===false)throw Object.assign(Error(imageRuntime.message),{status:409});
     if(active||activePackage||critiqueActive||managed&&(!studio?.active||managedJobs.size>=2)||!managed&&(managedJobs.size||studio?.active||studio?.archiving))throw Object.assign(Error('工作台已有任务，请先暂停或等待完成。'),{status:409});
     const reservation=Symbol('managed-image');if(managed)managedJobs.add(reservation);else active='reserved';let job;try{
@@ -253,6 +255,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
           const prompt = paintingPrompt(options);
           const resolved=await resolvePicture(input,{jobs,workflows}),image={bytes:resolved.bytes};if(options.operation==='detail-upscale'){const m=await orientedDimensions(image.bytes);if(options.task.longEdge**2*Math.min(m.width,m.height)/Math.max(m.width,m.height)>40000000)throw Error('此比例放大后超过4000万像素，请选择较小输出尺寸。');}if(resolved.parentJobId)options.parentId=resolved.parentJobId;
           if (!await bridge.account()) throw Object.assign(Error('请先使用 ChatGPT 账号登录。'),{status:401});
+          if(isCancelled?.())throw Object.assign(Error('Agent已取消，未创建新的图片请求。'),{status:409});
           const owner={account:expectedAccount};bridge.capture(owner);
           const id = randomUUID();
           const workflow=await workflows.create({kind:'retouch',name:PRESETS.find(p=>p.id===options.operation)?.name||'人物精修',jobId:id,parentId:resolved.parentWorkflowId});
@@ -266,7 +269,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
           const featureReferences=[];for(const ref of references){const normalized=await prepareEditImage(ref.bytes,null),asset=await workflows.putAsset(workflow.id,normalized.source,'image/png');featureReferences.push({assetId:asset.id,title:ref.title,role:ref.role==='any'?(tool.referenceRole||'any'):ref.role});}
           job.featureReferences=featureReferences;const source=await workflows.putAsset(workflow.id,image.bytes,'image/png');let targetMaskAsset=null;if(input.targetMask){if(tool.fullFrame)throw Error('独立输出、扩图和放大不使用原位编辑蒙版。');targetMaskAsset=(await workflows.putAsset(workflow.id,await checkedTargetMask(input,image.bytes),'image/png')).id;job.targetMaskAsset=targetMaskAsset;}
           let maskAsset=null;if(input.protectionMask){const mask=decodeImage(input.protectionMask);if(isSceneOperation(options.operation)&&mask.extension!=='png')throw Error('主体保护蒙版需要PNG格式。');const stored=await workflows.putAsset(workflow.id,mask.bytes,'image/png'),displayShape=isSceneOperation(options.operation)?await orientedDimensions(image.bytes):source;if(isSceneOperation(options.operation)&&Math.abs(stored.width/stored.height-displayShape.width/displayShape.height)>.025)throw Error('主体保护蒙版与原图长宽比不一致，请重新分析。');maskAsset=stored.id;}job.maskAsset=maskAsset;const referenceAssets=[];for(const ref of resolved.identity){const asset=await workflows.asset(ref.workflowId,ref.assetId);referenceAssets.push((await workflows.putAsset(workflow.id,await readFile(asset.file),'image/png')).id);}if(input.portraitAuditId){const audit=await workflows.get(input.portraitAuditId);if(audit.kind!=='portrait-audit')throw new Error('人物检查记录无效。');const audited=await workflows.asset(audit.id,audit.steps[0].output.imageAsset);if((audit.steps[0].output.pixelSignature||await pictureSignature(await readFile(audited.file)))!==await pictureSignature(image.bytes))throw new Error('这份检查针对其他图片，请重新检查。');}await doneJobStep(job,{imageAsset:source.id,options,maskAsset,targetMaskAsset,referenceAssets,featureReferences,promptVersion:tool.promptRevision||PROMPT_VERSION,sourceWorkflowId:resolved.parentWorkflowId,sourceStep:resolved.sourceStep,sourceAsset:resolved.sourceAsset},[{id:source.id,label:'本轮实际人物成品输入',type:'image'},...(maskAsset?[{id:maskAsset,label:isSceneOperation(options.operation)?'主体保护蒙版：黑色保留、白色可修改':'本轮背景保护蒙版',type:'image'}]:[])],'原图、细化参数与保护蒙版已保存');
-          await prepareJob(job,image.bytes);await generateJob(job);
+          await prepareJob(job,image.bytes);if(isCancelled?.())job.cancelled=true;await generateJob(job);
 
       return publicJob(job);
     }catch(error){if(job&&isRunning(job))await finish(job,'error',friendlyError(error.message));throw error;}finally{managedJobs.delete(reservation);if(!managed&&active==='reserved')active=null;}
@@ -277,6 +280,14 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
   };
   studio=new StudioService({directory,workflows,adapter:{upscale:upscaleProcess,isBusy:()=>Boolean(active||activePackage||critiqueActive||managedJobs.size),startRetouch,findRequest:key=>{const job=findRequest(key);return job?publicJob(job):null;},getJob:id=>jobs.has(id)?publicJob(jobs.get(id)):null,recompose:recomposeManaged,authorize:async expected=>{if(!await bridge.account())throw Error('请先登录本站ChatGPT账号。');const control={account:expected};bridge.capture(control);return control.account;}}});await studio.load();
   planner=new StudioPlanner({root:ROOT,studio,workflows,bridge,acquire:id=>{if(runtimeBusy()||login||isClosing)return false;active='planner-'+id;return true;},release:id=>{if(active==='planner-'+id)active=null;}});
+  agents=new RetouchAgents({studio,workflows,bridge,platform,mask:agentMask,search:agentSearch,fetchAsset:agentFetchAsset,upscale:upscaleProcess,
+   acquirePrepare:id=>{if(runtimeBusy()||login||isClosing)return false;active='agent-'+id;return true;},releasePrepare:id=>{if(active==='agent-'+id)active=null;},
+   render:{findRequest:key=>{const j=findRequest(key);return j?publicJob(j):null;},getJob:id=>jobs.has(id)?publicJob(jobs.get(id)):null,
+    capacity:owner=>agents.owns(owner)&&studio.active?.projectId===owner.projectId&&!active&&!activePackage&&!critiqueActive&&managedJobs.size<2,
+    start:async(owner,input,options)=>{if(!agents.owns(owner)||studio.active?.projectId!==owner.projectId||!studio.active.photoIds.includes(owner.photoId))throw Error('Agent执行授权已失效。');try{return await startRetouch(input,{...options,managed:true,isCancelled:()=>agents.cancelled(owner)});}catch(error){if(!findRequest(options.requestKey))error.submissionState='not-submitted';throw error;}},
+    cancel:async id=>{const job=jobs.get(id);if(isRunning(job)){job.cancelled=true;job.status='cancelling';await persist(job);await bridge.cancel(job);}}
+   }});await agents.load();
+  studio.adapter.runAgent=({parentWorkflowId,stepId,inputAsset,...context})=>agents.runChild(parentWorkflowId,stepId,inputAsset,context);
 
   const updates=new SoftwareUpdates({root:ROOT,directory,cacheDirectory:suppliedBridge?path.join(directory,'.updates'):undefined,fetcher:updatesFetcher,
     reserve:()=>{if(isClosing||active||activePackage||critiqueActive||login||studio.active||studio.archiving||studio.queues.size||creative.running.size||pendingOperations||library.pendingThumbs.size)return false;active='software-update';return true;},
@@ -296,7 +307,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       const url = new URL(req.url, `http://${host}`);
       const route = url.pathname;if(clientPlatform==='android'&&(route==='/api/packages'||route.startsWith('/downloads/package/')||/^\/api\/updates\/(prepare|apply|rollback)$/.test(route)))return json(res,409,{error:'安卓版请使用应用菜单中的安卓版更新。'});if(isClosing&&!['/api/health','/api/shutdown'].includes(route))return json(res,503,{error:'网站正在停止，请稍后重开。'});
       if (!['GET', 'POST'].includes(req.method)) return json(res, 405, { error: '不支持的请求。' });
-      if(req.method==='POST'&&(studio.active||studio.archiving)&&!route.startsWith('/api/studio/')&&!route.startsWith('/api/mobile/downloads')&&route!=='/api/shutdown'&&!route.startsWith('/api/updates/')&&!/^\/api\/jobs\/[a-f0-9-]{36}\/cancel$/.test(route))return json(res,409,{error:'照片流程正在运行，请先完成本步并暂停。'});
+      if(req.method==='POST'&&(studio.active||studio.archiving)&&!route.startsWith('/api/studio/')&&!route.startsWith('/api/mobile/downloads')&&route!=='/api/shutdown'&&!route.startsWith('/api/updates/')&&!/^\/api\/jobs\/[a-f0-9-]{36}\/cancel$/.test(route)&&!/^\/api\/retouch-agents\/[a-f0-9-]{36}\/(pause|cancel)$/.test(route))return json(res,409,{error:'照片流程正在运行，请先完成本步并暂停。'});
       if (req.method === 'POST') {
         if (req.headers.origin !== `http://${host}` || req.headers['x-paint-csrf'] !== csrf) return json(res, 403, { error: '请从本站页面发起操作。' });
       }
@@ -335,6 +346,12 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
         }finally{if(active===reservation)active=null;}
       }
       if(route==='/api/studio/projects'&&req.method==='GET')return json(res,200,{projects:studio.list(),active:studio.active?{projectId:studio.active.projectId,currentPhoto:studio.active.currentPhoto,currentStep:studio.active.currentStep}:null});
+      const agentCreate=/^\/api\/studio\/projects\/([a-f0-9-]{36})\/agents$/.exec(route);
+      if(agentCreate&&req.method==='POST')return json(res,202,await agents.start(agentCreate[1],await body(req,100000)));
+      const agentBatch=/^\/api\/retouch-agent-batches\/([a-f0-9-]{36})(?:\/(run))?$/.exec(route);
+      if(agentBatch){if(req.method==='GET'&&!agentBatch[2])return json(res,200,await agents.batchView(agentBatch[1]));if(req.method==='POST'&&agentBatch[2]==='run'){await body(req,4096);return json(res,202,await agents.runBatch(agentBatch[1]));}}
+      const agentRoute=/^\/api\/retouch-agents\/([a-f0-9-]{36})(?:\/(continue|pause|cancel|step|mode|accept|prompt|parameters|mask|manual-plan|branch))?$/.exec(route);
+      if(agentRoute){const [,id,action]=agentRoute;if(req.method==='GET'&&!action)return json(res,200,await agents.view(id));if(req.method==='POST'&&action){const input=await body(req,100000),methods={continue:'continue',pause:'pause',cancel:'pause',step:'manualStep',mode:'setMode',accept:'accept',prompt:'savePrompt',parameters:'saveParameters',mask:'provideMask','manual-plan':'manualPlan',branch:'branch'};return json(res,200,await agents[methods[action]](id,action==='cancel'?{...input,cancel:true}:input));}}
       if(route==='/api/studio/planning/capabilities'&&req.method==='GET')return json(res,200,planner.capabilities());
       const planningPreflight=/^\/api\/studio\/projects\/([a-f0-9-]{36})\/planning-preflight$/.exec(route);
       if(planningPreflight&&req.method==='POST')return json(res,200,await planner.preflight(planningPreflight[1],await body(req,100000)));
@@ -599,14 +616,14 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
         file=path.join(ROOT,'frontend','workflows.html');
       } else if(req.method==='GET'&&(route==='/creative'||route==='/creative/')){
         file=path.join(ROOT,'frontend','creative.html');
-      } else if (req.method === 'GET' && /^\/color\/(app\.js|engine\.js|worker\.js|masks\.js|workflow-client\.js|workflows\.js|effects\.js|creative\.js|creative-multi\.js|server\.js|studio\.js|studio-planner\.js|studio-layout\.(?:js|css)|lab\.js|tonal-looks\.js|tone-controls\.js|upscale\.js|updates\.js|style\.css)$/.test(route)) {
+      } else if (req.method === 'GET' && /^\/color\/(app\.js|engine\.js|worker\.js|masks\.js|workflow-client\.js|workflows\.js|effects\.js|creative\.js|creative-multi\.js|server\.js|studio\.js|studio-agent\.js|studio-planner\.js|studio-layout\.(?:js|css)|lab\.js|tonal-looks\.js|tone-controls\.js|upscale\.js|updates\.js|style\.css)$/.test(route)) {
         file=path.join(ROOT,'frontend',path.basename(route));
       } else if (req.method === 'GET' && /^\/vision\/(vision_bundle\.mjs|wasm\/vision_wasm_(?:nosimd_)?internal\.(?:js|wasm))$/.test(route)) {
         file=path.join(ROOT,'node_modules','@mediapipe','tasks-vision',route.slice('/vision/'.length));
       } else if (req.method === 'GET' && /^\/models\/(selfie_multiclass_256x256\.tflite|face_landmarker\.task|hand_landmarker\.task)$/.test(route)) {
         file=path.join(ROOT,'models',path.basename(route));
       } else {
-        const files = { '/studio-planning.js':'studio-planning.js','/editor-history.js':'editor-history.js','/editor-history.css':'editor-history.css','/upload-limits.js':'upload-limits.js','/portrait':'portrait.html','/portrait/':'portrait.html','/ai':'index.html','/ai/':'index.html','/image-import.js':'image-import.js','/image-formats.js':'image-formats.js','/workspace.js':'workspace.js','/workspace.css':'workspace.css','/workflow-sections.js':'workflow-sections.js','/manual-portrait.js':'manual-portrait.js','/manual-portrait-worker.js':'manual-portrait-worker.js','/manual-portrait-engine.js':'manual-portrait-engine.js','/manual-portrait.css':'manual-portrait.css', '/android-shell.js':'android-shell.js','/android-shell.css':'android-shell.css','/superres-options.js':'superres-options.js', '/superres.css':'superres.css', '/editor-layout.css':'editor-layout.css', '/image-viewer.js':'image-viewer.js','/view-geometry.js':'view-geometry.js','/image-viewer.css':'image-viewer.css', '/update-notice.js':'update-notice.js','/update-notice.css':'update-notice.css', '/paint-profile.js':'paint-profile.js','/feature-expansion.js':'feature-expansion.js','/prompt-contract.js':'prompt-contract.js','/feature-ui.js':'feature-ui.js','/target-policy.js':'target-policy.js','/target-masks.js':'target-masks.js','/vision-target.html':'vision-target.html', '/': 'index.html', '/app.js': 'app.js', '/catalog.js': 'catalog.js', '/style.css': 'style.css', '/favicon.svg': 'favicon.svg','/portrait-options.js':'portrait-options.js','/portrait-ui.js':'portrait-ui.js','/model-picker.js':'model-picker.js','/model-options.js':'model-options.js','/scene-options.js':'scene-options.js','/belly-options.js':'belly-options.js','/scene-ui.js':'scene-ui.js','/subject-mask.js':'subject-mask.js' };
+        const files = { '/retouch-agent-options.js':'retouch-agent-options.js','/retouch-agent-knowledge.js':'retouch-agent-knowledge.js','/studio-planning.js':'studio-planning.js','/editor-history.js':'editor-history.js','/editor-history.css':'editor-history.css','/upload-limits.js':'upload-limits.js','/portrait':'portrait.html','/portrait/':'portrait.html','/ai':'index.html','/ai/':'index.html','/image-import.js':'image-import.js','/image-formats.js':'image-formats.js','/workspace.js':'workspace.js','/workspace.css':'workspace.css','/workflow-sections.js':'workflow-sections.js','/manual-portrait.js':'manual-portrait.js','/manual-portrait-worker.js':'manual-portrait-worker.js','/manual-portrait-engine.js':'manual-portrait-engine.js','/manual-portrait.css':'manual-portrait.css', '/android-shell.js':'android-shell.js','/android-shell.css':'android-shell.css','/superres-options.js':'superres-options.js', '/superres.css':'superres.css', '/editor-layout.css':'editor-layout.css', '/image-viewer.js':'image-viewer.js','/view-geometry.js':'view-geometry.js','/image-viewer.css':'image-viewer.css', '/update-notice.js':'update-notice.js','/update-notice.css':'update-notice.css', '/paint-profile.js':'paint-profile.js','/feature-expansion.js':'feature-expansion.js','/prompt-contract.js':'prompt-contract.js','/feature-ui.js':'feature-ui.js','/target-policy.js':'target-policy.js','/target-masks.js':'target-masks.js','/vision-target.html':'vision-target.html', '/': 'index.html', '/app.js': 'app.js', '/catalog.js': 'catalog.js', '/style.css': 'style.css', '/favicon.svg': 'favicon.svg','/portrait-options.js':'portrait-options.js','/portrait-ui.js':'portrait-ui.js','/model-picker.js':'model-picker.js','/model-options.js':'model-options.js','/scene-options.js':'scene-options.js','/belly-options.js':'belly-options.js','/scene-ui.js':'scene-ui.js','/subject-mask.js':'subject-mask.js' };
         if (!Object.hasOwn(files, route) || req.method !== 'GET') return json(res, 404, { error: '页面不存在。' });
         file = path.join(ROOT, 'public', files[route]);
       }
@@ -622,14 +639,14 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     studio.closing=true;if(studio.active)studio.active.stop=true;
     for(const state of creative.running.values())state.stop=true;
     await imageImports.close();await updates.close();await platform.close();
-    await planner.close();await bridge.stop(); for (const j of jobs.values()) clearTimeout(j.deadline);
-    await creative.drain();await studio.drain();await targetVision.close();if(portraitAuditTask)await Promise.allSettled([portraitAuditTask]);
+    await agents.close();await planner.close();await bridge.stop(); for (const j of jobs.values()) clearTimeout(j.deadline);
+    await creative.drain();await studio.drain();await agents.drain();await targetVision.close();if(portraitAuditTask)await Promise.allSettled([portraitAuditTask]);
     await Promise.allSettled([...jobWrites.values()]);
     await Promise.allSettled([accounts.queue,library.queue,...library.pendingThumbs.values()]);
     server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
     try { const record = JSON.parse(await readFile(path.join(directory, 'server.json'), 'utf8')); if (record.instanceId === instanceId) await unlink(path.join(directory, 'server.json')); } catch {}
   })();
-  return { server, bridge, studio, planner, targetVision, updates, instanceId, close, isBusy:runtimeBusy };
+  return { server, bridge, studio, planner, agents, targetVision, updates, instanceId, close, isBusy:runtimeBusy };
 }
 
 export function friendlyError(message = '') {

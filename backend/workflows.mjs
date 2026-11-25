@@ -1,11 +1,13 @@
 import {originalImageSignature} from '../public/image-formats.js';
 import {workflowSection} from '../public/workflow-sections.js';
 import path from 'node:path';
-import {mkdir,readdir,readFile,writeFile,rename,stat} from 'node:fs/promises';
+import {mkdir,readdir,readFile,writeFile,rename,stat,lstat,link,copyFile,realpath} from 'node:fs/promises';
 import {randomUUID,createHash} from 'node:crypto';
 import sharp from 'sharp';
 import {replaceFile} from '../lib/files.mjs';
 export const FLOW_STEPS={
+ 'agent-batch':[['source','本轮勾选与执行授权',[]],['prepare','为各张建立Agent新流程',['source']],['execute','后台执行与人工检查边界',['prepare']],['deliver','本轮结果与历史',['execute']]],
+ 'retouch-agent':[['source','Agent原图与设置',[]],['deliver','保存成品',['source']]],
  'studio-plan':[['source','规划输入与参考用途',[]],['analysis','逐张分析与任务拆分',['source']],['proposal','可执行方案与步骤预算',['analysis']],['apply','确认应用到照片新版本',['proposal']]],
  'image-import':[['source','原始图片只读存档',[]],['develop','本机显影与位图预览',['source']]],
  'manual-portrait':[['source','手动修图原图',[]],['edit','本机笔触与保护区',['source']],['export','原尺寸成片',['edit']]],
@@ -37,4 +39,5 @@ export class WorkflowStore{
  async checkpoint(id,step,state,artifacts=[],message='已完成'){const {token}=await this.begin(id,step);return this.complete(id,step,token,{state,artifacts,message});}
  async putAsset(id,bytes,type,options={}){this.folder(id);await this.get(id);if(!Buffer.isBuffer(bytes)||bytes.length>110*1024*1024)throw error('工作流文件过大。',413);let metadata={type};if(['image/png','image/jpeg','image/webp'].includes(type)){const image=await sharp(bytes,{limitInputPixels:40000000,failOn:'error'}).metadata();if(!['png','jpeg','webp'].includes(image.format))throw error('请选择PNG、JPG或WebP图片。',400);metadata={type:'image/'+(image.format==='jpeg'?'jpeg':image.format),width:image.width,height:image.height};}else if(type!=='application/octet-stream'||bytes.length>32*1024*1024&&!(options.originalImage===true&&originalImageSignature(bytes)))throw error('工作流文件格式无效或过大。',400);const hash=createHash('sha256').update(type).update(bytes).digest('hex'),dir=path.join(this.folder(id),'assets');await mkdir(dir,{recursive:true});const target=path.join(dir,hash);try{await stat(target);}catch(e){if(e.code!=='ENOENT')throw e;const temp=target+'.'+randomUUID()+'.tmp';await writeFile(temp,bytes);await replaceFile(temp,target);}const metaTemp=target+'.'+randomUUID()+'.meta.tmp';await writeFile(metaTemp,JSON.stringify({...metadata,bytes:bytes.length}));await replaceFile(metaTemp,target+'.json');return {id:hash,...metadata,bytes:bytes.length};}
  async asset(id,hash){if(!HASH.test(hash))throw error('产物编号无效。',400);const file=path.join(this.folder(id),'assets',hash),meta=JSON.parse(await readFile(file+'.json','utf8'));return {file,...meta};}
+ async copyAsset(from,to,hash){await this.get(to);const a=await this.asset(from,hash),s=await lstat(a.file);if(!s.isFile()||s.isSymbolicLink()||await realpath(a.file)!==a.file)throw error('素材必须是当前工作流的普通文件。',400);const bytes=await readFile(a.file),types=a.type.startsWith('image/')?[a.type,'image/png','image/jpeg','image/webp']:[a.type],valid=b=>types.some(type=>createHash('sha256').update(type).update(b).digest('hex')===hash);if(!valid(bytes))throw error('素材校验失败。',400);const folder=path.join(this.folder(to),'assets');await mkdir(folder,{recursive:true});const target=path.join(folder,hash);try{await link(a.file,target);}catch(e){if(e.code==='EEXIST'){const t=await lstat(target);if(!t.isFile()||t.isSymbolicLink()||!valid(await readFile(target)))throw error('目标素材校验失败。',400);}else{if(!['EPERM','EXDEV','EOPNOTSUPP','ENOTSUP'].includes(e.code))throw e;await copyFile(a.file,target);}}const metadata={...a};delete metadata.file;const temporary=target+'.'+randomUUID()+'.meta.tmp';await writeFile(temporary,JSON.stringify(metadata));await replaceFile(temporary,target+'.json');return {id:hash,...metadata};}
 }

@@ -1,0 +1,5 @@
+MediaPipe Selfie Segmentation, original model by Google / MediaPipe.
+ONNX conversion published by ONNX Community on Hugging Face.
+Model card declares Apache License 2.0; see ../LICENSE.txt.
+Pinned revision: be49485c8e027524be38591817fc5cd31bd9d00e.
+Source and SHA-256 are recorded in README.md. No new model training is claimed.
