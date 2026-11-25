@@ -1,3 +1,4 @@
+import {MAX_IMAGE_UPLOAD_BYTES,IMAGE_UPLOAD_MESSAGE} from '/upload-limits.js';
 import {STYLES,PRESETS} from '/catalog.js';
 import {DEFAULT_EDIT_BRIEF} from '/prompt-contract.js';
 const $=id=>document.getElementById(id),el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
@@ -16,7 +17,7 @@ async function open(id,reset=false){selected=specs().some(s=>s.id===id)?id:'full
  if(snapshot){const p=snapshot.payload;$('lab-model').value=p.requestedModel;$('lab-origin').value=p.origin;$('lab-prompt').textContent=p.exactPrompt;$('lab-preview').replaceChildren(...[['source','实际原图'],['input','发送的输入'],['raw','AI原始出图'],['result','最终结果']].map(([key,label])=>figure(snapshot.preview[key],label)),...snapshot.preview.references.map(r=>figure(r.url,r.role+' · '+r.title)));}
  else if(!isAnalysis()&&PRESETS.some(t=>t.id===selected))await compile();else $('lab-prompt').textContent='请填写实际使用的完整指令，并提供实际输入与返回。';renderHistory(s);list();}
 async function compile(){if(snapshot){$('lab-prompt').textContent=snapshot.payload.exactPrompt;return;}if(!PRESETS.some(t=>t.id===selected)){notify('请在下方填写实际完整指令。');return;}const v=await api('/api/prompt',options());$('lab-prompt').textContent=v.prompt;$('lab-exact').value=v.prompt;$('lab-options-json').value=JSON.stringify(options(),null,2);}
-async function readFile(file){if(!file)throw Error('请选择实际输入和对应的返回结果。');if(file.size>12*1024*1024)throw Error('单张请控制在12MB以内。');return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file);});}
+async function readFile(file){if(!file)throw Error('请选择实际输入和对应的返回结果。');if(file.size>MAX_IMAGE_UPLOAD_BYTES)throw Error(IMAGE_UPLOAD_MESSAGE);return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file);});}
 const fileData=id=>readFile($(id).files[0]);
 async function loadJob(id){snapshot=await api('/api/prompt-lab/jobs/'+id);await open(snapshot.payload.operation);$('lab-confirm').checked=false;}
 for(const s of STYLES)$('lab-style').append(new Option(s.name,s.id));

@@ -1,3 +1,5 @@
+import {readRequestBytes} from './lib/request-body.mjs';
+import {MAX_IMAGE_UPLOAD_BYTES,IMAGE_JSON_BODY_BYTES,LAB_JSON_BODY_BYTES,IMAGE_UPLOAD_MESSAGE} from './public/upload-limits.js';
 import {ImageImports} from './backend/image-imports.mjs';
 import {superresModels} from './backend/super-resolution.mjs';
 import {SoftwareUpdates} from './backend/software-updates.mjs';
@@ -231,13 +233,8 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
   const json = (res, status, data) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(data)); };
   const body = async (req, maxBytes = 18 * 1024 * 1024) => {
     if (!req.headers['content-type']?.startsWith('application/json')) throw Object.assign(new Error('请求格式应为 JSON。'), { status: 415 });
-    const chunks = []; let length = 0;
-    for await (const chunk of req) {
-      length += chunk.length;
-      if (length > maxBytes) throw Object.assign(new Error('请求内容过大，请缩小图片或导入文件。'), { status: 413 });
-      chunks.push(chunk);
-    }
-    try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+    const bytes=await readRequestBytes(req,maxBytes,'本次请求总量过大，请减少同时提交的参考图；单图上限100 MB。');
+    try { return JSON.parse(bytes.toString('utf8')); }
     catch { throw Object.assign(new Error('请求内容无效。'), { status: 400 }); }
   };
 
@@ -321,15 +318,15 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
           return json(res,200,result);
         }catch(error){return json(res,409,{error:String(error.message).slice(0,400)});}
       }
-      if(route==='/api/targets/analyze'&&req.method==='POST'){const input=await body(req),resolved=await resolvePicture(input,{jobs,workflows}),options=normalizeEditOptions(input),result=await targetVision.analyze(resolved.bytes,{operation:options.operation,areas:options.areas,portrait:options.portrait});return json(res,200,{...result,selectionSuggestion:options.operation==='face'&&result.mask?await suggestedHeadScope(result.mask):null,mask:result.mask?'data:image/png;base64,'+result.mask.toString('base64'):null,sourceSignature:await pictureSignature(resolved.bytes)});}
+      if(route==='/api/targets/analyze'&&req.method==='POST'){const input=await body(req,IMAGE_JSON_BODY_BYTES),resolved=await resolvePicture(input,{jobs,workflows}),options=normalizeEditOptions(input),result=await targetVision.analyze(resolved.bytes,{operation:options.operation,areas:options.areas,portrait:options.portrait});return json(res,200,{...result,selectionSuggestion:options.operation==='face'&&result.mask?await suggestedHeadScope(result.mask):null,mask:result.mask?'data:image/png;base64,'+result.mask.toString('base64'):null,sourceSignature:await pictureSignature(resolved.bytes)});}
       const labJob=/^\/api\/prompt-lab\/jobs\/([a-f0-9-]{36})$/.exec(route);if(labJob){const job=jobs.get(labJob[1]);if(req.method==='GET')return json(res,200,await jobEvidence(job,workflows));if(req.method==='POST')return json(res,201,await saveJobEvidence(job,workflows,promptLab,await body(req,20000)));}
       if(route==='/api/prompt-lab/trials'&&req.method==='GET')return json(res,200,await promptLab.trials());
-      if(route==='/api/prompt-lab'&&req.method==='GET')return json(res,200,await promptLab.list());if(route==='/api/prompt-lab/records'&&req.method==='POST')return json(res,201,await promptLab.save(await body(req,110*1024*1024)));const labImage=/^\/api\/prompt-lab\/images\/([a-f0-9-]{36})\/(source|result|input|raw|ref-\d{1,2})$/.exec(route);if(labImage&&req.method==='GET'){const file=await promptLab.image(labImage[1],labImage[2]);res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'no-store'});await pipeline(createReadStream(file),res);return;}
+      if(route==='/api/prompt-lab'&&req.method==='GET')return json(res,200,await promptLab.list());if(route==='/api/prompt-lab/records'&&req.method==='POST')return json(res,201,await promptLab.save(await body(req,LAB_JSON_BODY_BYTES)));const labImage=/^\/api\/prompt-lab\/images\/([a-f0-9-]{36})\/(source|result|input|raw|ref-\d{1,2})$/.exec(route);if(labImage&&req.method==='GET'){const file=await promptLab.image(labImage[1],labImage[2]);res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'no-store'});await pipeline(createReadStream(file),res);return;}
       if(route==='/api/superres/models'&&req.method==='GET')return json(res,200,await superresModels());
       if(route==='/api/superres/import'&&req.method==='POST'){
         if(active||activePackage||critiqueActive||studio.active||studio.archiving||studio.queues.size)return json(res,409,{error:'工作台正忙，请先完成或暂停当前任务。'});
         const reservation='superres-import-'+randomUUID();active=reservation;
-        try{const input=await body(req,70*1024*1024),resolved=await resolvePicture(input,{jobs,workflows});
+        try{const input=await body(req,IMAGE_JSON_BODY_BYTES),resolved=await resolvePicture(input,{jobs,workflows});
           const project=await studio.create({name:input.name||'4K超分 · '+new Date().toLocaleDateString('zh-CN'),recipe:{name:'本机4K超分',stages:[{type:'upscale',name:'本机4K超分',options:input.options||{}},{type:'export',name:'超分成片导出',options:{format:'png',maxEdge:0,prefix:'4K超分'}}]}}),added=await studio.addPhoto(project.id,resolved.bytes,input.name||'超分原图',{savedSource:true});
           const photo=(await studio.get(project.id)).photos[0];if(resolved.parentWorkflowId)await workflows.mutate(photo.workflowId,w=>{w.parentId=resolved.parentWorkflowId;w.sourceOrigin={workflowId:resolved.parentWorkflowId,assetId:resolved.sourceAsset,step:resolved.sourceStep};return {};});
           return json(res,201,{projectId:project.id,photoId:photo.id,workflowId:photo.workflowId,url:'/upscale/?project='+project.id});
@@ -349,9 +346,9 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
         if(req.method==='GET'&&photoId&&!photoAction)return json(res,200,await studio.photo(id,photoId));
         if(req.method==='GET'&&photoAction==='thumbnail'){const detail=await studio.photo(id,photoId),asset=await workflows.asset(detail.photo.originalWorkflowId,detail.photo.originalAsset);const bytes=await sharp(asset.file,{limitInputPixels:40000000}).rotate().resize({width:360,height:360,fit:'inside',withoutEnlargement:true}).webp({quality:75}).toBuffer();res.writeHead(200,{'Content-Type':'image/webp','Content-Length':bytes.length});res.end(bytes);return;}
         if(req.method==='POST'){
-          if(action==='photos'&&!photoId){if(String(req.headers['content-type']||'').split(';')[0]==='application/json'){const input=await body(req,4096),resolved=await resolvePicture(input,{jobs,workflows}),added=await studio.addPhoto(id,resolved.bytes,url.searchParams.get('name')||'已保存原图',{savedSource:true});if(!added.duplicate&&resolved.parentWorkflowId)await workflows.mutate(added.photo.workflowId,w=>{w.parentId=resolved.parentWorkflowId;w.sourceOrigin={workflowId:resolved.parentWorkflowId,assetId:resolved.sourceAsset,step:resolved.sourceStep};return {};});return json(res,201,added);}const chunks=[];let length=0;for await(const chunk of req){length+=chunk.length;if(length>30*1024*1024)throw Object.assign(Error('照片超过30 MB。'),{status:413});chunks.push(chunk);}return json(res,201,await studio.addPhoto(id,Buffer.concat(chunks),url.searchParams.get('name')||'photo'));}
-          if(photoAction==='references')return json(res,200,await studio.attachReferences(id,photoId,referenceInputs((await body(req,70*1024*1024)).references)));
-          if(photoAction==='mask'){const input=await body(req,20*1024*1024),decoded=decodeImage(input.mask);if(decoded.extension!=='png')throw Error('保护蒙版需要PNG格式。');return json(res,200,await studio.attachMask(id,photoId,decoded.bytes));}
+          if(action==='photos'&&!photoId){if(String(req.headers['content-type']||'').split(';')[0]==='application/json'){const input=await body(req,4096),resolved=await resolvePicture(input,{jobs,workflows}),added=await studio.addPhoto(id,resolved.bytes,url.searchParams.get('name')||'已保存原图',{savedSource:true});if(!added.duplicate&&resolved.parentWorkflowId)await workflows.mutate(added.photo.workflowId,w=>{w.parentId=resolved.parentWorkflowId;w.sourceOrigin={workflowId:resolved.parentWorkflowId,assetId:resolved.sourceAsset,step:resolved.sourceStep};return {};});return json(res,201,added);}const bytes=await readRequestBytes(req,MAX_IMAGE_UPLOAD_BYTES,IMAGE_UPLOAD_MESSAGE);return json(res,201,await studio.addPhoto(id,bytes,url.searchParams.get('name')||'photo'));}
+          if(photoAction==='references')return json(res,200,await studio.attachReferences(id,photoId,referenceInputs((await body(req,IMAGE_JSON_BODY_BYTES)).references)));
+          if(photoAction==='mask'){const input=await body(req,IMAGE_JSON_BODY_BYTES),decoded=decodeImage(input.mask);if(decoded.extension!=='png')throw Error('保护蒙版需要PNG格式。');return json(res,200,await studio.attachMask(id,photoId,decoded.bytes));}
           const input=await body(req,1000000);if(action==='backup')return json(res,200,await backupProject(studio,id));if(action==='delivery')return json(res,200,await exportProjectPhotos(studio,id,input.photoIds));if(action==='recipe')return json(res,200,await studio.setRecipe(id,input));if(action==='run')return json(res,202,await studio.run(id,input));if(action==='pause')return json(res,200,await studio.pause(id));if(photoAction==='fork')return json(res,200,await studio.forkPhoto(id,photoId,input));if(photoId)return json(res,200,await studio.updatePhoto(id,photoId,input));
         }
       }
@@ -365,7 +362,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       if(route==='/api/portrait/cancel'&&req.method==='POST'){if(portraitAuditControl){portraitAuditControl.cancelled=true;await bridge.cancel(portraitAuditControl);}return json(res,200,{ok:true});}
       if(route==='/api/portrait/diagnose'&&req.method==='POST'){
         if(active||activePackage||critiqueActive)return json(res,409,{error:'已有任务正在运行，请等待完成。'});active='portrait-audit';portraitAuditControl={};
-        try{const input=await body(req);if(!await bridge.account())return json(res,401,{error:'请先登录ChatGPT再使用人物画面检查。'});const resolved=input.auditId?null:await resolvePicture(input,{jobs,workflows});if(portraitAuditControl.cancelled||isClosing)throw new Error('画面检查已停止，输入记录仍保留。');portraitAuditTask=auditPortrait({workflows,bridge,resolved,auditId:input.auditId,model:normalizeModel(input.model),control:portraitAuditControl});return json(res,200,await portraitAuditTask);}finally{if(active==='portrait-audit')active=null;portraitAuditControl=null;portraitAuditTask=null;}
+        try{const input=await body(req,IMAGE_JSON_BODY_BYTES);if(!await bridge.account())return json(res,401,{error:'请先登录ChatGPT再使用人物画面检查。'});const resolved=input.auditId?null:await resolvePicture(input,{jobs,workflows});if(portraitAuditControl.cancelled||isClosing)throw new Error('画面检查已停止，输入记录仍保留。');portraitAuditTask=auditPortrait({workflows,bridge,resolved,auditId:input.auditId,model:normalizeModel(input.model),control:portraitAuditControl});return json(res,200,await portraitAuditTask);}finally{if(active==='portrait-audit')active=null;portraitAuditControl=null;portraitAuditTask=null;}
       }
       const lineageMatch=/^\/api\/jobs\/([a-f0-9-]{36})\/lineage$/.exec(route);
       if(lineageMatch&&req.method==='GET'){let node=jobs.get(lineageMatch[1]);if(!node)return json(res,404,{error:'精修版本不存在。'});const versions=[],seen=new Set();for(let i=0;node&&i<50&&!seen.has(node.id);i++){seen.add(node.id);versions.push(publicJob(node));node=jobs.get(node.parentId);}return json(res,200,{versions:versions.reverse()});}
@@ -393,7 +390,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
         if(action==='stop'){await creative.stop(id);output={ok:true};}
         return json(res,200,output);
       }
-      if(route==='/api/image-imports'&&req.method==='POST'){let length=0;const chunks=[];for await(const chunk of req){length+=chunk.length;if(length>110*1024*1024)throw Object.assign(Error('原始图片最大110MB。'),{status:413});chunks.push(chunk);}const name=String(url.searchParams.get('name')||'original.raw');return json(res,201,await imageImports.create(Buffer.concat(chunks),name));}
+      if(route==='/api/image-imports'&&req.method==='POST'){const bytes=await readRequestBytes(req,MAX_IMAGE_UPLOAD_BYTES,IMAGE_UPLOAD_MESSAGE),name=String(url.searchParams.get('name')||'original.raw');return json(res,201,await imageImports.create(bytes,name));}
       const importView=/^\/api\/image-imports\/([a-f0-9-]{36})$/.exec(route);if(importView&&req.method==='GET')return json(res,200,await imageImports.view(importView[1]));
       const importMatch=/^\/api\/image-imports\/([a-f0-9-]{36})\/(develop|original)$/.exec(route);if(importMatch){if(importMatch[2]==='develop'&&req.method==='POST')return json(res,200,await imageImports.develop(importMatch[1],await body(req,4096)));if(importMatch[2]==='original'&&req.method==='GET'){const asset=await imageImports.original(importMatch[1]);res.writeHead(200,{'Content-Type':'application/octet-stream','Content-Length':asset.bytes,'Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(asset.name)}`});await pipeline(createReadStream(asset.file),res);return;}}
       if(route==='/api/workflows'&&req.method==='GET')return json(res,200,{workflows:await workflows.list({section:url.searchParams.get('section')||'',status:url.searchParams.get('status')||'',query:(url.searchParams.get('q')||'').slice(0,200)})});
@@ -403,12 +400,12 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
         const [,id,action,assetId]=workflowMatch;
         if(req.method==='GET'&&!action)return json(res,200,await workflows.get(id));
         if(action==='assets'&&req.method==='GET'&&assetId){const asset=await workflows.asset(id,assetId);res.writeHead(200,{'Content-Type':asset.type,'Content-Length':asset.bytes,...(url.searchParams.has('download')?{'Content-Disposition':`attachment; filename="workflow-${assetId.slice(0,8)}.${asset.type==='application/octet-stream'?'bin':asset.type.split('/')[1]}`}:{})});await pipeline(createReadStream(asset.file),res);return;}
-        if(action==='assets'&&req.method==='POST'&&!assetId){const type=String(req.headers['content-type']||'').split(';')[0],chunks=[];let length=0;for await(const chunk of req){length+=chunk.length;if(length>110*1024*1024)throw Object.assign(new Error('工作流图片过大。'),{status:413});chunks.push(chunk);}return json(res,201,await workflows.putAsset(id,Buffer.concat(chunks),type));}
+        if(action==='assets'&&req.method==='POST'&&!assetId){const type=String(req.headers['content-type']||'').split(';')[0],bytes=await readRequestBytes(req,MAX_IMAGE_UPLOAD_BYTES,IMAGE_UPLOAD_MESSAGE);return json(res,201,await workflows.putAsset(id,bytes,type));}
         if(req.method==='POST'){
           if(action==='retry'){
             if(active||activePackage||critiqueActive)return json(res,409,{error:'有任务正在运行，请勿重复启动。'});
             active='reserved';let job;
-            try{const input=await body(req,24*1024*1024),w=await workflows.get(id);job=jobs.get(w.jobId);if(w.kind!=='retouch'||!job)throw new Error('此工作流应在调色工作台继续。');
+            try{const input=await body(req,IMAGE_JSON_BODY_BYTES),w=await workflows.get(id);job=jobs.get(w.jobId);if(w.kind!=='retouch'||!job)throw new Error('此工作流应在调色工作台继续。');
               if(!['prepare','generate','compose'].includes(input.step))throw new Error('请选择裁片、生成或合成步骤。');
               const dependency={prepare:'source',generate:'prepare',compose:'generate'}[input.step],upstream=w.steps.find(n=>n.id===dependency);if(upstream?.status!=='done')throw new Error('前置步骤尚未完成，请先从前面的失败步骤继续。');
               if(input.step!=='compose'&&!await bridge.account())return json(res,401,{error:'请先登录 ChatGPT，合成步骤本身不需要重新生成。'});
@@ -438,7 +435,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
         if(route==='/api/color/critique'){
           if(active||critiqueActive)return json(res,409,{error:'请等待当前图片任务完成。'});
           critiqueActive=true;const dir=path.join(directory,'analysis',randomUUID());let analysisAttempt=null;
-          try{const input=await body(req);if(input.workflow){const w=await workflows.get(input.workflow.id),n=w.steps.find(n=>n.id==='analysis');if(w.kind!=='color'||n?.status!=='running'||n.token!==input.workflow.token)throw Object.assign(new Error('审美步骤已过期，请重新开始。'),{status:409});analysisAttempt=input.workflow;}if(!await bridge.account())throw Object.assign(new Error('请先在AI修图板块登录ChatGPT，再使用审美分析。'),{status:401});await mkdir(dir,{recursive:true});const image=decodeImage(input.image);const prepared=await prepareEditImage(image.bytes,null);const imagePath=path.join(dir,'source.png');await writeFile(imagePath,prepared.source);let referencePath=null;
+          try{const input=await body(req,IMAGE_JSON_BODY_BYTES);if(input.workflow){const w=await workflows.get(input.workflow.id),n=w.steps.find(n=>n.id==='analysis');if(w.kind!=='color'||n?.status!=='running'||n.token!==input.workflow.token)throw Object.assign(new Error('审美步骤已过期，请重新开始。'),{status:409});analysisAttempt=input.workflow;}if(!await bridge.account())throw Object.assign(new Error('请先在AI修图板块登录ChatGPT，再使用审美分析。'),{status:401});await mkdir(dir,{recursive:true});const image=decodeImage(input.image);const prepared=await prepareEditImage(image.bytes,null);const imagePath=path.join(dir,'source.png');await writeFile(imagePath,prepared.source);let referencePath=null;
             if(input.reference){const ref=decodeImage(input.reference);const ready=await prepareEditImage(ref.bytes,null);referencePath=path.join(dir,'reference.png');await writeFile(referencePath,ready.source);}
             const model=normalizeModel(input.model),control={model,account:null};
             if(analysisAttempt){const previous=(await workflows.get(analysisAttempt.id)).steps.find(n=>n.id==='analysis')?.output;control.account=accountSnapshot(previous?.account);if(normalizeModel(previous?.model)===model)control.resolvedModel=normalizeModel(previous?.resolvedModel);}
@@ -553,7 +550,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       if (route === '/api/prompt' && req.method === 'POST') {
         return json(res, 200, { prompt: paintingPrompt(await body(req)) });
       }
-      if(route==='/api/jobs'&&req.method==='POST'){return json(res,202,await startRetouch(await body(req,70*1024*1024)));}
+      if(route==='/api/jobs'&&req.method==='POST'){return json(res,202,await startRetouch(await body(req,IMAGE_JSON_BODY_BYTES)));}
       const jobMatch = /^\/api\/jobs\/([a-f0-9-]{36})(\/cancel)?$/.exec(route);
       if (jobMatch) {
         const job = jobs.get(jobMatch[1]);
@@ -594,7 +591,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       } else if (req.method === 'GET' && /^\/models\/(selfie_multiclass_256x256\.tflite|face_landmarker\.task|hand_landmarker\.task)$/.test(route)) {
         file=path.join(ROOT,'models',path.basename(route));
       } else {
-        const files = { '/portrait':'portrait.html','/portrait/':'portrait.html','/ai':'index.html','/ai/':'index.html','/image-import.js':'image-import.js','/image-formats.js':'image-formats.js','/workspace.js':'workspace.js','/workspace.css':'workspace.css','/workflow-sections.js':'workflow-sections.js','/manual-portrait.js':'manual-portrait.js','/manual-portrait-worker.js':'manual-portrait-worker.js','/manual-portrait-engine.js':'manual-portrait-engine.js','/manual-portrait.css':'manual-portrait.css', '/android-shell.js':'android-shell.js','/android-shell.css':'android-shell.css','/superres-options.js':'superres-options.js', '/superres.css':'superres.css', '/editor-layout.css':'editor-layout.css', '/image-viewer.js':'image-viewer.js','/view-geometry.js':'view-geometry.js','/image-viewer.css':'image-viewer.css', '/update-notice.js':'update-notice.js','/update-notice.css':'update-notice.css', '/paint-profile.js':'paint-profile.js','/feature-expansion.js':'feature-expansion.js','/prompt-contract.js':'prompt-contract.js','/feature-ui.js':'feature-ui.js','/target-policy.js':'target-policy.js','/target-masks.js':'target-masks.js','/vision-target.html':'vision-target.html', '/': 'index.html', '/app.js': 'app.js', '/catalog.js': 'catalog.js', '/style.css': 'style.css', '/favicon.svg': 'favicon.svg','/portrait-options.js':'portrait-options.js','/portrait-ui.js':'portrait-ui.js','/model-picker.js':'model-picker.js','/model-options.js':'model-options.js','/scene-options.js':'scene-options.js','/belly-options.js':'belly-options.js','/scene-ui.js':'scene-ui.js','/subject-mask.js':'subject-mask.js' };
+        const files = { '/upload-limits.js':'upload-limits.js','/portrait':'portrait.html','/portrait/':'portrait.html','/ai':'index.html','/ai/':'index.html','/image-import.js':'image-import.js','/image-formats.js':'image-formats.js','/workspace.js':'workspace.js','/workspace.css':'workspace.css','/workflow-sections.js':'workflow-sections.js','/manual-portrait.js':'manual-portrait.js','/manual-portrait-worker.js':'manual-portrait-worker.js','/manual-portrait-engine.js':'manual-portrait-engine.js','/manual-portrait.css':'manual-portrait.css', '/android-shell.js':'android-shell.js','/android-shell.css':'android-shell.css','/superres-options.js':'superres-options.js', '/superres.css':'superres.css', '/editor-layout.css':'editor-layout.css', '/image-viewer.js':'image-viewer.js','/view-geometry.js':'view-geometry.js','/image-viewer.css':'image-viewer.css', '/update-notice.js':'update-notice.js','/update-notice.css':'update-notice.css', '/paint-profile.js':'paint-profile.js','/feature-expansion.js':'feature-expansion.js','/prompt-contract.js':'prompt-contract.js','/feature-ui.js':'feature-ui.js','/target-policy.js':'target-policy.js','/target-masks.js':'target-masks.js','/vision-target.html':'vision-target.html', '/': 'index.html', '/app.js': 'app.js', '/catalog.js': 'catalog.js', '/style.css': 'style.css', '/favicon.svg': 'favicon.svg','/portrait-options.js':'portrait-options.js','/portrait-ui.js':'portrait-ui.js','/model-picker.js':'model-picker.js','/model-options.js':'model-options.js','/scene-options.js':'scene-options.js','/belly-options.js':'belly-options.js','/scene-ui.js':'scene-ui.js','/subject-mask.js':'subject-mask.js' };
         if (!Object.hasOwn(files, route) || req.method !== 'GET') return json(res, 404, { error: '页面不存在。' });
         file = path.join(ROOT, 'public', files[route]);
       }

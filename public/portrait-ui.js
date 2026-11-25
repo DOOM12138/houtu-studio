@@ -1,3 +1,4 @@
+import {MAX_IMAGE_UPLOAD_BYTES} from './upload-limits.js';
 import {PORTRAIT_AREAS,PORTRAIT_PROFILES,portraitOptions} from './portrait-options.js';
 export function createPortraitTools({api,getImage,getSource,onChange,onBusy,feedback}){
  const $=id=>document.getElementById(id);let maskData='',diagnosis=null,auditId=null,notes='',model=null;
@@ -8,7 +9,7 @@ export function createPortraitTools({api,getImage,getSource,onChange,onBusy,feed
  function reset(){maskData='';auditId=null;diagnosis=null;notes='';$('portrait-mask-file').value='';$('portrait-mask-view').hidden=true;$('portrait-audit-result').replaceChildren();$('portrait-apply-audit').disabled=true;}
  async function loadMask(url){const image=new Image();image.src=url;await image.decode();if(image.naturalWidth*image.naturalHeight>40000000)throw Error('蒙版超过4000万像素。');const c=document.createElement('canvas'),scale=1;c.width=Math.round(image.naturalWidth*scale);c.height=Math.round(image.naturalHeight*scale);c.getContext('2d').drawImage(image,0,0,c.width,c.height);maskData=c.toDataURL('image/png');$('portrait-mask-preview').src=maskData;$('portrait-mask-view').hidden=false;}
  async function buildMask(force=false){if(maskData&&!force)return maskData;const image=getImage();if(!image?.naturalWidth)throw Error('请先打开人物图片。');
-  const file=$('portrait-mask-file').files[0];if(file){if(file.size>12*1024*1024)throw Error('自备蒙版请控制在12 MB以内。');if(file.type!=='image/png')throw Error('请上传对应的灰度PNG蒙版。');const url=URL.createObjectURL(file);try{await loadMask(url);}finally{URL.revokeObjectURL(url);}return maskData;}
+  const file=$('portrait-mask-file').files[0];if(file){if(file.size>MAX_IMAGE_UPLOAD_BYTES)throw Error('自备蒙版最大支持100 MB。');if(file.type!=='image/png')throw Error('请上传对应的灰度PNG蒙版。');const url=URL.createObjectURL(file);try{await loadMask(url);}finally{URL.revokeObjectURL(url);}return maskData;}
   feedback('正在用本机模型分析当前成品的人物区域…');await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
   if(!model){const {FilesetResolver,ImageSegmenter}=await import('/vision/vision_bundle.mjs');model=await ImageSegmenter.createFromOptions(await FilesetResolver.forVisionTasks('/vision/wasm'),{baseOptions:{modelAssetPath:'/models/selfie_multiclass_256x256.tflite',delegate:'CPU'},runningMode:'IMAGE',outputCategoryMask:true,outputConfidenceMasks:true});}
   const c=document.createElement('canvas'),scale=Math.min(1,1024/Math.max(image.naturalWidth,image.naturalHeight));c.width=Math.round(image.naturalWidth*scale);c.height=Math.round(image.naturalHeight*scale);c.getContext('2d').drawImage(image,0,0,c.width,c.height);let selected=0;

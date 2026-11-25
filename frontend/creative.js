@@ -1,3 +1,4 @@
+import {MAX_IMAGE_UPLOAD_BYTES,IMAGE_UPLOAD_MESSAGE} from '/upload-limits.js';
 import {imageOrigin} from '/image-import.js';
 import {createImageViewer} from '/image-viewer.js';
 import {createModelPicker} from '/model-picker.js';
@@ -13,7 +14,7 @@ const message=(s,error=false)=>{$('creative-notice').textContent=s;$('creative-n
 const safe=fn=>async(...args)=>{try{await fn(...args);}catch(e){message(e.message||'操作未成功，请重试。',true);}};
 async function api(url,input){if(!csrf)csrf=(await(await fetch('/api/health')).json()).csrf;const r=await fetch(url,input===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json','X-Paint-CSRF':csrf},body:JSON.stringify(input)});const data=await r.json();if(!r.ok)throw Error(data.error||'操作失败。');return data;}
 const blob=c=>new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(Error('无法读取图片。')),'image/png'));
-async function canvas(file,restore=false){if(!restore&&file.size>30*1024*1024&&!imageOrigin(file))throw Error('单张图片请控制在30 MB以内。');const bitmap=await createImageBitmap(file);if(bitmap.width*bitmap.height>24000000){bitmap.close();throw Error('单张图片请控制在24 MP以内。');}const c=document.createElement('canvas');c.width=bitmap.width;c.height=bitmap.height;c.getContext('2d').drawImage(bitmap,0,0);bitmap.close();return c;}
+async function canvas(file,restore=false){if(!restore&&file.size>MAX_IMAGE_UPLOAD_BYTES&&!imageOrigin(file))throw Error(IMAGE_UPLOAD_MESSAGE);const bitmap=await createImageBitmap(file);if(bitmap.width*bitmap.height>24000000){bitmap.close();throw Error('单张图片请控制在24 MP以内。');}const c=document.createElement('canvas');c.width=bitmap.width;c.height=bitmap.height;c.getContext('2d').drawImage(bitmap,0,0);bitmap.close();return c;}
 async function upload(file){return uploadBlob(await blob(await canvas(file)));}
 async function uploadBlob(b){if(!csrf)await api('/api/health');const response=await fetch(`/api/workflows/${current.id}/assets`,{method:'POST',headers:{'X-Paint-CSRF':csrf,'Content-Type':'image/png'},body:b});const data=await response.json();if(!response.ok)throw Error(data.error||'保存图片未成功。');return data.id;}
 async function uploadCanvas(c){return uploadBlob(await blob(c));}

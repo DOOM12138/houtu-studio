@@ -1,3 +1,4 @@
+import {MAX_IMAGE_UPLOAD_BYTES,IMAGE_UPLOAD_MESSAGE} from './upload-limits.js';
 import {IMAGE_ACCEPT,needsImageImport} from './image-formats.js';
 const origins=new WeakMap(),originKeys=new Map(),selections=new WeakMap();let installed=false,csrf='',queue=Promise.resolve(),current=null,panel=null;
 const originKey=file=>file?[file.name,file.size,file.lastModified].join('|'):'';
@@ -20,9 +21,10 @@ export function installImageImports(){
  document.addEventListener('drop',event=>{const files=[...(event.dataTransfer?.files||[])];if(!files.some(needsImageImport))return;const input=event.target.closest?.('label')?.querySelector('input[type=file]')||document.querySelector('input[type=file][accept*="image"]');if(!input||input.disabled)return;event.preventDefault();event.stopImmediatePropagation();const transfer=new DataTransfer();for(const file of files)transfer.items.add(file);input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));},true);
  document.addEventListener('change',event=>{
   const input=event.target;if(!(input instanceof HTMLInputElement)||input.type!=='file'||!input.files?.length)return;const files=[...input.files];
+  if(/image\//i.test(input.accept)&&files.some(file=>!imageOrigin(file)&&file.size>MAX_IMAGE_UPLOAD_BYTES)){event.stopImmediatePropagation();const p=elements();p.root.hidden=false;p.status.textContent=IMAGE_UPLOAD_MESSAGE;p.links.hidden=true;p.details.hidden=true;input.value='';return;}
   if(!files.some(needsImageImport)){if(current?.input===input&&!files.some(imageOrigin)){panel.root.hidden=true;current=null;}return;}
   event.stopImmediatePropagation();queue=queue.catch(()=>{}).then(async()=>{const p=elements();p.root.hidden=false;p.links.hidden=true;p.details.hidden=true;input.disabled=true;
-   try{const prepared=[];for(const file of files){if(!needsImageImport(file)){prepared.push({file});continue;}if(file.size>110*1024*1024)throw Error('原始图片最大110MB。');p.status.textContent='正在本机导入 '+file.name+'，不发送到AI服务…';const imported=await request('/api/image-imports?name='+encodeURIComponent(file.name),file,true);prepared.push({imported});}await replaceInput(input,prepared);}
+   try{const prepared=[];for(const file of files){if(!needsImageImport(file)){prepared.push({file});continue;}if(file.size>MAX_IMAGE_UPLOAD_BYTES)throw Error('原始图片最大支持100 MB。');p.status.textContent='正在本机导入 '+file.name+'，不发送到AI服务…';const imported=await request('/api/image-imports?name='+encodeURIComponent(file.name),file,true);prepared.push({imported});}await replaceInput(input,prepared);}
    catch(e){p.status.textContent=e.message;if(e.workflowId){try{await loadImport(e.workflowId,input);}catch{p.links.hidden=false;p.history.href='/workflows/?id='+e.workflowId;p.history.textContent='查看保留的原始文件与错误';p.original.hidden=true;p.master.hidden=true;}}}
    finally{input.disabled=false;}
   });

@@ -1,3 +1,4 @@
+import {MAX_IMAGE_UPLOAD_BYTES,IMAGE_UPLOAD_MESSAGE} from './upload-limits.js';
 import {imageOrigin} from './image-import.js';
 import {createImageViewer} from './image-viewer.js';
 import {COS_PAINT_LEVELS,PAINT_EDIT_BRIEF} from './paint-profile.js';
@@ -249,7 +250,7 @@ async function setFile(file, reference = null) {
   reference=reference||imageOrigin(file)?.source||null;
   if (!file || busy || portraitChecking || running(currentJob?.status)) return;
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) return feedback('请选择 PNG、JPG 或 WebP 图片。');
-  if (!reference && file.size > 12 * 1024 * 1024) return feedback('图片超过 12 MB，请先缩小图片。');
+  if (!reference && file.size > MAX_IMAGE_UPLOAD_BYTES) return feedback(IMAGE_UPLOAD_MESSAGE);
   try {
     const data = reference ? URL.createObjectURL(file) : await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); });
     const img = new Image();

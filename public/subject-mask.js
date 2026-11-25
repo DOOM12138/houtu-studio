@@ -1,4 +1,5 @@
-﻿// Semantic segmentation is not instance-aware: the default keeps the largest central component.
+import {MAX_IMAGE_UPLOAD_BYTES} from './upload-limits.js';
+// Semantic segmentation is not instance-aware: the default keeps the largest central component.
 export function subjectWeights(probability,width,height,mode='primary'){
  if(!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1||width*height>2000000||probability.length!==width*height)throw Error('主体识别结果尺寸无效。');
  const size=width*height,labels=new Int32Array(size).fill(-1),queue=new Int32Array(size);let chosen=-1,best=-1,count=0;
@@ -27,7 +28,7 @@ export function createSubjectMaskEditor({getImage,canvas,file,mode,brush,add,sub
  function exportEditingMask(){if(!matte)throw Error('请先分析或上传主体保护蒙版。');const editing=document.createElement('canvas');editing.width=matte.width;editing.height=matte.height;const ctx=editing.getContext('2d'),pixels=matte.getContext('2d').getImageData(0,0,matte.width,matte.height);for(let i=0;i<pixels.data.length;i+=4){pixels.data[i]=pixels.data[i+1]=pixels.data[i+2]=255-pixels.data[i];pixels.data[i+3]=255;}ctx.putImageData(pixels,0,0);return editing.toDataURL('image/png');}
  const safe=fn=>async(...args)=>{try{await fn(...args);}catch(error){feedback(error.message);}};
  analyze.onclick=safe(async()=>{await build(true);feedback('绿色区域将保留原图。请检查主角、发丝与道具，可用增减保护修正；重新分析会替换手绘笔触。',true);});
- file.onchange=safe(async()=>{const selected=file.files[0];if(!selected)return;if(selected.type!=='image/png'||selected.size>12*1024*1024)throw Error('主体蒙版请使用12 MB以内、白色保留主体的PNG。');previous=matte?.toDataURL('image/png')||null;const url=URL.createObjectURL(selected);try{await load(url);}finally{URL.revokeObjectURL(url);}feedback('已载入主体保护，可用画笔增减。',true);});
+ file.onchange=safe(async()=>{const selected=file.files[0];if(!selected)return;if(selected.type!=='image/png'||selected.size>MAX_IMAGE_UPLOAD_BYTES)throw Error('主体蒙版请使用100 MB以内、白色保留主体的PNG。');previous=matte?.toDataURL('image/png')||null;const url=URL.createObjectURL(selected);try{await load(url);}finally{URL.revokeObjectURL(url);}feedback('已载入主体保护，可用画笔增减。',true);});
  mode.onchange=()=>{file.value='';previous=matte?.toDataURL('image/png')||previous;matte=null;canvas.hidden=true;undo.disabled=!previous;feedback('识别方式已更改，请重新分析；撤销可恢复上一张蒙版。');onChange();};
  function drawingMode(value){drawing=value;canvas.style.touchAction=value==='none'?'auto':'none';canvas.style.cursor=value==='none'?'default':'crosshair';add.setAttribute('aria-pressed',String(value==='add'));subtract.setAttribute('aria-pressed',String(value==='subtract'));}
  add.onclick=()=>drawingMode('add');subtract.onclick=()=>drawingMode('subtract');stop.onclick=()=>drawingMode('none');
