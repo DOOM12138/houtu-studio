@@ -20,11 +20,12 @@ await mkdir(extracted, { recursive: true });
 const isolatedEnv = { ...process.env, PATH: path.join(process.env.SystemRoot || 'C:/Windows', 'System32') };
 for (const key of ['OPENAI_API_KEY', 'OPENAI_BASE_URL', 'CODEX_HOME', 'NODE_PATH', 'NODE_OPTIONS']) delete isolatedEnv[key];
 function run(file, args, options = {}) {
+  console.log('VERIFY '+path.basename(file)+' '+args.slice(0,2).map(a=>String(a).slice(0,120)).join(' '));
   return new Promise((resolve, reject) => {
     const child = spawn(file, args, { windowsHide: true, env: isolatedEnv, ...options, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '', stderr = '';
     child.stdout.on('data', bytes => { stdout += bytes.toString(); }); child.stderr.on('data', bytes => { stderr += bytes.toString(); });
-    const timer = setTimeout(() => { child.kill(); reject(new Error('Portable verification command timed out')); }, 45000);
+    const timer = setTimeout(() => { child.kill(); reject(new Error('Portable verification timed out: '+path.basename(file)+' '+args.slice(0,2).join(' ')+'; output: '+(stderr||stdout).slice(-300))); }, 45000);
     child.on('error', error => { clearTimeout(timer); reject(error); });
     child.on('exit', code => { clearTimeout(timer); if (code === 0) resolve(stdout); else reject(new Error(`Portable command exited ${code}: ${stderr || stdout}`)); });
   });
