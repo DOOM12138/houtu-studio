@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>运行日志 · 厚涂小站</title><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/color/style.css"><link rel="stylesheet" href="/color/logs.css"><link rel="stylesheet" href="/workspace.css"><script type="module" src="/workspace.js"></script><script type="module" src="/color/logs.js"></script></head>
+<body><header><a class="brand" href="/portrait/">厚涂小站</a><button id="theme" type="button">切换主题</button></header>
+<main class="logs-main">
+ <div class="titlebar"><div><p class="logs-eyebrow">诊断与运行记录</p><h1>运行日志</h1><p>查看执行步骤、模型回执和失败原因；从关联工作流继续处理。</p></div><button id="logs-export" class="primary" type="button">导出脱敏日志 ZIP</button></div>
+ <p class="hint logs-privacy">只记录必要的运行信息。导出不含照片、账号凭据、图片文件名、原始提示词和 AI 原始回复。旧版本未记录的日志不会补造。</p>
+ <form id="logs-filters" class="logs-filters" aria-label="筛选日志">
+  <label>级别<select id="logs-level" name="level"><option value="">全部级别</option><option value="error">错误</option><option value="warn">提醒</option><option value="info">信息</option></select></label>
+  <label>类别<select id="logs-category" name="category"><option value="">全部类别</option><option value="workflow">工作流步骤</option><option value="agent">Agent 调度</option><option value="model">模型回执</option><option value="job">图片任务</option><option value="runtime">运行组件</option><option value="request">接口异常</option><option value="export">日志导出</option></select></label>
+  <label>时间范围<select id="logs-hours" name="hours"><option value="1">最近 1 小时</option><option value="24" selected>最近 24 小时</option><option value="168">最近 7 天</option><option value="336">最近 14 天</option><option value="0">全部保留记录</option></select></label>
+  <label>工作流编号<input id="logs-workflow" name="workflowId" type="text" autocomplete="off" placeholder="可从失败步骤进入" pattern="[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}"></label>
+  <label>查找运行信息<input id="logs-query" name="q" type="search" maxlength="100" placeholder="步骤、模型或错误码"></label>
+  <div class="logs-filter-actions"><button type="submit">应用筛选</button><button id="logs-reset" type="button">重置</button></div>
+ </form>
+ <div class="logs-toolbar"><div><strong id="logs-count">正在读取…</strong><span id="logs-updated" class="hint"></span></div><div class="logs-actions"><label><input id="logs-auto" type="checkbox" checked>每 5 秒刷新</label><button id="logs-refresh" type="button">刷新</button></div></div>
+ <p id="logs-status" role="status" aria-live="polite"></p><p id="logs-storage" class="hint"></p>
+ <section id="logs-download" class="logs-download" aria-label="导出结果" hidden><h2>诊断包已就绪</h2><p id="logs-receipt"></p><a id="logs-save" download>下载日志包</a><details><summary>校验值与导出内容</summary><p class="hint">包含当前筛选的最近 1000 条日志、程序环境、文件校验清单；指定工作流时附带脱敏步骤摘要。保留最近 5 份导出包，48 小时后可被清理。</p><code id="logs-sha"></code></details></section>
+ <section aria-label="日志记录"><ol id="logs-list" class="logs-list"></ol><div id="logs-empty" class="logs-empty" hidden><h2>当前没有匹配的日志</h2><p>可以扩大时间范围或重置筛选。新执行的步骤会自动记录。</p></div></section>
+ <p class="hint logs-footer">运行记录自动轮转，磁盘上限约 10 MB；导出缓存最多 40 MB。修图不因日志写入失败而中断。查看和导出日志不调用模型。</p>
+</main></body></html>

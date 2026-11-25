@@ -1,5 +1,7 @@
 # 前后端与运行边界
 
+`backend/diagnostics.mjs` 观测已提交的工作流变化、图片任务状态、客户端事件与请求异常；记录和回读均按允许字段重建，不写自由格式输入输出。`/api/logs` 只读筛选，`POST /api/logs/export` 经同源与CSRF校验后生成有校验清单的ZIP；文件留在私有 `data/logs/`。`/logs/` 和 `frontend/logs.js` 共用Windows、安卓及独立前端代理。日志队列与工作流持久化分离，磁盘异常退回有限内存，导出占用纳入更新忙锁。使用与保留规则见 `public/docs/LOGS.md`。
+
 GPU路由：`backend/agent-hardware.mjs`通过`scripts/probe-agent-gpu.ps1`的DXGI 64位显存和nvidia-smi读实际资源；`backend/local-retouch-agent.mjs`管理项目独立、锁定版本的Ollama/Qwen3-VL，真实GPU驻留验证和JSON/权限边界；`backend/agent-cloud.mjs`提供无本地模型的云端蒙版和细节增强。所有调用仍进入RetouchAgents检查点、图片请求账本与勾选范围校验；旧版配置不强制迁移。
 
 本项目是个人本机图片工作台。桌面默认一个进程在 127.0.0.1:4317 同时托管静态页面与 JSON API，面向本机用户。安卓版在手机内部运行同一前后端协议，使用私有随机端口和原生注入的本机访问密钥。

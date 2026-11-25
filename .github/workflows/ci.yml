@@ -17,4 +17,5 @@ jobs:
       - run: npm run test:uploads-ui
       - run: npm run test:history-ui
       - run: npm run test:planner-ui
+      - run: npm run test:logs-ui
       - run: npm run test:agent-ui

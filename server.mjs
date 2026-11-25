@@ -6,6 +6,7 @@ import {SoftwareUpdates} from './backend/software-updates.mjs';
 import {MobileDownloads} from './backend/mobile-downloads.mjs';
 import {localAccessAllowed} from './lib/local-access.mjs';
 import {APP_VERSION} from './lib/app-version.mjs';
+import {Diagnostics,logFilter} from './backend/diagnostics.mjs';
 import {exportProjectPhotos,backupProject,restoreProject} from './backend/studio-archive.mjs';
 import {StudioService} from './backend/studio.mjs';
 import {StudioPlanner} from './backend/studio-planner.mjs';
@@ -75,9 +76,10 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
   const home = path.join(directory, 'codex');
   const jobsDirectory = path.join(directory, 'jobs');
   await mkdir(jobsDirectory, { recursive: true });await mkdir(home,{recursive:true});
+  const diagnostics=await new Diagnostics(directory,{root:ROOT,version:APP_VERSION}).load();await diagnostics.record({event:'runtime.start'});
   const accounts=new AccountLedger(directory);await accounts.load();
   const library=new ImageLibrary(directory);await library.load();
-  const bridge = trackedBridge(suppliedBridge || new CodexBridge(home),accounts);
+  const rawBridge=suppliedBridge||new CodexBridge(home);if('diagnostic' in rawBridge){const previousDiagnostic=rawBridge.diagnostic;rawBridge.diagnostic=value=>{diagnostics.clientEvent(value);previousDiagnostic?.call(rawBridge,value);};}const bridge=trackedBridge(rawBridge,accounts);
   const startedAt=Date.now();let studio,planner,agents;const targetVision=suppliedVision||new TargetVision(()=>{const address=server.address();if(!address)throw Error('服务尚未启动。');return 'http://127.0.0.1:'+address.port;});
   const csrf = randomBytes(32).toString('hex');
   const mobileDownloads=clientPlatform==='android'?new MobileDownloads(directory):null;await mobileDownloads?.load();
@@ -87,7 +89,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
   await templates.load();
   const colors = new ColorStore(directory, path.join(ROOT, 'defaults', 'color-presets.json'));
   await colors.load();
-  const workflows=new WorkflowStore(directory);await workflows.load();const imageImports=new ImageImports(workflows,{mobile:clientPlatform==='android'});const promptLab=new PromptLab(directory);await promptLab.load();
+  const workflows=new WorkflowStore(directory,{onReadError:(workflowId,error)=>{void diagnostics.record({event:'workflow.load-failed',workflowId,level:'warn',error});},onWrite:(previous,current)=>diagnostics.observeWorkflow(previous,current)});await workflows.load();const imageImports=new ImageImports(workflows,{mobile:clientPlatform==='android'});const promptLab=new PromptLab(directory);await promptLab.load();
   const packages = new Map();
   let activePackage = null, latestPackage = null;
   const packageView = value => value && ({ id: value.id, status: value.status, message: value.message, bytes: value.bytes, sha256: value.sha256, downloadUrl: value.status === 'done' ? `/downloads/package/${value.id}` : null });
@@ -95,11 +97,11 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
   let critiqueActive = false;let portraitAuditControl=null,portraitAuditTask=null,isClosing=false,closingPromise=null;
   let login = null, loginStartedAt = 0;
   let loginError = '';
-  const runtimeBusy=()=>Boolean(active||activePackage||critiqueActive||studio?.active||studio?.archiving||mobileDownloads?.active||imageImports.active||(clientPlatform==='android'&&login&&Date.now()-loginStartedAt<15*60*1000));
+  const runtimeBusy=()=>Boolean(active||activePackage||critiqueActive||studio?.active||studio?.archiving||mobileDownloads?.active||diagnostics.activeExports||imageImports.active||(clientPlatform==='android'&&login&&Date.now()-loginStartedAt<15*60*1000));
   const platform=suppliedPlatform||new PlatformBrowser(directory);
   const creative=new CreativeService({workflows,bridge,platform,acquire:id=>{if(active||activePackage||critiqueActive||studio?.active||studio?.archiving)return false;active='creative-'+id;return true;},release:id=>{if(active==='creative-'+id)active=null;}});
   const jobWrites=new Map();
-  const persist=j=>{const snapshot=JSON.stringify(publicJob(j),null,2);const next=(jobWrites.get(j.id)||Promise.resolve()).catch(()=>{}).then(async()=>{const temp=path.join(j.directory,'job-'+randomUUID()+'.tmp');await writeFile(temp,snapshot);await replaceFile(temp,path.join(j.directory,'job.json'));});jobWrites.set(j.id,next);return next;};
+  const persist=j=>{const snapshot=JSON.stringify(publicJob(j),null,2);const next=(jobWrites.get(j.id)||Promise.resolve()).catch(()=>{}).then(async()=>{const temp=path.join(j.directory,'job-'+randomUUID()+'.tmp');await writeFile(temp,snapshot);await replaceFile(temp,path.join(j.directory,'job.json'));diagnostics.observeJob(JSON.parse(snapshot));});jobWrites.set(j.id,next);return next;};
   const isRunning = j => j && ['preparing', 'generating', 'cancelling'].includes(j.status);
 
   for (const entry of await readdir(jobsDirectory, { withFileTypes: true })) {
@@ -304,12 +306,12 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self'; img-src 'self' blob: data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
     if (!/^(127\.0\.0\.1|localhost):\d+$/.test(host)) return json(res, 403, { error: '仅允许本机访问。' });
-    let trackedOperation=false;
+    let trackedOperation=false,diagnosticOperation='UNKNOWN';
     try {
       const url = new URL(req.url, `http://${host}`);
-      const route = url.pathname;if(clientPlatform==='android'&&(route==='/api/packages'||route.startsWith('/downloads/package/')||/^\/api\/updates\/(prepare|apply|rollback)$/.test(route)))return json(res,409,{error:'安卓版请使用应用菜单中的安卓版更新。'});if(isClosing&&!['/api/health','/api/shutdown'].includes(route))return json(res,503,{error:'网站正在停止，请稍后重开。'});
+      const route = url.pathname;diagnosticOperation=req.method+'.'+(/^\/api\/(logs|retouch-agents|retouch-agent-capabilities|studio|workflows|jobs|updates|color|creative|superres|image-imports|account|models|login|templates)(?:\/|$)/.exec(route)?.[1]||'other');if(clientPlatform==='android'&&(route==='/api/packages'||route.startsWith('/downloads/package/')||/^\/api\/updates\/(prepare|apply|rollback)$/.test(route)))return json(res,409,{error:'安卓版请使用应用菜单中的安卓版更新。'});if(isClosing&&!['/api/health','/api/shutdown'].includes(route))return json(res,503,{error:'网站正在停止，请稍后重开。'});
       if (!['GET', 'POST'].includes(req.method)) return json(res, 405, { error: '不支持的请求。' });
-      if(req.method==='POST'&&(studio.active||studio.archiving)&&!route.startsWith('/api/studio/')&&!route.startsWith('/api/mobile/downloads')&&route!=='/api/shutdown'&&!route.startsWith('/api/updates/')&&!/^\/api\/jobs\/[a-f0-9-]{36}\/cancel$/.test(route)&&!/^\/api\/retouch-agents\/[a-f0-9-]{36}\/(pause|cancel)$/.test(route))return json(res,409,{error:'照片流程正在运行，请先完成本步并暂停。'});
+      if(req.method==='POST'&&(studio.active||studio.archiving)&&!route.startsWith('/api/studio/')&&!route.startsWith('/api/mobile/downloads')&&route!=='/api/shutdown'&&!route.startsWith('/api/updates/')&&route!=='/api/logs/export'&&!/^\/api\/jobs\/[a-f0-9-]{36}\/cancel$/.test(route)&&!/^\/api\/retouch-agents\/[a-f0-9-]{36}\/(pause|cancel)$/.test(route))return json(res,409,{error:'照片流程正在运行，请先完成本步并暂停。'});
       if (req.method === 'POST') {
         if (req.headers.origin !== `http://${host}` || req.headers['x-paint-csrf'] !== csrf) return json(res, 403, { error: '请从本站页面发起操作。' });
       }
@@ -347,6 +349,9 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
           return json(res,201,{projectId:project.id,photoId:photo.id,workflowId:photo.workflowId,url:'/upscale/?project='+project.id});
         }finally{if(active===reservation)active=null;}
       }
+      if(route==='/api/logs'&&req.method==='GET')return json(res,200,await diagnostics.read(Object.fromEntries(url.searchParams)));
+      if(route==='/api/logs/export'&&req.method==='POST'){const input=logFilter(await body(req,4096)),workflow=input.workflowId?await workflows.get(input.workflowId).catch(()=>null):null,receipt=await diagnostics.export(input,workflow);void diagnostics.record({event:'export.created',workflowId:input.workflowId,data:{bytes:receipt.bytes,count:receipt.count}});return json(res,201,receipt);}
+      const logDownload=/^\/api\/logs\/exports\/([a-f0-9-]{36})$/.exec(route);if(logDownload&&req.method==='GET'){const receipt=await diagnostics.asset(logDownload[1]);res.writeHead(200,{'Content-Type':'application/zip','Content-Length':receipt.bytes,'Cache-Control':'no-store','X-Houtu-Content-SHA256':receipt.sha256,'Content-Disposition':"attachment; filename*=UTF-8''"+encodeURIComponent(receipt.name)});await pipeline(createReadStream(receipt.file),res);return;}
       if(route==='/api/retouch-agent-capabilities'&&req.method==='GET')return json(res,200,await agents.capabilities({refresh:url.searchParams.get('refresh')==='1',model:url.searchParams.get('model')||'auto'}));
       if(route==='/api/studio/projects'&&req.method==='GET')return json(res,200,{projects:studio.list(),active:studio.active?{projectId:studio.active.projectId,currentPhoto:studio.active.currentPhoto,currentStep:studio.active.currentStep}:null});
       const agentCreate=/^\/api\/studio\/projects\/([a-f0-9-]{36})\/agents$/.exec(route);
@@ -605,6 +610,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       if (imageMatch && req.method === 'GET' && jobs.has(imageMatch[1])) {
         file = path.join(jobsDirectory, imageMatch[1], imageMatch[2]);
         if (url.searchParams.has('download')) res.setHeader('Content-Disposition', `attachment; filename="anime-paint-${imageMatch[1].slice(0,8)}.${path.extname(file).slice(1)}"`);
+      } else if(req.method==='GET'&&(route==='/logs'||route==='/logs/')){file=path.join(ROOT,'frontend','logs.html');
       } else if(req.method==='GET'&&(route==='/server'||route==='/server/')){
         file=path.join(ROOT,'frontend','server.html');
       } else if (req.method === 'GET' && (route === '/color' || route === '/color/' || route === '/ai/color' || route === '/ai/color/')) {
@@ -619,7 +625,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
         file=path.join(ROOT,'frontend','workflows.html');
       } else if(req.method==='GET'&&(route==='/creative'||route==='/creative/')){
         file=path.join(ROOT,'frontend','creative.html');
-      } else if (req.method === 'GET' && /^\/color\/(app\.js|engine\.js|worker\.js|masks\.js|workflow-client\.js|workflows\.js|effects\.js|creative\.js|creative-multi\.js|server\.js|studio\.js|studio-agent\.js|studio-planner\.js|studio-layout\.(?:js|css)|lab\.js|tonal-looks\.js|tone-controls\.js|upscale\.js|updates\.js|style\.css)$/.test(route)) {
+      } else if (req.method === 'GET' && /^\/color\/(app\.js|engine\.js|worker\.js|masks\.js|workflow-client\.js|workflows\.js|effects\.js|creative\.js|creative-multi\.js|server\.js|studio\.js|studio-agent\.js|studio-planner\.js|studio-layout\.(?:js|css)|logs\.(?:js|css)|lab\.js|tonal-looks\.js|tone-controls\.js|upscale\.js|updates\.js|style\.css)$/.test(route)) {
         file=path.join(ROOT,'frontend',path.basename(route));
       } else if (req.method === 'GET' && /^\/vision\/(vision_bundle\.mjs|wasm\/vision_wasm_(?:nosimd_)?internal\.(?:js|wasm))$/.test(route)) {
         file=path.join(ROOT,'node_modules','@mediapipe','tasks-vision',route.slice('/vision/'.length));
@@ -633,6 +639,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       let bytes = await readFile(file);if(clientPlatform==='android'&&path.extname(file)==='.html')bytes=Buffer.from(bytes.toString('utf8').replace('<head>','<head><script src="/android-shell.js"></script><link rel="stylesheet" href="/android-shell.css">'));
       res.writeHead(200, { 'Content-Type': ({'.mjs':'text/javascript; charset=utf-8','.wasm':'application/wasm'})[path.extname(file)] || MIME[path.extname(file)] || 'application/octet-stream' }); res.end(bytes);
     } catch (error) {
+      void diagnostics.record({event:'request.failed',level:error.status&&error.status<500?'warn':'error',workflowId:error.workflowId,data:{operation:diagnosticOperation,httpStatus:error.code==='ENOENT'?404:error.status||400},error});
       if (!res.headersSent) json(res, error.code === 'ENOENT' ? 404 : error.status || 400, { error: friendlyError(error.message),...(error.workflowId?{workflowId:error.workflowId}:{}) });
       else res.end();
     } finally {if(trackedOperation)pendingOperations--;}
@@ -646,10 +653,10 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     await creative.drain();await studio.drain();await agents.drain();await targetVision.close();if(portraitAuditTask)await Promise.allSettled([portraitAuditTask]);
     await Promise.allSettled([...jobWrites.values()]);
     await Promise.allSettled([accounts.queue,library.queue,...library.pendingThumbs.values()]);
-    server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
+    await diagnostics.close();server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
     try { const record = JSON.parse(await readFile(path.join(directory, 'server.json'), 'utf8')); if (record.instanceId === instanceId) await unlink(path.join(directory, 'server.json')); } catch {}
   })();
-  return { server, bridge, studio, planner, agents, targetVision, updates, instanceId, close, isBusy:runtimeBusy };
+  return { server, bridge, studio, planner, agents, diagnostics, targetVision, updates, instanceId, close, isBusy:runtimeBusy };
 }
 
 export function friendlyError(message = '') {
