@@ -26,6 +26,8 @@ jobs:
       - uses: actions/setup-java@v4
         with: {distribution: 'temurin', java-version: '21'}
       - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
       - name: Prepare Android toolchain
         run: |
           rustup toolchain install 1.99.1 --profile minimal --target ${{ matrix.target }}
