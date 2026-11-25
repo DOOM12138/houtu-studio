@@ -1,6 +1,6 @@
 {
   "name": "anime-paint-studio",
-  "version": "1.23.0",
+  "version": "1.23.1",
   "description": "使用 ChatGPT 账号登录的本机二次元厚涂工作台",
   "main": "server.mjs",
   "scripts": {
