@@ -14,6 +14,8 @@ Windows 发布使用官方 Codex 0.172.0 同版本独立 app-server，按 deskto
 
 Setup 使用 NSIS 的 LZMA 压缩；ZIP 为兼容旧客户端的便携与更新格式。宿主、WebView2 DLL 和独立客户端全部在现有 runtime 白名单内，旧客户端可验证更新 ZIP；新宿主会在运行库替换前退出，独立更新进程验证新版服务后恢复窗口。回退保留当前私人数据。
 
+1.22是首个桌面宿主版本。要回到1.21或更早的浏览器版，请从GitHub下载对应便携包；桌面宿主会在改动文件前阻止这类自动回退，避免留下失效的EXE快捷方式。后续桌面版本仍使用同一套程序回退与资料保留流程。
+
 SDK、NSIS 编译器与下载缓存只放 .cache/desktop。微软 WebView2 引导程序每次构建核对 Authenticode 发布者与签名；自有 EXE/Setup 尚无商业代码签名，下载需使用本项目 GitHub Release 的 SHA-256 回执。软件本身免费，无站内收费。
 
 ## 构建与验收
