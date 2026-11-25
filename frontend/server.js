@@ -1,5 +1,5 @@
 ﻿import './updates.js';
-const $=id=>document.getElementById(id);
+const $=id=>document.getElementById(id),mobile=document.documentElement.dataset.platform==='android';
 let page=1,total=0,requestId=0,timer;
 const names={pipeline:'照片配方',retouch:'人物精修',color:'调色成品',creative:'特效与合成'};
 const date=value=>value?new Date(value).toLocaleString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'尚未记录';
@@ -10,7 +10,7 @@ async function loadStatus(){
  const info=await get('/api/server/status'),current=info.current;
  $('server-current').textContent=current.status==='signedIn'?(current.account?'已登录 · '+current.account.email+' · '+current.account.plan:'已登录 · 客户端未返回账号标识'):current.status==='signedOut'?'ChatGPT 尚未登录，图片档案仍可查看':'账号状态待确认，已有记录仍保留';
  $('server-info').replaceChildren();
- for(const [label,value]of [['电脑',info.machine],['版本',info.version],['数据目录',info.dataRoot],['本机授权目录',info.loginRoot],['本次启动',date(info.startedAt)],['资料库建立',date(info.created)],['访问范围','仅此电脑 · 127.0.0.1']])$('server-info').append(text('dt',label),text('dd',value));
+ for(const [label,value]of [[mobile?'手机':'电脑',mobile?'本机独立运行':info.machine],['版本',info.version],['数据目录',info.dataRoot],['本机授权目录',info.loginRoot],['本次启动',date(info.startedAt)],['资料库建立',date(info.created)],['访问范围',mobile?'仅本手机 · 127.0.0.1':'仅此电脑 · 127.0.0.1']])$('server-info').append(text('dt',label),text('dd',value));
  const selected=$('archive-account').value;$('archive-account').replaceChildren(new Option('全部账号',''),new Option('未记录账号','unknown'));$('server-account-list').replaceChildren();$('server-account-count').textContent=info.accounts.length+' 个';
  for(const account of info.accounts){
   $('archive-account').append(new Option(account.email,account.id));const row=document.createElement('article');row.className='server-account';row.append(text('h3',account.email));

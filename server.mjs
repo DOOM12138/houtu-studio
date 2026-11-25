@@ -473,7 +473,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       }
       if (route === '/api/state' && req.method === 'GET') {
         let account = null, serviceError = '';
-        try { account = await bridge.account(); } catch { serviceError = '本机图片客户端未就绪，请重启网站，或在项目文件夹运行 npm install。'; }
+        try { account = await bridge.account(); } catch { serviceError = clientPlatform==='android'?'手机内置AI客户端尚未就绪，请重新打开应用或在更多中复制诊断；本地调色与超分仍可使用。':'本机图片客户端未就绪，请重启网站，或在项目文件夹运行 npm install。'; }
         return json(res, 200, { csrf, account, serviceError, loginError, loginPending: Boolean(login), defaultPrompt: DEFAULT_PROMPT,
           activeAnalysis:critiqueActive||active==='portrait-audit',activeJob: jobs.has(active) ? publicJob(jobs.get(active)) : null, package: packageView(packages.get(latestPackage)) });
       }
