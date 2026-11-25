@@ -86,7 +86,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
   const packageView = value => value && ({ id: value.id, status: value.status, message: value.message, bytes: value.bytes, sha256: value.sha256, downloadUrl: value.status === 'done' ? `/downloads/package/${value.id}` : null });
   let active = null, pendingOperations=0;
   let critiqueActive = false;let portraitAuditControl=null,portraitAuditTask=null,isClosing=false,closingPromise=null;
-  let login = null;
+  let login = null, loginStartedAt = 0;
   let loginError = '';
   const platform=suppliedPlatform||new PlatformBrowser(directory);
   const creative=new CreativeService({workflows,bridge,platform,acquire:id=>{if(active||activePackage||critiqueActive||studio?.active||studio?.archiving)return false;active='creative-'+id;return true;},release:id=>{if(active==='creative-'+id)active=null;}});
@@ -524,6 +524,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
         if (!login) {
           loginError = '';
           login = await bridge.login();
+          loginStartedAt = Date.now();
           const auth = new URL(login.authUrl);
           if (auth.protocol !== 'https:' || auth.hostname !== 'auth.openai.com') { login = null; throw new Error('官方登录地址校验失败。'); }
         }
@@ -604,7 +605,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
     try { const record = JSON.parse(await readFile(path.join(directory, 'server.json'), 'utf8')); if (record.instanceId === instanceId) await unlink(path.join(directory, 'server.json')); } catch {}
   })();
-  return { server, bridge, studio, targetVision, updates, instanceId, close, isBusy:()=>Boolean(active||activePackage||critiqueActive||studio.active||studio.archiving||mobileDownloads?.active) };
+  return { server, bridge, studio, targetVision, updates, instanceId, close, isBusy:()=>Boolean(active||activePackage||critiqueActive||studio.active||studio.archiving||mobileDownloads?.active||(clientPlatform==='android'&&login&&Date.now()-loginStartedAt<15*60*1000)) };
 }
 
 export function friendlyError(message = '') {

@@ -41,7 +41,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             upstream/codex-rs/target
-          key: codex-android-0.172-${{ matrix.target }}-${{ hashFiles('studio/scripts/build-android-codex.py') }}
+          key: codex-android-0.172-${{ matrix.target }}-${{ hashFiles('studio/scripts/build-android-codex.py', 'studio/android/codex-source.json') }}
           restore-keys: codex-android-0.172-${{ matrix.target }}-
       - name: Build the image-capable upstream app-server
         run: python3 studio/scripts/build-android-codex.py --source upstream --ndk "$ANDROID_HOME/ndk/27.3.13750724" --target ${{ matrix.target }} --output native-output
@@ -52,7 +52,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             upstream/codex-rs/target
-          key: codex-android-0.172-${{ matrix.target }}-${{ hashFiles('studio/scripts/build-android-codex.py') }}
+          key: codex-android-0.172-${{ matrix.target }}-${{ hashFiles('studio/scripts/build-android-codex.py', 'studio/android/codex-source.json') }}
       - uses: actions/upload-artifact@v4
         if: success()
         with:

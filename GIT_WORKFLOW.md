@@ -44,3 +44,7 @@ Git 只管理源码。切换版本不会把 data/ 的工作流格式回退，旧
 源码目录（含 .git）或未完整部署运行环境的目录显示版本提示，但请继续按 GIT_WORKFLOW.md 使用 Git 更新；不会自动覆盖源码。旧于 1.17 的便携版第一次需手动下载新包，停止旧网站，备份 data，再把 data 放入新包目录。GitHub 自动生成的 Source code ZIP 不含便携运行环境，请下载 Windows-x64 ZIP。
 
 维护者：修改版本号与 CHANGELOG，完成检查并提交后推送 v版本号 标签。GitHub Actions 会校验、打包、上传到草稿，确认 ZIP 与 SHA256 文件齐全后才公开发布。失败的草稿不会成为客户端最新稳定版；已公开版本不原地替换，修复请递增版本。分叉发布需同步修改 lib/distribution.mjs 中的更新仓库。
+
+1.21起同一次发版还需通过安卓隔离设备检查，再生成两种架构的签名APK与Windows ZIP；全部附件核对后才公开。安卓运行库从 runtime-lock.json 中的持久版本获取，不依赖短期CI产物。维护者的长期安卓签名在私有 data/android-signing 和专用发布 secrets；清缓存与项目分享均不包含签名，也不要重新生成它。
+
+安卓代码回退同样使用 git revert，之后递增软件版本重新发布。系统常规安装不支持降低应用版本号；Git 回退只回退代码，不回退手机里的照片、工作流或账号数据。Android构建、依赖、签名与验证边界见 android/README.md。
