@@ -260,7 +260,17 @@ test('large normalized PNG sources and results can be reused by local reference 
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   assert.equal(done.status, 'done');
+  // Completed pixels can be visible while the server is finishing its private
+  // bookkeeping. Wait for the public idle boundary before starting another job.
+  const idle = async () => {
+    for (let n = 0; n < 100; n++) {
+      if (!(await (await fetch(origin + '/api/health')).json()).busy) return;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.fail('server did not become idle after a completed or cancelled image');
+  };
   for (const kind of ['source', 'result']) {
+    await idle();
     const { image: ignored, ...options } = input;
     const response = await post('/api/jobs', { ...options, source: { jobId: first.id, kind } });
     assert.equal(response.status, 202);

@@ -1,5 +1,6 @@
 import path from 'node:path';import os from 'node:os';
-import {readFile,readdir,mkdir,link,copyFile} from 'node:fs/promises';import {randomUUID,createHash} from 'node:crypto';import sharp from 'sharp';
+import {readFile,readdir,mkdir} from 'node:fs/promises';import {randomUUID,createHash} from 'node:crypto';import sharp from 'sharp';
+import {linkOrCopyFile} from '../lib/files.mjs';
 import {agentOptions,agentSteps,agentActions,agentBudget,imageAction,AGENT_VERSION} from '../public/retouch-agent-options.js';
 import {AGENT_KNOWLEDGE_VERSION,AGENT_TUTORIALS} from '../public/retouch-agent-knowledge.js';
 import {validateAgentPlan,compileAgentPrompt} from './agent-planning.mjs';
@@ -49,7 +50,7 @@ export class RetouchAgents{
   control.onModelSelected=async resolved=>{await this.workflows.mutate(w.id,current=>{current.roleModels||={};current.roleModels.planning={selected:requested,resolvedModel:resolved};return {};});};
   const inputs=assets.map((assetId,index)=>({assetId,role:index===0?'source':node.id==='check'||node.id==='recheck'?'current-result':'reference'}));
   await this.partial(w.id,node.id,token,{...(w.steps.find(s=>s.id===node.id).output||{}),imageAsset:node.deps.length?w.steps.find(s=>s.id===node.deps[0]).output.imageAsset:w.steps[0].output.imageAsset,compiledPrompt:prompt,sentInputs:inputs,model:requested,account:accountSnapshot(control.account)});
-  this.guard(run);const files=[],directory=path.join(this.workflows.folder(w.id),'analysis',node.id,token);await mkdir(directory,{recursive:true});for(const assetId of assets){const asset=await this.workflows.asset(w.id,assetId),extension=({'image/jpeg':'jpg','image/png':'png','image/webp':'webp'})[asset.type];if(!extension)throw Error('分析输入必须是实际图片。');const file=path.join(directory,assetId+'.'+extension);try{await link(asset.file,file);}catch(e){if(e.code!=='EEXIST'){if(!['EXDEV','EPERM','ENOTSUP','EOPNOTSUPP'].includes(e.code))throw e;await copyFile(asset.file,file);}}files.push(file);}
+  this.guard(run);const files=[],directory=path.join(this.workflows.folder(w.id),'analysis',node.id,token);await mkdir(directory,{recursive:true});for(const assetId of assets){const asset=await this.workflows.asset(w.id,assetId),extension=({'image/jpeg':'jpg','image/png':'png','image/webp':'webp'})[asset.type];if(!extension)throw Error('分析输入必须是实际图片。');const file=path.join(directory,assetId+'.'+extension);try{await linkOrCopyFile(asset.file,file);}catch(e){if(e.code!=='EEXIST')throw e;}files.push(file);}
   try{const value=await this.bridge.analyzeImages(files,prompt,control);this.guard(run);if(JSON.stringify(value).length>256000)throw Error('调度模型返回内容过大。');return {value,receipt:{provider:'chatgpt',model:requested,resolvedModel:control.resolvedModel||null,account:accountSnapshot(control.account),compiledPrompt:prompt,sentInputs:inputs,rawResponse:value,version:AGENT_VERSION}};}finally{run.control=null;}
  }
  async renderImage(w,node,token,run,inputAsset,action,{repair=false}={}){
