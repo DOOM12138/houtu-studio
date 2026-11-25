@@ -7,8 +7,9 @@
  <div class="server-session"><span id="server-current">正在确认 ChatGPT 登录状态…</span><a href="/">管理 ChatGPT 登录</a></div>
  <section id="software-updates" class="software-updates" aria-labelledby="updates-title">
   <div class="section-head"><div><h2 id="updates-title">版本与更新</h2><p id="updates-versions" class="hint">正在读取当前版本…</p></div><button id="updates-check">检查更新</button></div>
+  <p class="hint">完整更新同步人物修图、调色、AI工具、提示词、前后端与模型资源。照片、账号、自定义预设和工作流保留；安装前请保存各工作台修改。</p>
   <p id="updates-status" role="status" aria-live="polite">正在读取更新信息…</p>
-  <label class="updates-auto"><input id="updates-auto" type="checkbox" checked>自动检查并提示新版本</label>
+  <label class="updates-auto"><input id="updates-auto" type="checkbox" checked>启动及运行时每15分钟检查 GitHub 更新</label>
   <p class="hint">网站启动后及运行中每 12 小时检查公开版本。安装由你决定；请先保存其他页面的修改。</p>
   <progress id="updates-progress" max="100" value="0" hidden aria-label="安装包下载进度"></progress><p id="updates-bytes" class="hint" hidden></p>
   <div class="updates-actions"><button id="updates-download" hidden>下载并校验更新</button><button id="updates-apply" hidden>重启并安装更新</button><button id="updates-rollback" hidden>回退上个版本</button><a id="updates-release" href="https://github.com/DOOM12138/houtu-studio/releases" target="_blank" rel="noopener">查看公开版本</a></div>

@@ -27,6 +27,15 @@ public final class MainActivity extends Activity {
   Uri lastSaved;
   String lastMime;
   boolean ready = false;
+  boolean updatesForeground = false;
+  final Handler updatesHandler = new Handler(Looper.getMainLooper());
+  final Runnable automaticUpdates = new Runnable() {
+    public void run() { if (updatesForeground && !isFinishing()) {
+      AndroidUpdates.check(MainActivity.this, true);
+      updatesHandler.postDelayed(this, UpdatePolicy.AUTO_INTERVAL_MS);
+    } }
+  };
+
 
   public void onCreate(Bundle b) {
     super.onCreate(b);
@@ -275,6 +284,7 @@ public final class MainActivity extends Activity {
     PopupMenu p = new PopupMenu(this, anchor);
     String[] titles = {"AI特效与合成", "工作流管理", "图片档案", "提示词实验室", "检查安卓版更新", "分享最近成片", "复制诊断", "照片项目", "超分4K"};
     for (int i = 0; i < titles.length; i++) p.getMenu().add(0, i, i, titles[i]);
+    p.getMenu().add(0, 9, 9, "自动检查GitHub更新").setCheckable(true).setChecked(AndroidUpdates.enabled(this));
     p.setOnMenuItemClickListener(
         item -> {
           switch (item.getItemId()) {
@@ -292,6 +302,9 @@ public final class MainActivity extends Activity {
               break;
             case 4:
               AndroidUpdates.check(this);
+              break;
+            case 9:
+              AndroidUpdates.configure(this, !AndroidUpdates.enabled(this));
               break;
             case 5:
               if (lastSaved != null) {
@@ -332,7 +345,7 @@ public final class MainActivity extends Activity {
     String script =
         "window.addEventListener('message',function receive(e){if(e.data!=="
             + quoted
-            + "||e.ports.length!==1||(e.source&&e.source!==window))return;window.removeEventListener('message',receive);window.houtuDocuments=e.ports[0];});";
+            + "||e.ports.length!==1||(e.source&&e.source!==window))return;window.removeEventListener('message',receive);window.houtuDocuments=e.ports[0];window.dispatchEvent(new Event('houtu:documents-ready'));});";
     web.evaluateJavascript(
         script,
         unused -> {
@@ -347,6 +360,9 @@ public final class MainActivity extends Activity {
                   try {
                     JSONObject q = new JSONObject(raw);
                     String type = q.optString("type");
+                    if (type.equals("updatesStatus")) { AndroidUpdates.publish(MainActivity.this); return; }
+                    if (type.equals("checkUpdates")) { AndroidUpdates.details(MainActivity.this); return; }
+                    if (type.equals("dismissUpdate")) { AndroidUpdates.dismiss(MainActivity.this, q.optString("version")); return; }
                     if (type.equals("open")) {
                       openExternal(q.optString("url"));
                       return;
@@ -525,6 +541,15 @@ public final class MainActivity extends Activity {
     startForegroundService(new Intent(this, RuntimeService.class));
   }
 
+  protected void onResume() {
+    super.onResume(); updatesForeground = true;
+    updatesHandler.removeCallbacks(automaticUpdates); updatesHandler.postDelayed(automaticUpdates, 4000);
+  }
+
+  protected void onPause() {
+    updatesForeground = false; updatesHandler.removeCallbacks(automaticUpdates); super.onPause();
+  }
+
   protected void onStop() {
     RuntimeHost.visible = false;
     super.onStop();
@@ -555,6 +580,7 @@ public final class MainActivity extends Activity {
   }
 
   protected void onDestroy() {
+    updatesHandler.removeCallbacks(automaticUpdates);
     if (documents != null) documents.close();
     if (web != null) web.destroy();
     if (engine != null && engine.getParent() != null)

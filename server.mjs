@@ -202,6 +202,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     const job = jobs.get(active);
     if (!isRunning(job) || params.threadId !== job.threadId) return;
     if (method === 'turn/started') job.turnId = params.turn.id;
+    if(method==='item/completed'&&params.item?.type==='agentMessage'&&typeof params.item.text==='string')job.imageReply=params.item.text.slice(0,2000);
     if (method === 'item/started' && params.item?.type === 'imageGeneration') {
       job.message = `正在进行${PRESETS.find(p => p.id === job.operation)?.name || '人物精修'}，请稍候…`;
     }
@@ -217,7 +218,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
           if (params.turn.status === 'interrupted') await finish(job, 'cancelled', '已停止生成。',runId);
           else if (params.turn.status === 'failed') await finish(job, 'error', friendlyError(params.turn.error?.message),runId);
           else if (job.output) await finish(job, 'done', job.region ? '局部精修完成，选区外已保留原图。' : '人物精修完成，可以对比、下载或继续精修。',runId);
-          else await finish(job, 'error', '这次没有生成图片。请确认账号可用图片功能，再重试。',runId);
+          else await finish(job, 'error', '这次没有生成图片。'+(job.imageReply?'模型回复：'+job.imageReply:'请检查本机绘图执行组件及账号的图片能力。'),runId);
         } catch (error) { await finish(job, 'error', friendlyError(error.message),runId); }
       })().catch(() => {});
     }
@@ -244,6 +245,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
   const findRequest=requestKey=>[...jobs.values()].find(job=>job.requestKey===requestKey);
   const startRetouch=async(input,{requestKey=null,pipelineParentId=null,expectedAccount=null,managed=false}={})=>{
     if(requestKey){if(!/^[a-f0-9]{64}$/.test(requestKey))throw Error('流程请求标识无效。');const existing=findRequest(requestKey);if(existing)return publicJob(existing);}
+    const imageRuntime=bridge.imageRuntimeStatus?.();if(imageRuntime?.ready===false)throw Object.assign(Error(imageRuntime.message),{status:409});
     if(active||activePackage||critiqueActive||(studio?.active||studio?.archiving)&&!managed)throw Object.assign(Error('工作台已有任务，请先暂停或等待完成。'),{status:409});
     active='reserved';let job;try{
           const options = normalizeEditOptions(input),tool=PRESETS.find(p=>p.id===options.operation),references=referenceInputs(input.references);if(tool.output==='outpaint'&&input.protectionMask)throw Error('扩图使用原图全区域保护，不需要额外人物蒙版。');if(tool.referenceRole&&references.some(r=>!['any','style','result-guide',tool.referenceRole].includes(r.role)))throw Error('参考图角色与当前功能不一致，请重新选择。');if(tool.referenceRole&&!references.some(r=>r.role==='any'||r.role===tool.referenceRole))throw Error('此功能需要参考图，请先添加1–5张功能参考图。');if(tool.needsTarget&&!options.selection&&!options.task.target.trim())throw Error('请指定要转换的部位，或先框选编辑区域。');
@@ -304,10 +306,14 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       if(route.startsWith('/api/')&&!route.startsWith('/api/updates/')&&!['/api/health','/api/shutdown'].includes(route)){pendingOperations++;trackedOperation=true;}
       if(mobileDownloads&&route==='/api/mobile/downloads'&&req.method==='POST')return json(res,201,await mobileDownloads.create(req,{name:url.searchParams.get('name')||'导出文件',mime:url.searchParams.get('mime')||'application/octet-stream'}));
       const mobileDownload=/^\/api\/mobile\/downloads\/([a-f0-9-]{36})$/.exec(route);if(mobileDownloads&&mobileDownload&&req.method==='GET'){const asset=await mobileDownloads.asset(mobileDownload[1]);res.writeHead(200,{'Content-Type':asset.mime,'Content-Length':asset.bytes,'X-Houtu-Content-SHA256':asset.sha256,'Content-Disposition':"attachment; filename=export; filename*=UTF-8''"+encodeURIComponent(asset.name)});await pipeline(createReadStream(asset.file),res);return;}
+      if(route==='/api/updates/events'&&req.method==='GET'){
+        res.writeHead(200,{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'no-cache, no-transform','Connection':'keep-alive','X-Accel-Buffering':'no'});res.write('event: ready\ndata: {}\n\n');
+        const unsubscribe=updates.subscribe(()=>{if(!res.destroyed)res.write('event: version\ndata: {}\n\n');}),heartbeat=setInterval(()=>{if(!res.destroyed)res.write(': keepalive\n\n');},25000);heartbeat.unref();res.once('close',()=>{clearInterval(heartbeat);unsubscribe();});return;
+      }
       if(route==='/api/updates/status'&&req.method==='GET')return json(res,200,await updates.view());
       if(route.startsWith('/api/updates/')&&req.method==='POST'){
         try{if(updates.handoff)throw Error('网站正在重启安装更新，请稍后再操作。');const input=await body(req,4096);let result;
-          if(route==='/api/updates/check')result=await updates.check();
+          if(route==='/api/updates/check')result=await updates.check({automatic:input.automatic===true});
           else if(route==='/api/updates/settings')result=await updates.configure(input);
           else if(route==='/api/updates/prepare')result=await updates.beginPrepare();
           else if(route==='/api/updates/apply')result=await updates.apply({id:input.id});
@@ -479,7 +485,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       if (route === '/api/state' && req.method === 'GET') {
         let account = null, serviceError = '';
         try { account = await bridge.account(); } catch { serviceError = clientPlatform==='android'?'手机内置AI客户端尚未就绪，请重新打开应用或在更多中复制诊断；本地调色与超分仍可使用。':'本机图片客户端未就绪，请重启网站，或在项目文件夹运行 npm install。'; }
-        return json(res, 200, { csrf, account, serviceError, loginError, loginPending: Boolean(login), defaultPrompt: DEFAULT_PROMPT,
+        return json(res, 200, { csrf, account, serviceError, imageRuntime:bridge.imageRuntimeStatus?.()||null, loginError, loginPending: Boolean(login), defaultPrompt: DEFAULT_PROMPT,
           activeAnalysis:critiqueActive||active==='portrait-audit',activeJob: jobs.has(active) ? publicJob(jobs.get(active)) : null, package: packageView(packages.get(latestPackage)) });
       }
       if (route === '/api/templates' && req.method === 'GET') return json(res, 200, { schemaVersion: 1, templates: templates.list() });

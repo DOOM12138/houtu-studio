@@ -10,7 +10,7 @@
 
 ## 体积与依赖
 
-Windows 发布使用官方 Codex 0.172.0 同版本独立 app-server，按 desktop/runtime-lock.json 核对归档与 EXE 的 SHA-256，代替完整命令行套件；图像工具与认证协议保持原样。Node 源码开发环境仍可回退到 npm 客户端，Android 显式指定它自己的原生客户端。运行库、模型及其许可保留，不以删除必要模型来缩小体积。
+Windows 发布使用官方 Codex 0.172.0 同版本独立 app-server 和 code-mode host，按 desktop/runtime-lock.json 核对归档与 EXE 的 SHA-256，代替完整命令行套件；图像工具与认证协议保持原样。Node 源码开发环境仍可回退到 npm 客户端，Android 显式指定它自己的原生客户端。运行库、模型及其许可保留，不以删除必要模型来缩小体积。
 
 Setup 使用 NSIS 的 LZMA 压缩；ZIP 为兼容旧客户端的便携与更新格式。宿主、WebView2 DLL 和独立客户端全部在现有 runtime 白名单内，旧客户端可验证更新 ZIP；新宿主会在运行库替换前退出，独立更新进程验证新版服务后恢复窗口。回退保留当前私人数据。
 
@@ -30,3 +30,6 @@ SDK、NSIS 编译器与下载缓存只放 .cache/desktop。微软 WebView2 引�
 上述检查不输入真实账号凭据、不调用 AI 出图。真实账号和图片效果的验证边界继续适用。
 
 运行时与安全依据：[微软分发说明](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/distribution)、[微软宿主安全说明](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/security)、[NSIS 官方分发](https://nsis.sourceforge.io/Download)、[官方 Codex 0.172.0](https://github.com/openai/codex/releases/tag/rust-v0.172.0)。
+
+
+1.24起，完整包必须包含runtime/codex-code-mode-host.exe（0.172.0），并在desktop-build.json和更新清单中校验；它是代码模式主模型调用绘图等内置工具的必要执行组件。1.23精简包漏带该文件的情况会导致主模型有回复而无图片。新包补齐组件，开始生成前先检查；不通过时提示修复组件，不要求重新登录。新增V8／ICU等许可在vendor-licenses/code-mode-host。

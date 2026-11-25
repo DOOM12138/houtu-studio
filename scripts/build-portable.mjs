@@ -1,4 +1,4 @@
-import {ensureDesktopRuntime} from './build-desktop.mjs';
+import {ensureDesktopRuntime,DESKTOP_RUNTIME_FILES} from './build-desktop.mjs';
 import {SR_MODELS} from '../public/superres-options.js';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -51,7 +51,7 @@ export async function buildPortable({ root = ROOT, output, includePrompts = fals
     await ensureDesktopRuntime(root);
     await mkdir(path.join(app, 'runtime'));
     await copyFile(process.execPath, path.join(app, 'runtime', 'node.exe'));
-    for(const file of ['HoutuStudio.exe','HoutuStudio.exe.config','Microsoft.Web.WebView2.Core.dll','Microsoft.Web.WebView2.WinForms.dll','WebView2Loader.dll','MicrosoftEdgeWebview2Setup.exe','codex-app-server.exe'])await copyFile(path.join(root,'runtime',file),path.join(app,'runtime',file));
+    for(const file of DESKTOP_RUNTIME_FILES)await copyFile(path.join(root,'runtime',file),path.join(app,'runtime',file));
     await copyFile(path.join(root,'runtime/desktop-build.json'),path.join(app,'runtime/desktop-build.json'));
     await cp(path.join(root,'vendor-licenses/desktop'),path.join(app,'vendor-licenses/desktop'),{recursive:true});
     const licenses = [path.join(root, 'runtime', 'LICENSE.txt'), path.join(root, 'vendor-licenses', 'node-LICENSE.txt'), path.join(path.dirname(process.execPath), 'LICENSE'), path.join(path.dirname(process.execPath), 'LICENSE.txt')];
@@ -67,7 +67,7 @@ export async function buildPortable({ root = ROOT, output, includePrompts = fals
       const pkg = JSON.parse(await readFile(path.join(root, relative, 'package.json'), 'utf8'));
       dependencies.push({ name: pkg.name, version: pkg.version, license: pkg.license || 'See bundled package license' });
     }
-    for (const required of ['runtime/codex-app-server.exe', 'node_modules/libraw-wasm/dist/libraw.js','node_modules/libraw-wasm/dist/libraw.wasm','vendor-licenses/raw/LibRaw-0.22.1.tar.gz','vendor-licenses/raw/LibRaw-LICENSE.CDDL.txt','node_modules/sharp/package.json','node_modules/onnxruntime-node/bin/napi-v6/win32/x64/onnxruntime_binding.node','node_modules/onnxruntime-node/bin/napi-v6/win32/x64/onnxruntime.dll','vendor-licenses/onnxruntime-1.31.1/LICENSE','vendor-licenses/directml-1.15.4/LICENSE.txt','vendor-licenses/dxc-1.8.2502.8/LICENSE-LLVM.txt']) if (!await exists(path.join(app, required))) throw new Error('缺少 Windows x64 生产依赖，请先完成 npm install。');
+    for (const required of ['runtime/codex-app-server.exe','runtime/codex-code-mode-host.exe', 'node_modules/libraw-wasm/dist/libraw.js','node_modules/libraw-wasm/dist/libraw.wasm','vendor-licenses/raw/LibRaw-0.22.1.tar.gz','vendor-licenses/raw/LibRaw-LICENSE.CDDL.txt','node_modules/sharp/package.json','node_modules/onnxruntime-node/bin/napi-v6/win32/x64/onnxruntime_binding.node','node_modules/onnxruntime-node/bin/napi-v6/win32/x64/onnxruntime.dll','vendor-licenses/onnxruntime-1.31.1/LICENSE','vendor-licenses/directml-1.15.4/LICENSE.txt','vendor-licenses/dxc-1.8.2502.8/LICENSE-LLVM.txt']) if (!await exists(path.join(app, required))) throw new Error('缺少 Windows x64 生产依赖，请先完成 npm install。');
     const nativeFiles = await readdir(path.join(app, 'node_modules', '@img', 'sharp-win32-x64', 'lib'));
     if (!nativeFiles.some(name => name.endsWith('.node')) || !nativeFiles.some(name => name.endsWith('.dll'))) throw new Error('缺少图片处理的原生模块或 DLL。');
     let templateCount = 0;
@@ -90,6 +90,7 @@ export async function buildPortable({ root = ROOT, output, includePrompts = fals
     await writeFile(path.join(app, 'THIRD-PARTY-NOTICES.txt'), [
       'This distribution includes Node.js and the production npm packages listed below.',
       'Node.js license and third-party notices are in runtime/LICENSE.txt.',
+      'Codex app-server + code-mode host 0.172.0: Apache-2.0 and component notices, including MIT/BSD V8 and Unicode ICU, in vendor-licenses/code-mode-host/.',
       'Local super-resolution: official Real-ESRGAN checkpoints converted to ONNX; BSD-3-Clause and provenance in models/superres/.',
       'ONNX Runtime 1.31.1 MIT and full third-party notices: vendor-licenses/onnxruntime-1.31.1/.',
       'Bundled Windows DirectML 1.15.4 is under Microsoft Software License Terms, with additional code notices: vendor-licenses/directml-1.15.4/.',

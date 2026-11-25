@@ -159,7 +159,7 @@ function updateControls() {
   $('belly-panel').inert=working||custom;
   document.querySelector('.strength-field').hidden=scene||isBellyOperation(operation)&&!custom;
   if(scene||isBellyOperation(operation)&&!custom)$('preserve').checked=true;
-  $('generate').disabled = !modelPicker.valid() || !hasSource() || !state.account || working || !$('prompt').value.trim() || (!custom && ['full-body','portrait-polish'].includes(operation) && !editOptions().areas.length);
+  $('generate').disabled = state.imageRuntime?.ready===false || !modelPicker.valid() || !hasSource() || !state.account || working || !$('prompt').value.trim() || (!custom && ['full-body','portrait-polish'].includes(operation) && !editOptions().areas.length);
   $('generate').querySelector('span').textContent = packing ? '打包中，稍后精修' : portraitChecking ? (portraitTaskType==='audit'?'正在检查人物…':'正在分析人物蒙版…') : working ? '正在精修…' : ready ? '先检查主体保护' : isCleanupOperation(operation)&&!custom ? '开始场照清理' : isBellyOperation(operation)&&!custom ? '开始平滑收腹' : selection ? '精修选区' : '开始精修';
   $('cancel').hidden = !running(currentJob?.status)&&!(portraitChecking&&portraitTaskType==='audit');
   $('cancel').disabled = currentJob?.status === 'cancelling';
@@ -196,7 +196,7 @@ async function refreshState() {
     $('login').hidden = Boolean(state.account);
     $('logout').hidden = !state.account;
     $('login').textContent = state.loginPending ? '继续登录 ChatGPT' : '使用 ChatGPT 登录';
-    const note = state.serviceError || state.loginError;
+    const note = (state.imageRuntime?.ready===false?state.imageRuntime.message:'') || state.serviceError || state.loginError;
     if (note) showConnection(note);
     else if (!state.loginPending) $('connection').hidden = true;
     if (!promptInitialized) { $('prompt').value = state.defaultPrompt; promptInitialized = true;syncDefaultBrief(); optionsChanged(); }

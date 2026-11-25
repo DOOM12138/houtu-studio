@@ -1,5 +1,27 @@
 {
-  "webview2": {"version":"1.0.4370.26","url":"https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.4370.26/microsoft.web.webview2.1.0.4370.26.nupkg","file":"webview2.nupkg","sha256":"1c0dacac84b70109b3fd42f90c53a0ba942abc3a87590d7a4e0ccd86e4a06cf4"},
-  "nsis": {"version":"3.13","url":"https://downloads.sourceforge.net/project/nsis/NSIS%203/3.13/nsis-3.13.zip","file":"nsis-3.13.zip","sha256":"ba63dffc4410ee89193e1cb5a41989991bd77c61068da17e3156d136b7b0b3d8"},
-  "codex": {"version":"0.172.0","url":"https://github.com/openai/codex/releases/download/rust-v0.172.0/codex-app-server-x86_64-pc-windows-msvc.exe.zip","file":"codex-app-server.zip","sha256":"fd443ed42014a6dcd3ba6c14e377973e99e896f7fe219e2cbfd29f88cb573596","elfSha256":"46b576dac430379b4be40c5ef568120f3ac487b0d471ba9625e789fe5a49e39f"}
+  "webview2": {
+    "version": "1.0.4370.26",
+    "url": "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.4370.26/microsoft.web.webview2.1.0.4370.26.nupkg",
+    "file": "webview2.nupkg",
+    "sha256": "1c0dacac84b70109b3fd42f90c53a0ba942abc3a87590d7a4e0ccd86e4a06cf4"
+  },
+  "nsis": {
+    "version": "3.13",
+    "url": "https://downloads.sourceforge.net/project/nsis/NSIS%203/3.13/nsis-3.13.zip",
+    "file": "nsis-3.13.zip",
+    "sha256": "ba63dffc4410ee89193e1cb5a41989991bd77c61068da17e3156d136b7b0b3d8"
+  },
+  "codex": {
+    "version": "0.172.0",
+    "url": "https://github.com/openai/codex/releases/download/rust-v0.172.0/codex-app-server-x86_64-pc-windows-msvc.exe.zip",
+    "file": "codex-app-server.zip",
+    "sha256": "fd443ed42014a6dcd3ba6c14e377973e99e896f7fe219e2cbfd29f88cb573596",
+    "elfSha256": "46b576dac430379b4be40c5ef568120f3ac487b0d471ba9625e789fe5a49e39f",
+    "codeModeHost": {
+      "package": "@openai/codex-win32-x64",
+      "version": "0.172.0-win32-x64",
+      "file": "vendor/x86_64-pc-windows-msvc/bin/codex-code-mode-host.exe",
+      "sha256": "183d5bb378b5d230d044265882e697fec199d0eb6bfebb585fb8c95718b78055"
+    }
+  }
 }

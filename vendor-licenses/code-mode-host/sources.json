@@ -1,0 +1,58 @@
+{
+  "clientVersion": "0.172.0",
+  "hostSha256": "183d5bb378b5d230d044265882e697fec199d0eb6bfebb585fb8c95718b78055",
+  "rustyV8Commit": "90a65f887a0c0f048f3784afbcb320b373c8a2e0",
+  "v8Commit": "c4ca1eccb90c5464d826b7713dc27178a53b0cfe",
+  "files": [
+    {
+      "file": "Rusty-V8-MIT.txt",
+      "url": "https://github.com/openai-oss-forks/rusty_v8/blob/90a65f887a0c0f048f3784afbcb320b373c8a2e0/LICENSE",
+      "sha256": "1c6356fb751d45f0c53093ebf8a7f5e580e802f51999178e19d60f3ec39e147d"
+    },
+    {
+      "file": "Abseil-Apache-2.0.txt",
+      "url": "https://github.com/abseil/abseil-cpp/blob/20250814.1/LICENSE",
+      "sha256": "c79a7fea0e3cac04cd43f20e7b648e5a0ff8fa5344e644b0ee09ca1162b62747"
+    },
+    {
+      "file": "Highway-Apache-2.0.txt",
+      "url": "https://github.com/google/highway/blob/2607d3b5b0113992fe84d3848859eae13b3b52c1/LICENSE",
+      "sha256": "e340270d4f64384569a91d546acb5b094d69ce47f0c015db77abb74dc6f815af"
+    },
+    {
+      "file": "fast-float-MIT.txt",
+      "url": "https://github.com/fastfloat/fast_float/blob/v8.2.10/LICENSE-MIT",
+      "sha256": "e562f3f974ced7e69dd1db77b820b36bcf8f30377f1aa105723fba449c53c4e6"
+    },
+    {
+      "file": "simdutf-MIT.txt",
+      "url": "https://github.com/simdutf/simdutf/blob/v7.7.0/LICENSE-MIT",
+      "sha256": "fc8dbc04e03ad4efc08a647ffe7f995b811a95bc04c0e85a56d5277c6593fa5f"
+    },
+    {
+      "file": "Dragonbox-Boost.txt",
+      "url": "https://github.com/jk-jeon/dragonbox/blob/beeeef91cf6fef89a4d4ba5e95d47ca64ccb3a44/LICENSE-Boost",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566"
+    },
+    {
+      "file": "FP16-MIT.txt",
+      "url": "https://github.com/Maratyszcza/FP16/blob/782eea126dc5c755827be751a099eb01826175cf/LICENSE",
+      "sha256": "17e4f539024be2749ee729d1e2f01d24cef12ece8c9bf18e91a4349be29c80bf"
+    },
+    {
+      "file": "V8-BSD-3-Clause.txt",
+      "url": "https://github.com/denoland/v8/blob/c4ca1eccb90c5464d826b7713dc27178a53b0cfe/LICENSE",
+      "sha256": "6ab33af8774a0f396ee3aeeb761e3229057682d6f9fa7f572e390c2cb3a6e509"
+    },
+    {
+      "file": "ICU-Unicode-3.0-and-notices.txt",
+      "url": "https://chromium.googlesource.com/chromium/deps/icu/+/d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738/LICENSE",
+      "sha256": "e55522d81edc687a341a4411e0776e54ca654e90147f354a90458aaced4116af"
+    },
+    {
+      "file": "deno-core-icudata-MIT.txt",
+      "url": "https://crates.io/crates/deno_core_icudata/0.78.0",
+      "sha256": "b4c3ac407651a94dd320d42f426364d0ac4c81c4ecb8110bbfc748a142c169e1"
+    }
+  ]
+}
