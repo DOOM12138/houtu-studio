@@ -23,6 +23,9 @@ jobs:
           ref: 3d86e43b075adeba2193ec5c22ac92f55afd82e6
           path: upstream
           persist-credentials: false
+      - uses: actions/setup-java@v4
+        with: {distribution: 'temurin', java-version: '21'}
+      - uses: android-actions/setup-android@v3
       - name: Prepare Android toolchain
         run: |
           rustup toolchain install 1.99.1 --profile minimal --target ${{ matrix.target }}

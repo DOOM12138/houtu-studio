@@ -4,6 +4,17 @@ on:
   workflow_dispatch:
   push:
     branches: ['feat/android-standalone']
+    paths:
+      - 'android/**'
+      - 'backend/**'
+      - 'lib/**'
+      - 'public/**'
+      - 'frontend/**'
+      - 'server.mjs'
+      - 'test/android-smoke.mjs'
+      - 'scripts/build-android.mjs'
+      - 'scripts/android-runtime.mjs'
+      - '.github/workflows/android-test.yml'
 permissions:
   contents: read
 concurrency:
