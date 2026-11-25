@@ -90,3 +90,9 @@
 Real-ESRGAN官方权重与SRVGGNetCompact架构：https://github.com/xinntao/Real-ESRGAN （BSD-3-Clause）。固定checkpoint源、SHA-256、转换工具及ONNX哈希在models/superres/manifest.json和README.md。没有重新训练基础权重。
 
 ONNX Runtime1.31.1 CPU，官方Node支持：https://onnxruntime.ai/docs/get-started/with-javascript/node.html 。MIT及第三方全文来自Microsoft.ML.OnnxRuntime1.31.1官方NuGet；DirectML1.15.4和DXC1.8.2502.8随Windows包附带，分别保留各自微软／MIT／LLVM条款，见vendor-licenses。未把DirectML二进制标成MIT。
+
+## 安卓单机运行时（2026-11-25）
+
+移动 Node 来自 https://github.com/fogtape/nodejs-mobile/tree/v24.22.1-0 的社区适配，发布标记为 Prerelease。官方开源 Codex 0.172.0 源码 https://github.com/openai/codex/tree/3d86e43b075adeba2193ec5c22ac92f55afd82e6 经最小 Android/Bionic 兼容补丁构建；没有重新实现官方认证或图片工具。固定工具链、构建回执、平台补丁与双 ABI 摘要见 android/codex-source.json、codex-build-artifacts.json、runtime-lock.json 和构建依赖预发布。Node、Codex LICENSE/NOTICE、JNA/所选Apache2.0、libffi、匹配NDK的许可保留于 vendor-licenses/android-runtime 并随 APK 附送。
+
+手机图片处理使用 Sharp 0.35.5 WASM 与 ONNX Runtime Web 1.31.1 WASM；本地模型来源与桌面一致。设备合成保护、超分、重启、客户端握手与真实登录出图分别记录，编译成功不代表账号或审美验收。

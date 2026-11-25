@@ -6,20 +6,21 @@ parser=argparse.ArgumentParser();parser.add_argument('--abi',choices=['arm64-v8a
 SDK=pathlib.Path(args.sdk);JDK=pathlib.Path(args.jdk);BT=SDK/'build-tools/36.0.0';ANDROID=SDK/'platforms/android-36/android.jar';WORK=ROOT/'tmp/android-build'/args.abi;CACHE=ROOT/'.cache/android';DEPS=ROOT/'.cache/android-node/node_modules'
 if not ANDROID.is_file() or not (JDK/'bin/java.exe').is_file():raise SystemExit('Android SDK 36 and a JDK 21 path are required; use --sdk and --jdk.')
 WORK.mkdir(parents=True,exist_ok=True)
-for folder in ['assets','classes','dex','lib']: (WORK/folder).mkdir(exist_ok=True)
+assert not WORK.is_symlink() and WORK.resolve().parent==(ROOT/'tmp/android-build').resolve(),'Unexpected build directory'
+for folder in ['assets','classes','dex','lib']:
+    target=WORK/folder;assert not target.is_symlink() and target.resolve().parent==WORK.resolve(),'Unexpected build output path'
+    if target.exists():shutil.rmtree(target)
+    target.mkdir()
 lock=json.loads((ROOT/'android/runtime-lock.json').read_text('utf-8'));archive=CACHE/'node-android.zip';assert hashlib.sha256(archive.read_bytes()).hexdigest()==lock['node']['sha256']
 with zipfile.ZipFile(archive) as z:
     data=z.read('bin/'+args.abi+'/libnode.so');native=WORK/'lib'/args.abi;native.mkdir(exist_ok=True);(native/'libnode.so').write_bytes(data)
 cxx=lock['libcxx']['abis'][args.abi];cxx_bytes=(ROOT/cxx['file']).read_bytes();assert hashlib.sha256(cxx_bytes).hexdigest()==cxx['sha256'];(native/'libc++_shared.so').write_bytes(cxx_bytes)
 with zipfile.ZipFile(CACHE/'jna.aar') as z:
     (WORK/'jna-classes.jar').write_bytes(z.read('classes.jar'));(native/'libjnidispatch.so').write_bytes(z.read('jni/'+args.abi+'/libjnidispatch.so'))
-entry=lock['codex']['archives']['aarch64' if args.abi=='arm64-v8a' else 'x86_64'];codex=CACHE/entry['file'];assert hashlib.sha256(codex.read_bytes()).hexdigest()==entry['sha256']
-native_override=os.environ.get('HOUTU_ANDROID_NATIVE_CLIENT_DIR')
-if native_override:
-    client_dir=pathlib.Path(native_override);report=json.loads((client_dir/'build.json').read_text());expected=json.loads((ROOT/'android/codex-source.json').read_text());blob=(client_dir/'libhoutu_codex.so').read_bytes();assert report['commit']==expected['commit'] and report['nativeAndroid'] is True and report['thirdPartyIdentityChanges']==0 and report['target']==('aarch64-linux-android' if args.abi=='arm64-v8a' else 'x86_64-linux-android');assert hashlib.sha256(blob).hexdigest()==report['sha256'];(native/'libhoutu_codex.so').write_bytes(blob)
-else:
-    with tarfile.open(codex,'r:gz') as t:
-        blob=t.extractfile(entry['member']).read();assert hashlib.sha256(blob).hexdigest()==entry['elfSha256'];(native/'libhoutu_codex.so').write_bytes(blob)
+entry=lock['codex']['archives']['aarch64' if args.abi=='arm64-v8a' else 'x86_64'];codex=CACHE/entry['file'];assert entry['nativeAndroid'] is True and hashlib.sha256(codex.read_bytes()).hexdigest()==entry['sha256']
+with tarfile.open(codex,'r:gz') as t:
+    report=json.load(t.extractfile('build.json'));expected=json.loads((ROOT/'android/codex-source.json').read_text());assert all(report[k]==v for k,v in expected.items()) and report['nativeAndroid'] is True and report['thirdPartyIdentityChanges']==0 and report['target']==('aarch64-linux-android' if args.abi=='arm64-v8a' else 'x86_64-linux-android')
+    blob=t.extractfile(entry['member']).read();assert hashlib.sha256(blob).hexdigest()==entry['elfSha256']==report['sha256'] and len(blob)==report['bytes'];assert hashlib.sha256(t.extractfile('Cargo.lock').read()).hexdigest()==report['lockSha256'];(native/'libhoutu_codex.so').write_bytes(blob)
 bundle=WORK/'assets/houtu-project.zip';count=0
 with zipfile.ZipFile(bundle,'w',zipfile.ZIP_STORED) as z:
     for name in ['server.mjs','package.json','package-lock.json','LICENSE','README.md','SOURCES.md','PROMPT_LAB.md']:

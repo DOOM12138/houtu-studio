@@ -10,24 +10,102 @@
   },
   "codex": {
     "version": "0.172.0",
-    "packages": [
-      "@openai/codex-linux-arm64",
-      "@openai/codex-linux-x64"
-    ],
+    "source": {
+      "repository": "https://github.com/openai/codex",
+      "version": "0.172.0",
+      "commit": "3d86e43b075adeba2193ec5c22ac92f55afd82e6",
+      "rust": "1.99.1",
+      "ndk": "27.3.13750724",
+      "minApi": 29,
+      "buildTarget": "codex-app-server",
+      "scope": "Android platform compatibility; no image-tool or authentication substitution"
+    },
+    "provenance": {
+      "repository": "DOOM12138/houtu-studio",
+      "runId": 45540107727,
+      "workflow": ".github/workflows/android-codex.yml",
+      "commit": "7ba313c1cd1c5446e6d77c533a91328dbce52fed",
+      "artifacts": {
+        "x86_64": {
+          "id": 14990378467,
+          "sha256": "6e697000918606350ae840d321699ad160b8dbfe12cac36960ad8fc1589a7c84"
+        },
+        "aarch64": {
+          "id": 14991316514,
+          "sha256": "d33c36cd74fc616f52b1cd762969499bf3268cebeb0499d39f5c0d8a059a2988"
+        }
+      }
+    },
     "archives": {
-      "aarch64": {
-        "url": "https://github.com/openai/codex/releases/download/rust-v0.172.0/codex-app-server-aarch64-unknown-linux-musl.tar.gz",
-        "file": "codex-app-server-aarch64.tar.gz",
-        "sha256": "0eebb5d265b0d03bb7fe1ab86b53ea78e4a21a0b3e6d3f2de576ae46d97082d0",
-        "member": "codex-app-server-aarch64-unknown-linux-musl",
-        "elfSha256": "936426ca8ecc5690fc74d800203339607ee793c130d8cbf00d2d37b6f188e7b7"
-      },
       "x86_64": {
-        "url": "https://github.com/openai/codex/releases/download/rust-v0.172.0/codex-app-server-x86_64-unknown-linux-musl.tar.gz",
-        "file": "codex-app-server-x86_64.tar.gz",
-        "sha256": "9675313ed4bec5e1dcc99a399cb6eee4b7bc269536a36a6a2df207202737c9d7",
-        "member": "codex-app-server-x86_64-unknown-linux-musl",
-        "elfSha256": "655bd2929df7731b065db1b9c2e6ecbf9acff22fac882f4239fab303757ac8c7"
+        "url": "https://github.com/DOOM12138/houtu-studio/releases/download/android-runtime-v0.172.0-r1/codex-app-server-0.172.0-Android-x86_64.tar.gz",
+        "file": "codex-app-server-0.172.0-Android-x86_64.tar.gz",
+        "sha256": "d28bf184dcdd00d071c8df0e16a8b4cc44349c75a64d436bf33747305349cf0b",
+        "member": "libhoutu_codex.so",
+        "elfSha256": "c4973729bb7fe6e85a022b267dcc007bff3ad392553c8af5693e8a58337266b7",
+        "bytes": 303709120,
+        "nativeAndroid": true,
+        "elf": {
+          "interpreter": "/system/bin/linker64",
+          "loadAlignments": [
+            16384,
+            16384,
+            16384,
+            16384
+          ],
+          "machine": 62
+        },
+        "build": {
+          "repository": "https://github.com/openai/codex",
+          "version": "0.172.0",
+          "commit": "3d86e43b075adeba2193ec5c22ac92f55afd82e6",
+          "rust": "1.99.1",
+          "ndk": "27.3.13750724",
+          "minApi": 29,
+          "buildTarget": "codex-app-server",
+          "scope": "Android platform compatibility; no image-tool or authentication substitution",
+          "target": "x86_64-linux-android",
+          "sha256": "c4973729bb7fe6e85a022b267dcc007bff3ad392553c8af5693e8a58337266b7",
+          "bytes": 303709120,
+          "nativeAndroid": true,
+          "lockSha256": "0c017d96dae581ea09834ddbda7c572dd48e771cf86e9f87f8b3bcb4ab16f686",
+          "thirdPartyIdentityChanges": 0
+        }
+      },
+      "aarch64": {
+        "url": "https://github.com/DOOM12138/houtu-studio/releases/download/android-runtime-v0.172.0-r1/codex-app-server-0.172.0-Android-aarch64.tar.gz",
+        "file": "codex-app-server-0.172.0-Android-aarch64.tar.gz",
+        "sha256": "47be6eb5ec68fb06a67e79f6cf11382aa92bfe7f4a8909b3b2a352850238836b",
+        "member": "libhoutu_codex.so",
+        "elfSha256": "a8a29e2e613b83791d43e61222c17097ed3ddf3a730bb909ff11c7934bae5f45",
+        "bytes": 271849888,
+        "nativeAndroid": true,
+        "elf": {
+          "interpreter": "/system/bin/linker64",
+          "loadAlignments": [
+            16384,
+            16384,
+            16384,
+            16384
+          ],
+          "machine": 183
+        },
+        "build": {
+          "repository": "https://github.com/openai/codex",
+          "version": "0.172.0",
+          "commit": "3d86e43b075adeba2193ec5c22ac92f55afd82e6",
+          "rust": "1.99.1",
+          "ndk": "27.3.13750724",
+          "minApi": 29,
+          "buildTarget": "codex-app-server",
+          "scope": "Android platform compatibility; no image-tool or authentication substitution",
+          "target": "aarch64-linux-android",
+          "sha256": "a8a29e2e613b83791d43e61222c17097ed3ddf3a730bb909ff11c7934bae5f45",
+          "bytes": 271849888,
+          "nativeAndroid": true,
+          "lockSha256": "0c017d96dae581ea09834ddbda7c572dd48e771cf86e9f87f8b3bcb4ab16f686",
+          "thirdPartyIdentityChanges": 0
+        }
       }
     }
   },
