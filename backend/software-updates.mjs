@@ -13,7 +13,16 @@ export class SoftwareUpdates{
  save(){const snapshot=JSON.stringify(this.state,null,2),next=this.queue.catch(()=>{}).then(async()=>{const tmp=this.file+'.'+randomUUID()+'.tmp';await fs.writeFile(tmp,snapshot);await replaceFile(tmp,this.file);});this.queue=next;return next;}
  async view(){let worker=null;if(this.state.id&&/^[a-f0-9-]{36}$/.test(this.state.id))try{worker=JSON.parse(await fs.readFile(path.join(this.cache,this.state.id,'worker.json'),'utf8'));}catch{}let rollback=null;try{const last=JSON.parse(await fs.readFile(path.join(this.cache,'last-success.json'),'utf8')),journal=JSON.parse(await fs.readFile(path.join(this.cache,last.id,'transaction.json'),'utf8'));if(journal.status==='complete'&&last.toVersion===this.currentVersion)rollback={id:last.id,version:last.fromVersion};}catch{}const latest=this.state.latest,available=latest?compareVersions(latest.version,this.currentVersion)>0:false;return {currentVersion:this.currentVersion,sourceMode:this.sourceMode,repository:UPDATE_REPO_URL,releases:UPDATE_REPO_URL+'/releases',settings:this.settings,checkIntervalMinutes:15,updateScope:'full-application',lastChecked:this.state.lastChecked||null,checkError:this.state.checkError||null,latest:latest||null,available,installable:!this.sourceMode&&available&&Boolean(latest?.asset&&(latest.asset.sha256||latest.asset.checksumUrl)),job:{id:this.state.id||null,status:worker?.status||this.state.status,message:worker?.message||this.state.message,version:this.state.targetVersion||null,bytes:this.state.bytes||0,total:this.state.total||0,error:worker?.error||this.state.error||null,backup:worker?.backup||null},rollback:this.sourceMode?null:rollback};}
  async configure(input){if(typeof input.autoCheck!=='boolean')throw Error('自动检查设置无效。');this.settings={autoCheck:input.autoCheck};await fs.mkdir(path.dirname(this.settingsFile),{recursive:true});const tmp=this.settingsFile+'.tmp';await fs.writeFile(tmp,JSON.stringify(this.settings));await replaceFile(tmp,this.settingsFile);return this.view();}
- startAutomatic(){if(this.timer)return;const tick=()=>{if(this.settings.autoCheck)this.check({automatic:true}).catch(()=>{});};this.timer=setInterval(tick,UPDATE_CHECK_INTERVAL_MS);this.timer.unref();this.firstTimer=setTimeout(()=>{if(this.settings.autoCheck)this.check({automatic:true,startup:true}).catch(()=>{});},1800);this.firstTimer.unref();}
+ startAutomatic(){
+  if(this.timer||this.firstTimer||this.closed)return;
+  const tick=async(startup=false)=>{
+   if(this.closed)return;this.timer=null;
+   try{if(this.settings.autoCheck)await this.check({automatic:true,startup});}catch{}
+   finally{if(!this.closed){const last=this.state.lastAttempt||this.state.lastChecked||0,age=Math.max(0,this.clock()-last),delay=this.settings.autoCheck&&last?Math.max(1000,UPDATE_CHECK_INTERVAL_MS-age):UPDATE_CHECK_INTERVAL_MS;this.timer=setTimeout(tick,delay);this.timer.unref();}}
+  };
+  this.firstTimer=setTimeout(()=>{this.firstTimer=null;tick(true);},1800);this.firstTimer.unref();
+ }
+
  async check({automatic=false,startup=false}={}){
   if(this.checking)return this.checking;if(this.handoff||this.closed)return this.view();
   const now=this.clock(),last=this.state.lastAttempt||this.state.lastChecked||0,interval=automatic&&!startup?UPDATE_CHECK_INTERVAL_MS:30000;
