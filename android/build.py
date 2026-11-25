@@ -14,8 +14,12 @@ cxx=lock['libcxx']['abis'][args.abi];cxx_bytes=(ROOT/cxx['file']).read_bytes();a
 with zipfile.ZipFile(CACHE/'jna.aar') as z:
     (WORK/'jna-classes.jar').write_bytes(z.read('classes.jar'));(native/'libjnidispatch.so').write_bytes(z.read('jni/'+args.abi+'/libjnidispatch.so'))
 entry=lock['codex']['archives']['aarch64' if args.abi=='arm64-v8a' else 'x86_64'];codex=CACHE/entry['file'];assert hashlib.sha256(codex.read_bytes()).hexdigest()==entry['sha256']
-with tarfile.open(codex,'r:gz') as t:
-    blob=t.extractfile(entry['member']).read();assert hashlib.sha256(blob).hexdigest()==entry['elfSha256'];(native/'libhoutu_codex.so').write_bytes(blob)
+native_override=os.environ.get('HOUTU_ANDROID_NATIVE_CLIENT_DIR')
+if native_override:
+    client_dir=pathlib.Path(native_override);report=json.loads((client_dir/'build.json').read_text());expected=json.loads((ROOT/'android/codex-source.json').read_text());blob=(client_dir/'libhoutu_codex.so').read_bytes();assert report['commit']==expected['commit'] and report['nativeAndroid'] is True and report['thirdPartyIdentityChanges']==0 and report['target']==('aarch64-linux-android' if args.abi=='arm64-v8a' else 'x86_64-linux-android');assert hashlib.sha256(blob).hexdigest()==report['sha256'];(native/'libhoutu_codex.so').write_bytes(blob)
+else:
+    with tarfile.open(codex,'r:gz') as t:
+        blob=t.extractfile(entry['member']).read();assert hashlib.sha256(blob).hexdigest()==entry['elfSha256'];(native/'libhoutu_codex.so').write_bytes(blob)
 bundle=WORK/'assets/houtu-project.zip';count=0
 with zipfile.ZipFile(bundle,'w',zipfile.ZIP_STORED) as z:
     for name in ['server.mjs','package.json','package-lock.json','LICENSE','README.md','SOURCES.md','PROMPT_LAB.md']:

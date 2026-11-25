@@ -17,6 +17,7 @@ on:
       - '.github/workflows/android-test.yml'
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: android-test-${{ github.ref }}
   cancel-in-progress: true
@@ -43,8 +44,16 @@ jobs:
             .cache/android
             .cache/android-node
           key: android-runtime-${{ hashFiles('android/runtime-lock.json', 'android/node-package-lock.json') }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-codex-x86_64-linux-android
+          github-token: ${{ github.token }}
+          run-id: 45540107727
+          path: .cache/android/native-client-x64
       - name: Build isolated x86_64 test APK
         shell: pwsh
+        env:
+          HOUTU_ANDROID_NATIVE_CLIENT_DIR: .cache/android/native-client-x64
         run: node scripts/project-node.mjs scripts/build-android.mjs --abi x86_64 --sdk $env:ANDROID_HOME --jdk $env:JAVA_HOME --probe --debug
       - uses: actions/upload-artifact@v4
         with:
