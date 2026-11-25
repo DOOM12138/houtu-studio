@@ -202,8 +202,7 @@ test('a text-only turn is failure, never a fake painting', async t => {
   const job = await (await post('/api/jobs', input)).json();
   bridge.emit('notification','item/completed',{threadId:'thread-test',item:{type:'agentMessage',text:'绘图工具无法启动，请检查执行组件。'}});
   bridge.emit('notification', 'turn/completed', { threadId: 'thread-test', turn: { status: 'completed' } });
-  await settle();
-  const result = await (await fetch(origin + `/api/jobs/${job.id}`)).json();
+  const result = await waitJob(origin,job.id,'error');
   assert.equal(result.status, 'error');
   assert.equal(result.outputUrl, null);
   const failureReceipt=await(await fetch(origin+'/api/jobs/'+job.id)).json();assert.match(failureReceipt.message,/执行组件/);
