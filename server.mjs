@@ -1,5 +1,6 @@
 import {superresModels} from './backend/super-resolution.mjs';
 import {SoftwareUpdates} from './backend/software-updates.mjs';
+import {MobileDownloads} from './backend/mobile-downloads.mjs';
 import {localAccessAllowed} from './lib/local-access.mjs';
 import {APP_VERSION} from './lib/app-version.mjs';
 import {exportProjectPhotos,backupProject,restoreProject} from './backend/studio-archive.mjs';
@@ -72,6 +73,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
   const bridge = trackedBridge(suppliedBridge || new CodexBridge(home),accounts);
   const startedAt=Date.now();let studio;const targetVision=suppliedVision||new TargetVision(()=>{const address=server.address();if(!address)throw Error('服务尚未启动。');return 'http://127.0.0.1:'+address.port;});
   const csrf = randomBytes(32).toString('hex');
+  const mobileDownloads=clientPlatform==='android'?new MobileDownloads(directory):null;await mobileDownloads?.load();
   const jobs = new Map();
   const instanceId = randomUUID();
   const templates = new TemplateStore(directory, path.join(ROOT, 'defaults', 'prompts.json'));
@@ -292,12 +294,14 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       const url = new URL(req.url, `http://${host}`);
       const route = url.pathname;if(clientPlatform==='android'&&(route==='/api/packages'||route.startsWith('/downloads/package/')||/^\/api\/updates\/(prepare|apply|rollback)$/.test(route)))return json(res,409,{error:'安卓版请使用应用菜单中的安卓版更新。'});if(isClosing&&!['/api/health','/api/shutdown'].includes(route))return json(res,503,{error:'网站正在停止，请稍后重开。'});
       if (!['GET', 'POST'].includes(req.method)) return json(res, 405, { error: '不支持的请求。' });
-      if(req.method==='POST'&&(studio.active||studio.archiving)&&!route.startsWith('/api/studio/')&&route!=='/api/shutdown'&&!route.startsWith('/api/updates/')&&!/^\/api\/jobs\/[a-f0-9-]{36}\/cancel$/.test(route))return json(res,409,{error:'照片流程正在运行，请先完成本步并暂停。'});
+      if(req.method==='POST'&&(studio.active||studio.archiving)&&!route.startsWith('/api/studio/')&&!route.startsWith('/api/mobile/downloads')&&route!=='/api/shutdown'&&!route.startsWith('/api/updates/')&&!/^\/api\/jobs\/[a-f0-9-]{36}\/cancel$/.test(route))return json(res,409,{error:'照片流程正在运行，请先完成本步并暂停。'});
       if (req.method === 'POST') {
         if (req.headers.origin !== `http://${host}` || req.headers['x-paint-csrf'] !== csrf) return json(res, 403, { error: '请从本站页面发起操作。' });
       }
       if(updates.handoff&&route.startsWith('/api/')&&!route.startsWith('/api/updates/')&&!['/api/health','/api/shutdown'].includes(route))return json(res,409,{error:'网站即将重启安装更新，请等待完成后重新打开。'});
       if(route.startsWith('/api/')&&!route.startsWith('/api/updates/')&&!['/api/health','/api/shutdown'].includes(route)){pendingOperations++;trackedOperation=true;}
+      if(mobileDownloads&&route==='/api/mobile/downloads'&&req.method==='POST')return json(res,201,await mobileDownloads.create(req,{name:url.searchParams.get('name')||'导出文件',mime:url.searchParams.get('mime')||'application/octet-stream'}));
+      const mobileDownload=/^\/api\/mobile\/downloads\/([a-f0-9-]{36})$/.exec(route);if(mobileDownloads&&mobileDownload&&req.method==='GET'){const asset=await mobileDownloads.asset(mobileDownload[1]);res.writeHead(200,{'Content-Type':asset.mime,'Content-Length':asset.bytes,'X-Houtu-Content-SHA256':asset.sha256,'Content-Disposition':"attachment; filename=export; filename*=UTF-8''"+encodeURIComponent(asset.name)});await pipeline(createReadStream(asset.file),res);return;}
       if(route==='/api/updates/status'&&req.method==='GET')return json(res,200,await updates.view());
       if(route.startsWith('/api/updates/')&&req.method==='POST'){
         try{if(updates.handoff)throw Error('网站正在重启安装更新，请稍后再操作。');const input=await body(req,4096);let result;
@@ -600,7 +604,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
     try { const record = JSON.parse(await readFile(path.join(directory, 'server.json'), 'utf8')); if (record.instanceId === instanceId) await unlink(path.join(directory, 'server.json')); } catch {}
   })();
-  return { server, bridge, studio, targetVision, updates, instanceId, close, isBusy:()=>Boolean(active||activePackage||critiqueActive||studio.active||studio.archiving) };
+  return { server, bridge, studio, targetVision, updates, instanceId, close, isBusy:()=>Boolean(active||activePackage||critiqueActive||studio.active||studio.archiving||mobileDownloads?.active) };
 }
 
 export function friendlyError(message = '') {
