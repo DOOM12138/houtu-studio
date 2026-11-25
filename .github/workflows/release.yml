@@ -1,4 +1,4 @@
-name: Publish Windows portable release
+name: Publish desktop and standalone Android
 on:
   push:
     tags: ['v*']
@@ -9,7 +9,11 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 jobs:
+  android-validation:
+    if: startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/android-test.yml
   release:
+    needs: android-validation
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: windows-latest
     permissions:
@@ -19,10 +23,35 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '25.2.1'
+      - uses: actions/setup-java@v4
+        with: {distribution: 'temurin', java-version: '21'}
       - run: npm ci
       - run: npm run check
       - run: npm test
       - run: npm run test:updates
+      - name: Install Android build components
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .cache/android
+            .cache/android-node
+          key: android-runtime-${{ hashFiles('android/runtime-lock.json', 'android/node-package-lock.json') }}
+      - name: Build signed standalone Android APKs
+        shell: pwsh
+        env:
+          HOUTU_ANDROID_RELEASE: '1'
+          HOUTU_ANDROID_KEYSTORE_B64: ${{ secrets.HOUTU_ANDROID_KEYSTORE_B64 }}
+          HOUTU_ANDROID_STOREPASS: ${{ secrets.HOUTU_ANDROID_STOREPASS }}
+        run: |
+          node scripts/project-node.mjs scripts/build-android.mjs --abi arm64-v8a --sdk $env:ANDROID_HOME --jdk $env:JAVA_HOME
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/project-node.mjs scripts/build-android.mjs --abi x86_64 --sdk $env:ANDROID_HOME --jdk $env:JAVA_HOME
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Verify, package, upload draft, then publish
         run: node scripts/project-node.mjs scripts/publish-release.mjs
         env:

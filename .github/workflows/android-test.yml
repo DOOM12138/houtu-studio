@@ -1,5 +1,6 @@
 name: Validate standalone Android
 on:
+  workflow_call:
   workflow_dispatch:
   push:
     branches: ['feat/android-standalone']
@@ -66,7 +67,7 @@ jobs:
           disk-size: 4096M
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
-          script: node scripts/project-node.mjs test/android-smoke.mjs release/houtu-studio-1.21.0-Android-x86_64-test.apk
+          script: node scripts/project-node.mjs test/android-smoke.mjs release/*-Android-x86_64-test.apk
       - uses: actions/upload-artifact@v4
         if: always()
         with:
