@@ -6,6 +6,10 @@ import {wikiBytes} from './scene-wikimedia.mjs';
 const characterTypes=new Set(['Q95074','Q15632617','Q1569167','Q125130106']);
 const itemId=id=>typeof id==='string'&&/^Q[1-9]\d{0,11}$/.test(id);
 const key=value=>String(value||'').normalize('NFKC').toLowerCase().replace(/[\s\p{P}]/gu,'');
+function workKey(value){
+ const s=String(value||'').trim().replace(/(?:游戏|遊戲|漫画|漫畫|动画|動畫)?系列(?:作品)?$/u,'').replace(/\s+(?:video game |manga |anime )?series$/iu,'');
+ return key(s);
+}
 function names(entity){
  return [...Object.values(entity?.labels||{}),...Object.values(entity?.aliases||{}).flat()].map(v=>v?.value).filter(v=>typeof v==='string');
 }
@@ -22,7 +26,7 @@ async function readApi(params,signal){
  const response=await wikiBytes(url,{signal});
  const result=JSON.parse(response.bytes.toString('utf8'));if(result.error)throw Error('资料查询失败');return result;
 }
-export async function lookupFictionalCharacter(candidate,{read=readApi,signal=AbortSignal.timeout(8000)}={}){
+export async function lookupFictionalCharacter(candidate,{read=readApi,signal=AbortSignal.timeout(14000)}={}){
  const name=fictionalTitle(candidate?.name),work=fictionalTitle(candidate?.work);
  if(!candidate?.canSearchName||!name)return {status:'not-requested'};
  try{
@@ -33,11 +37,17 @@ export async function lookupFictionalCharacter(candidate,{read=readApi,signal=Ab
   const titles=ids.map(id=>entities[id]).filter(e=>e&&names(e).some(n=>key(n)===key(name)));
   const possible=titles.filter(e=>!claims(e,'P31').includes('Q5')&&claims(e,'P31').some(t=>characterTypes.has(t)));
   if(!possible.length)return {status:titles.length&&titles.every(e=>claims(e,'P31').includes('Q5'))?'not-fictional':'no-match'};
-  const works=[...new Set(possible.flatMap(e=>[...claims(e,'P1441'),...claims(e,'P1080')]))].slice(0,16);
-  if(!works.length||!work)return {status:'unconfirmed-work'};
+  function nameOnly(){
+   if(possible.length!==1||titles.some(e=>claims(e,'P31').includes('Q5')))return {status:'ambiguous'};
+   const e=possible[0];if(!itemId(e.id))return {status:'no-match'};
+   return {status:'matched-name',id:e.id,name:label(e)||name,enName:fictionalTitle(e.labels?.en?.value),url:'https://www.wikidata.org/wiki/'+e.id};
+  }
+  const relations=e=>[...claims(e,'P1080'),...claims(e,'P179'),...claims(e,'P1441')];
+  const works=[...new Set(possible.flatMap(relations))].slice(0,16);
+  if(!works.length||!work)return nameOnly();
   const details=(await read({action:'wbgetentities',ids:works.join('|'),props:'labels|aliases',languages:'zh-hans|zh|ja|en'},signal)).entities||{};
-  const matching=possible.map(e=>({e,workIds:[...claims(e,'P1441'),...claims(e,'P1080')].filter(id=>names(details[id]).some(n=>key(n)===key(work)))})).filter(v=>v.workIds.length);
-  if(matching.length!==1)return {status:matching.length?'ambiguous':'unconfirmed-work'};
+  const matching=possible.map(e=>({e,workIds:relations(e).filter(id=>names(details[id]).some(n=>workKey(work)&&workKey(n)===workKey(work)))})).filter(v=>v.workIds.length);
+  if(matching.length!==1)return matching.length?{status:'ambiguous'}:nameOnly();
   const {e,workIds}=matching[0],workId=workIds[0];
   if(!itemId(e.id))return {status:'no-match'};
   return {status:'matched-record',id:e.id,name:label(e)||name,work:label(details[workId])||work,enName:fictionalTitle(e.labels?.en?.value),enWork:fictionalTitle(details[workId]?.labels?.en?.value),workId,url:'https://www.wikidata.org/wiki/'+e.id,workUrl:'https://www.wikidata.org/wiki/'+workId};

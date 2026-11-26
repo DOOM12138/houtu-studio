@@ -33,15 +33,15 @@ export function showSceneAnalysis(section,step){
  }
  if(output?.catalog){
   const c=output.catalog;
-  if(c.status==='matched-record'&&/^Q[1-9]\d{0,11}$/.test(c.id)){
-   const a=el('a','角色资料 · '+c.name+' / '+c.work);a.href='https://www.wikidata.org/wiki/'+c.id;a.rel='noopener noreferrer';a.target='_blank';section.append(a,paragraph('资料核对了角色与作品的关系。当前照片的装束仍需单独比对。'));
+  if(['matched-record','matched-name'].includes(c.status)&&/^Q[1-9]\d{0,11}$/.test(c.id)){
+   const a=el('a','角色资料 · '+c.name+(c.work?' / '+c.work:''));a.href='https://www.wikidata.org/wiki/'+c.id;a.rel='noopener noreferrer';a.target='_blank';section.append(a,paragraph(c.status==='matched-name'?'找到同名虚构角色记录，作品关系未核实；只按角色名检索，仍需比对造型。':'资料核对了角色与作品的关系。当前照片的装束仍需单独比对。'));
   }else if(catalogStatus[c.status])section.append(paragraph(catalogStatus[c.status]));
   if(output.queries?.length){const d=detail('查看实际搜图用词');for(const q of output.queries)d.append(paragraph((refRoles[q.role]||'参考')+' · '+q.provider+' · '+q.query));section.append(d);}
  }
  if(output?.plan?.referenceReviews?.length){
   if(output.plan.sceneProfile?.character?.status==='reference-candidate'){
    const c=output.plan.sceneProfile.character;
-   section.append(paragraph('参考图复核后的角色候选 · '+c.name+' / '+c.work+'。这是造型比对的推测。'));
+   section.append(paragraph('参考图复核后的角色候选 · '+c.name+(c.work?' / '+c.work:'')+'。这是造型比对的推测。'));
   }
   const d=detail('参考图为什么采用或舍弃');
   for(const r of output.plan.referenceReviews){

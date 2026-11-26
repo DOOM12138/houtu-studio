@@ -74,6 +74,7 @@ export function sceneMethod(profile,phase){
 export function catalogBoundProfile(profile,catalog){
  const c=profile.character;
  if(catalog?.status==='matched-record'&&c.canSearchName)return {...profile,catalogVerified:true};
+ if(catalog?.status==='matched-name'&&c.canSearchName)return {...profile,catalogVerified:true,character:{...c,work:''}};
  return {...profile,catalogVerified:false,character:{...c,status:c.status==='original'?'original':'unknown',name:'',work:'',canSearchName:false}};
 }
 export function profileForPrompt(profile){
@@ -86,12 +87,12 @@ export function sceneQueries(profile,config,catalog={}){
  const items=[],c=profile.character,limit=config.referenceCount;
  const add=(role,zh,en,cap,purpose='style')=>items.push({purpose,guideRole:role,query:config.referenceProvider==='xiaohongshu'&&purpose==='style'?zh:en,publicQuery:en,cap});
  const appearance=profile.appearanceTags.slice(0,3).map(t=>tags[t]),scene=sceneTerms[profile.scene.kind],light=lightTerms[profile.lighting];
- if(c.canSearchName){const english=catalog.status==='matched-record'?(catalog.enName||c.name):c.name,series=catalog.status==='matched-record'?(catalog.enWork||c.work):c.work;
+ if(c.canSearchName){const english=catalog.enName||c.name,series=catalog.status==='matched-record'?(catalog.enWork||c.work):c.work;
   add('design',[c.name,c.work,'人设 服装'].filter(Boolean).join(' '),[english,series,'cosplay'].filter(Boolean).join(' '),Math.max(1,Math.floor(limit/2)));
   if(series)add('design',c.name+' 角色造型',english+' cosplay',Math.max(1,Math.floor(limit/2)));
  }
  add('lighting',[...new Set([scene[0],light[0]].filter(Boolean))].join(' '),[scene[1],light[1]].filter(Boolean).join(' '),Math.max(1,Math.floor(limit/2)));
- const broader={convention:['漫展 场照','cosplay convention'],studio:['棚拍 人像','studio portrait'],location:['外景 人像','outdoor portrait'],unknown:['人像 光线','portrait light']}[profile.scene.kind];
+ const broader={convention:['漫展 场照','cosplay convention'],studio:['棚拍 人像','studio portrait photography'],location:['外景 人像','outdoor portrait photography'],unknown:['人像 自然光','portrait photography natural light']}[profile.scene.kind];
  add('lighting',broader[0],broader[1],Math.max(1,Math.floor(limit/2)));
  if(config.tasks.some(t=>['small','large'].includes(t)))add('material','透明光影素材','transparent light overlay',1,'material');
  add('appearance',(profile.subjectPresent===false?'环境光色 ':'COS 人像 ')+appearance.map(t=>t[0]).join(' '),(profile.subjectPresent===false?'environment lighting ':'cosplay portrait ')+appearance.map(t=>t[1]).join(' '),limit);

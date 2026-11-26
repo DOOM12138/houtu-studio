@@ -44,7 +44,9 @@ test('only a matching fictional catalogue record and work enable named public im
  const read=async params=>params.action==='wbsearchentities'?{search:[{id:'Q12'},{id:'Q14'},{id:'Q11'}]}:{entities:Object.fromEntries(params.ids.split('|').map(k=>[k,datasets[k]]))};
  const candidate={name:'Example',work:'Source Work',canSearchName:true};
  const match=await lookupFictionalCharacter(candidate,{read});assert.equal(match.id,'Q11');assert.equal(match.status,'matched-record');
- const ambiguous=await lookupFictionalCharacter({...candidate,work:'Unknown Media'},{read});assert.equal(ambiguous.status,'unconfirmed-work');
+ const ambiguous=await lookupFictionalCharacter({...candidate,work:'Unknown Media'},{read});assert.equal(ambiguous.status,'ambiguous');
+ const one=await lookupFictionalCharacter({...candidate,work:'Unverified subtitle'},{read:params=>params.action==='wbsearchentities'?{search:[{id:'Q11'}]}:read(params)});
+ assert.equal(one.status,'matched-name');assert.equal(one.work,undefined);assert.equal(catalogBoundProfile(profile(),one).character.work,'');
  const rejected=await lookupFictionalCharacter(candidate,{read:async p=>p.action==='wbsearchentities'?{search:[{id:'Q12'}]}:{entities:{Q12:person}}});assert.equal(rejected.status,'not-fictional');
  const declined=await lookupFictionalCharacter({...candidate,canSearchName:false},{read:()=>assert.fail('lookup should not run')});assert.equal(declined.status,'not-requested');
  for(const status of ['unavailable','not-requested','no-match','ambiguous','not-fictional','unconfirmed-work']){

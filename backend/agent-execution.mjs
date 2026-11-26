@@ -59,8 +59,8 @@ export async function executeAgentStep(service,w,node,token,run,inputAsset){
   else{plan=localAgentPlan(config,observation,references);analysis={provider:'local',engine:'task-rules',model:'mediapipe-selfie-segmentation'};}
   if(config.sceneGuide&&plan.roleHypothesis&&config.autoSearch&&!config.sceneGuide.character&&!plan.sceneProfile.catalogVerified){
    const proposed=plan.roleHypothesis,record=await service.characterLookup(proposed);service.guard(run);plan.roleCatalogue=record;
-   if(record.status==='matched-record'){
-    plan.sceneProfile={...plan.sceneProfile,catalogVerified:true,character:{...plan.sceneProfile.character,status:'reference-candidate',name:proposed.name,work:proposed.work,confidence:proposed.confidence,canSearchName:true}};
+   if(['matched-record','matched-name'].includes(record.status)){
+    plan.sceneProfile={...plan.sceneProfile,catalogVerified:true,character:{...plan.sceneProfile.character,status:'reference-candidate',name:proposed.name,work:record.status==='matched-record'?proposed.work:'',confidence:proposed.confidence,canSearchName:true}};
     plan.referenceSupport='visual-agreement';
    }
   }
