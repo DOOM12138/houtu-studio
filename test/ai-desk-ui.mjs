@@ -1,0 +1,67 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import sharp from 'sharp';
+import {chromium} from 'playwright-core';
+import {browserExecutable} from '../backend/platform-browser.mjs';
+import {deskFixture} from './helpers/desk-fixture.mjs';
+
+const f=await deskFixture(),errors=[],out=path.resolve('.impeccable/review/ai-modes');
+const browser=await chromium.launch({executablePath:await browserExecutable(),headless:true});
+const ctx=await browser.newContext({viewport:{width:1440,height:950},acceptDownloads:true});
+await ctx.addInitScript(()=>{
+ const counts=window.uiProbe={decode:0,encode:0,posts:0};
+ const decode=HTMLImageElement.prototype.decode;HTMLImageElement.prototype.decode=function(...args){counts.decode++;return decode.apply(this,args);};
+ const encode=HTMLCanvasElement.prototype.toBlob;HTMLCanvasElement.prototype.toBlob=function(...args){counts.encode++;return encode.apply(this,args);};
+ const native=window.fetch;window.fetch=(url,init)=>{if(init?.method==='POST'&&String(url).includes('/ai-runs'))counts.posts++;return native(url,init);};
+});
+const page=await ctx.newPage();page.setDefaultTimeout(15000);page.on('pageerror',e=>errors.push(e.message));
+const png=await sharp({create:{width:320,height:240,channels:3,background:'#8b8491'}}).png().toBuffer(),file={name:'演练图.png',mimeType:'image/png',buffer:png};
+const ready=()=>page.waitForFunction(()=>document.querySelector('#docName')?.textContent==='演练图.png'&&!document.querySelector('#export').disabled);
+async function selectTool(id,label){
+ const q=page.locator('#desk-search');await q.fill(label);await page.locator('[data-operation-choice="'+id+'"]').check();
+}
+const read=async route=>(await fetch(f.origin+route)).json();
+async function waitPic(step){await page.waitForFunction(id=>document.querySelector('[data-desk-step="'+id+'"]')?.textContent.includes('已完成'),step,{timeout:30000});}
+try{
+ await fs.mkdir(out,{recursive:true});
+ await page.goto(f.origin+'/workbench/?panel=ai');await page.locator('#desk-mode-auto').waitFor();
+ assert.equal(await page.locator('#desk-mode-auto').getAttribute('aria-selected'),'true');
+ await page.locator('#file').setInputFiles(file);await ready();await page.locator('#larger').click();
+ await page.locator('[data-section=color]').click();
+ const slider=page.locator('#exposure');await slider.evaluate(e=>{e.value='.25';e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));});
+ await page.waitForFunction(()=>document.querySelector('#ioState')?.textContent==='本机草稿');await page.locator('[data-section=ai]').click();
+ const before=await page.evaluate(()=>{window.stageIdentity=document.querySelector('#stage');return {...window.uiProbe,zoom:document.querySelector('#zoomLabel').value,url:location.href};});
+ await page.locator('#desk-mode-semi').click();await selectTool('soft-glow','柔光');await selectTool('lighting','人物光影');
+ await page.locator('#desk-mode-auto').click();await page.locator('#desk-auto-paint').check();const level=page.getByRole('spinbutton',{name:'厚涂程度 1–10'});await level.fill('');assert.ok(await page.locator('#desk-start').isDisabled());await level.fill('5');assert.ok(!await page.locator('#desk-start').isDisabled());await page.locator('#desk-auto-paint').uncheck();await page.locator('#desk-mode-semi').click();
+ const after=await page.evaluate(()=>({...window.uiProbe,zoom:document.querySelector('#zoomLabel').value,url:location.href,same:window.stageIdentity===document.querySelector('#stage')}));
+ assert.equal(after.same,true);for(const key of ['decode','encode','posts','zoom','url'])assert.equal(after[key],before[key],key);
+ assert.equal(f.bridge.images.length,0);assert.equal(f.bridge.reads.length,0);
+ assert.match(await page.locator('.desk-sequence').textContent(),/柔光.*人物光影/);
+ await page.getByRole('button',{name:'上移人物光影',exact:true}).click();assert.match(await page.locator('.desk-sequence').textContent(),/人物光影.*柔光/);
+ await page.screenshot({path:path.join(out,'desktop-semi.png')});
+ await page.locator('#desk-start').click();await waitPic('stage1');await page.waitForFunction(()=>!document.querySelector('#desk-start').disabled);
+ const runId=new URL(page.url()).searchParams.get('deskRun');assert.ok(runId);let v=await read('/api/studio/ai-runs/'+runId);assert.equal(v.next,'stage2');assert.equal(f.bridge.images.length,1);assert.equal(f.bridge.images[0].op,'lighting');
+ const runSource=await read('/api/workflows/'+v.origin.workflowId);assert.equal(runSource.kind,'single-canvas');assert.equal(runSource.steps.find(s=>s.id==='edit').output.settings.global.exposure,.25);
+ const draftsBefore=await read('/api/studio/canvas-drafts');assert.equal(draftsBefore.photos.length,1);await page.reload();await waitPic('stage1');assert.equal((await read('/api/studio/canvas-drafts')).photos.length,1);await page.waitForFunction(()=>!document.querySelector('#desk-start').disabled);assert.equal(f.bridge.images.length,1);
+ await page.locator('#desk-start').click();await waitPic('deliver');assert.equal(f.bridge.images.length,2);assert.equal(f.bridge.images[1].op,'soft-glow');
+ v=await read('/api/studio/ai-runs/'+runId);assert.ok(v.done);
+ await page.locator('[data-section=color]').click();await page.locator('#contrast').evaluate(e=>{e.value='10';e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));});await page.waitForFunction(()=>document.querySelector('#ioState')?.textContent==='本机草稿');
+ await page.locator('#undo').click();await page.waitForFunction(()=>document.querySelector('#contrast')?.value==='0');
+ await page.locator('#export').click();const download=page.waitForEvent('download');await page.locator('#doExport').click();
+ const actual=await sharp(await fs.readFile(await(await download).path())).raw().toBuffer();
+ const expected=await sharp(Buffer.from(await(await fetch(f.origin+'/api/workflows/'+v.result.workflowId+'/assets/'+v.result.assetId)).arrayBuffer())).ensureAlpha().raw().toBuffer();
+ assert.deepEqual([...actual.subarray(0,3)],[...expected.subarray(0,3)]);
+ await page.locator('[data-section=ai]').click();await page.locator('#desk-mode-auto').click();await page.locator('#desk-start').click();
+ await page.waitForFunction(()=>document.querySelector('[data-desk-step=deliver]')?.textContent.includes('已完成'),null,{timeout:30000});
+ const ai=await read('/api/studio/ai-runs/'+new URL(page.url()).searchParams.get('deskRun'));assert.equal(ai.mode,'auto');assert.equal(ai.origin.assetId,v.result.assetId);assert.ok(ai.done);assert.equal(f.bridge.images.length,4);
+ for(const width of [390,320]){
+  await page.setViewportSize({width,height:820});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+  await page.locator('#desk-mode-semi').click();await page.locator('#desk-mode-auto').click();await page.screenshot({path:path.join(out,'phone-'+width+'.png')});
+ }
+ await page.goto(f.origin+'/ai/');await page.locator('#desk-mode-auto').waitFor();assert.equal(await page.locator('#desk-mode-auto').getAttribute('aria-selected'),'true');
+ await page.locator('#desk-mode-semi').click();assert.ok(await page.locator('#desk-search').isVisible());await page.getByRole('button',{name:'单项精修工具',exact:true}).click();
+ assert.ok(await page.locator('#operation-title').isVisible());
+ assert.deepEqual(errors,[]);console.log(JSON.stringify({pass:true,realGenerations:0,semiSingleStep:true,restoredNoResubmit:true,exactChainedSource:true,fullAuto:true,modeSwitchNoImageIO:true,sameCanvas:true,editAfterAi:true,display320:true,legacySingleTool:true}));
+}catch(e){console.error('URL',page.url(),'pageerrors',errors,'notice',await page.locator('.desk-notice').allTextContents(),'status',await page.locator('#ioState').allTextContents());await page.screenshot({path:path.join(out,'failure.png')});throw e;}
+finally{await ctx.close();await browser.close();await f.close();}

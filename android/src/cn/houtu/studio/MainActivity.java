@@ -27,6 +27,7 @@ public final class MainActivity extends Activity {
   Uri lastSaved;
   String lastMime;
   boolean ready = false;
+  boolean unifiedPage = false;
   boolean updatesForeground = false;
   final Handler updatesHandler = new Handler(Looper.getMainLooper());
   final Runnable automaticUpdates = new Runnable() {
@@ -60,7 +61,7 @@ public final class MainActivity extends Activity {
                 in.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
             v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
             if (nav != null)
-              nav.setVisibility(in.isVisible(WindowInsets.Type.ime()) ? View.GONE : View.VISIBLE);
+              nav.setVisibility(unifiedPage || in.isVisible(WindowInsets.Type.ime()) ? View.GONE : View.VISIBLE);
             return new WindowInsets.Builder(in)
                 .setInsets(
                     WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout(),
@@ -108,7 +109,11 @@ public final class MainActivity extends Activity {
           }
 
           public void onPageFinished(WebView v, String u) {
-            if (own(u)) attachDownloads();
+            if (own(u)) {
+              unifiedPage = "/workbench/".equals(Uri.parse(u).getPath());
+              if (nav != null) nav.setVisibility(unifiedPage ? View.GONE : View.VISIBLE);
+              attachDownloads();
+            }
           }
 
           public void onReceivedSslError(
@@ -229,7 +234,7 @@ public final class MainActivity extends Activity {
               message.setVisibility(View.GONE);
               web.setVisibility(View.VISIBLE);
               nav.setVisibility(View.VISIBLE);
-              web.loadUrl(RuntimeHost.origin + "/");
+              web.loadUrl(RuntimeHost.origin + "/workbench/");
               engine = RuntimeHost.engine;
               if (engine == null) {
                 engine = new WebView(getApplicationContext());
@@ -286,6 +291,7 @@ public final class MainActivity extends Activity {
     for (int i = 0; i < titles.length; i++) p.getMenu().add(0, i, i, titles[i]);
     p.getMenu().add(0, 10, 10, "本机图层合成");
     p.getMenu().add(0, 11, 11, "功能中心");
+    p.getMenu().add(0, 12, 12, "单画布工作台");
     p.getMenu().add(0, 9, 9, "自动检查GitHub更新").setCheckable(true).setChecked(AndroidUpdates.enabled(this));
     p.setOnMenuItemClickListener(
         item -> {
@@ -307,6 +313,9 @@ public final class MainActivity extends Activity {
               break;
             case 10:
               go("/layers/");
+              break;
+            case 12:
+              go("/workbench/");
               break;
             case 11:
               go("/features/");

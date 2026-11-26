@@ -21,10 +21,12 @@ export function mergeRecipeStages(target,source,categories){
 }
 export function recipeValue(input={}){
  if(!input||typeof input!=='object'||Array.isArray(input))throw Error('流程配方格式无效。');
- if(!Array.isArray(input.stages)||input.stages.length<1||input.stages.length>12)throw Error('流程配方需要1–12个步骤。');
+ const reviewed=input.reviewEach===true;
+ if(!Array.isArray(input.stages)||input.stages.length<1||input.stages.length>(reviewed?76:12))throw Error(reviewed?'逐步清单最多75项修图和一个本机导出。':'流程配方需要1–12个步骤。');
+ if(reviewed&&(input.stages.length<2||input.stages.slice(0,-1).some(s=>s?.type!=='retouch'||s.enabled===false)||new Set(input.stages.slice(0,-1).map(s=>s.options?.operation)).size!==input.stages.length-1))throw Error('逐步清单只接受互不重复的已有修图功能。');
  let enabled=0;const stages=input.stages.map((stage,index)=>{
   if(!stage||typeof stage!=='object')throw Error('流程步骤无效。');const type=stage.type;let options;
-  if(type==='retouch'){options=normalizeEditOptions({...stage.options,model:null,parentId:null});if(stage.enabled!==false&&isSceneOperation(options.operation)&&options.scene.protectSubject&&enabled>0)throw Error('使用主体保护的场照步骤请放在第一步，后续图像变动后需重新确认蒙版。');}
+  if(type==='retouch'){options=normalizeEditOptions({...stage.options,model:null,parentId:null});if(!reviewed&&stage.enabled!==false&&isSceneOperation(options.operation)&&options.scene.protectSubject&&enabled>0)throw Error('使用主体保护的场照步骤请放在第一步，后续图像变动后需重新确认蒙版。');}
   else if(type==='agent')options=agentOptions(stage.options);
   else if(type==='upscale')options=superresOptions(stage.options);
   else if(type==='local')options=localOptions(stage.options);
@@ -35,7 +37,12 @@ export function recipeValue(input={}){
  });
  if(stages.at(-1).type!=='export'||stages.slice(0,-1).some(stage=>stage.type==='export'))throw Error('导出需要作为最后一步，且只能有一个导出步骤。');
  if(!stages.at(-1).enabled)throw Error('导出步骤不能关闭。');
- return {schemaVersion:1,name:cleanName(input.name,'我的修图配方'),description:String(input.description||'').slice(0,300),model:normalizeModel(input.model),stages};
+ return {schemaVersion:1,...(reviewed?{reviewEach:true}:{}),name:cleanName(input.name,'我的修图配方'),description:String(input.description||'').slice(0,300),model:normalizeModel(input.model),stages};
+}
+export function validateDeskMode(mode,recipe){
+ const steps=recipe?.stages||[],auto=mode==='auto'&&!recipe.reviewEach&&steps.length===2&&steps[0].type==='agent'&&steps[0].options.mode==='auto'&&steps[0].enabled&&steps[1].type==='export';
+ const semi=mode==='semi'&&recipe.reviewEach===true&&steps.length>=2&&steps.slice(0,-1).every(s=>s.type==='retouch'&&s.enabled)&&steps.at(-1).type==='export';
+ if(!auto&&!semi)throw Error('AI 修图模式与保存的步骤配置不一致。');
 }
 const retouch=(name,options)=>({type:'retouch',name,options:{task:{autoTarget:true,sourceRetention:0},...options}}),finish={type:'export',name:'成片导出',options:{format:'png',quality:90}};
 // Append new builtins; stored builtin IDs must never change a local recipe into AI work.

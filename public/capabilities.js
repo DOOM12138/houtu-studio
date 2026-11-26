@@ -26,6 +26,7 @@ export const CAPABILITY_GROUPS=[
   {name:'跨板块带图',status:'ready',description:'完整尺寸结果、步骤／Agent／历史快照按确切尝试接续；复制链接保留来源，原图和历史保留，切换不自动出图。'},
   {name:'批量局部蒙版',status:'partial',description:'可同步全局参数，专属人物／手绘蒙版需逐图分析或修正，不能把某张脸的固定选区盲目复制给整组照片。'}]},
  {id:'agent',name:'Agent与模型调度',direction:'本地与云端协作',url:'/studio/',items:[
+  {name:'单画布 AI 模式',status:'ready',description:'右栏顶部切换全自动与半自动。按场景连续修图，或勾选并排序已有任务，逐步确认并预览实际结果。'},
   {name:'按场景自动精修',status:'ready',description:'逐图分析场照、棚拍、外景和虚构角色候选，按依据找图、修人物和调色。厚涂、小特效分别勾选，线索不足或资料不匹配时按可见造型工作。'},
   {name:'可检查的修图Agent',status:'ready',description:'按勾选功能读图、找参考、规划、修整、检查与交付；调度和跑图模型独立选择，未勾选的步骤不执行。'},
   {name:'按真实硬件路由',status:'ready',description:'低配或未知条件走云端；满足条件时按需准备公开本地视觉Agent，验证GPU驻留后参与分析和检查。'},

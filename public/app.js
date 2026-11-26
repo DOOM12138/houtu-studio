@@ -5,6 +5,7 @@ import {imageOrigin} from './image-import.js';
 import {createImageViewer} from './image-viewer.js';
 import {COS_PAINT_LEVELS,PAINT_EDIT_BRIEF} from './paint-profile.js';
 import {featureDefault,DEFAULT_EDIT_BRIEF} from './prompt-contract.js';
+import {createAiDesk} from './ai-desk.js';
 import {createFeatureTools} from './feature-ui.js';
 import {isBellyOperation,bellyOptions} from './belly-options.js';
 import {createSceneTools} from './scene-ui.js';
@@ -17,6 +18,7 @@ const running = status => ['preparing', 'generating', 'cancelling'].includes(sta
 let state = {}, sourceData = '', currentJob = null, timer = null, historyJobs = [];
 const aiOptionHistory=new EditHistory(100);let aiOptionReady=false;
 let lastAiResultKey='';let aiHistoryRestoring=false,aiHistoryBusy=false,aiRedoJobs=[],aiUndoParent=null;
+let aiDesk=null,restoringDesk=false,restoreDeskModel=()=>{};
 let checking = false, busy = false,portraitChecking=false,portraitTaskType='';
 let operation = 'full-body', toolFilter = '全部', selection = null, selecting = false, parentId = null;
 let sourceMeta = null, dragStart = null, previousSelection = null, compiledVersion = 0;
@@ -57,7 +59,7 @@ function renderTools() {
       button.disabled = busy || running(currentJob?.status);
       const name = document.createElement('strong'); name.textContent = tool.name;
       const hint = document.createElement('small'); hint.textContent = tool.short;
-      button.append(name, hint); button.addEventListener('click', () => { $('prompt-mode').value = 'guided'; setOperation(tool.id); });
+      button.append(name, hint); button.addEventListener('click', () => { showClassic(); $('prompt-mode').value = 'guided'; setOperation(tool.id); });
       $('tool-list').append(button);
     }
   }
@@ -151,7 +153,7 @@ async function api(route, body) {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Paint-CSRF': state.csrf || '' }, body: JSON.stringify(body),
   });
   const data = await response.json();
-  if (!response.ok) throw Object.assign(new Error(data.error || '请求失败，请重试。'),{workflowId:data.workflowId});
+  if (!response.ok) throw Object.assign(new Error(data.error || '请求失败，请重试。'),{workflowId:data.workflowId,status:response.status});
   return data;
 }
 
@@ -167,6 +169,7 @@ function updateControls() {
   $('belly-panel').inert=working||custom;
   document.querySelector('.strength-field').hidden=scene||isBellyOperation(operation)&&!custom;
   if(scene||isBellyOperation(operation)&&!custom)$('preserve').checked=true;
+  aiDesk?.sync();
   $('generate').disabled = state.imageRuntime?.ready===false || !modelPicker.valid() || !hasSource() || !state.account || working || !$('prompt').value.trim() || (!custom && operation==='outpaint'&&!featureTools.validCanvas()) || (!custom && ['full-body','portrait-polish'].includes(operation) && !editOptions().areas.length);
   $('generate').querySelector('span').textContent = packing ? '打包中，稍后精修' : portraitChecking ? (portraitTaskType==='audit'?'正在检查人物…':'正在分析人物蒙版…') : working ? (operation==='outpaint'&&!custom?'正在 AI 扩图…':'正在精修…') : ready ? '先检查主体保护' : isCleanupOperation(operation)&&!custom ? '开始场照清理' : isBellyOperation(operation)&&!custom ? '开始平滑收腹' : operation==='outpaint'&&!custom ? '开始 AI 扩图' : selection ? '精修选区' : '开始精修';
   $('cancel').hidden = !running(currentJob?.status)&&!(portraitChecking&&portraitTaskType==='audit');
@@ -209,7 +212,7 @@ async function refreshState() {
     else if (!state.loginPending) $('connection').hidden = true;
     if (!promptInitialized) { $('prompt').value = state.defaultPrompt; promptInitialized = true;syncDefaultBrief(); optionsChanged(); }
     if (state.package && !packageJob) { renderPackage(state.package); if (state.package.status === 'building') watchPackage(); }
-    if (!currentJob && state.activeJob) await restoreJob(state.activeJob);
+    if (!currentJob && state.activeJob && !aiDesk?.active()) await restoreJob(state.activeJob);
     updateControls();
   } catch { showConnection('本机服务未连接。请双击项目中的「启动网站.cmd」，然后刷新此页面。'); }
   finally { checking = false; }
@@ -272,6 +275,7 @@ async function setFile(file, reference = null,{isCurrent=()=>true}={}) {
     $('file-name').textContent = file.name;
     $('file-name').title = file.name;
     $('image-info').textContent = `${img.width} × ${img.height} · ${(file.size / 1024 / 1024).toFixed(1)} MB`;
+    if(!restoringDesk){aiDesk?.sourceChanged(reference);const newURL=new URL(location.href);if(newURL.searchParams.has('deskRun')){newURL.searchParams.delete('deskRun');history.replaceState(null,'',newURL.href);}}
     clearResult(); updateRegion(); feedback(); updateControls(); requestAnimationFrame(drawSelection);if(!aiHistoryRestoring)resetAiOptions('打开图片');
     return true;
   } catch { feedback('这张图片无法打开，请换一张试试。'); }
@@ -434,6 +438,7 @@ $('cancel').addEventListener('click', async () => {
 });
 
 async function restoreJobImpl(job,{isCurrent=()=>true}={}) {
+  showClassic();
   restoringSources++;const previousRevision=sourceFileRevision;try {
     const response = await fetch(job.sourceUrl);
     if (!response.ok) throw new Error('原图不存在。');
@@ -580,6 +585,7 @@ async function loadPortraitVersions(job){try{const response=await api(`/api/jobs
 $('to-superres').onclick=async()=>{if(!hasSource()||busy||running(currentJob?.status))return;busy=true;updateControls();try{const value=await api('/api/superres/import',{...(sourceReference?{source:sourceReference}:{image:sourceData}),name:$('file-name').textContent});location.href=value.url;}catch(e){feedback(e.message);}finally{busy=false;updateControls();}};
 $('to-color').addEventListener('click',()=>{void navigateWorkspace('/color/');});
 
+installDeskInspector();
 setOperation('full-body');
 await Promise.all([refreshState(), loadHistory(), loadTemplates()]);
 const portraitParams=new URLSearchParams(location.search);if(portraitParams.get('tool')&&PRESETS.some(p=>p.id===portraitParams.get('tool'))&&!portraitParams.get('job')&&!portraitParams.get('refineWorkflow')&&!portraitParams.get('portraitAudit'))setOperation(portraitParams.get('tool'));if(workspaceStartupCurrent()&&(portraitParams.get('refineWorkflow')||portraitParams.get('portraitAudit'))){try{const query=portraitParams.get('portraitAudit')?'audit='+encodeURIComponent(portraitParams.get('portraitAudit')):'workflow='+encodeURIComponent(portraitParams.get('refineWorkflow'))+'&asset='+encodeURIComponent(portraitParams.get('refineAsset'));const info=await api('/api/portrait/source?'+query),r=await fetch(info.url),blob=await r.blob();if(await setFile(new File([blob],info.name+'-成品.png',{type:blob.type}),{kind:'workflow',workflowId:info.workflowId,assetId:info.assetId},{isCurrent:workspaceStartupCurrent})){$('prompt-mode').value='guided';setOperation('portrait-polish');if(info.auditId)portraitTools.setAuditId(info.auditId);if(info.diagnosis)portraitTools.showDiagnosis(info.diagnosis,info.auditId);feedback('已载入已保存成品，可以开始人物二次精修，前面的合成与调色不会重跑。',true);}}catch(e){feedback(e.message);}}
@@ -610,6 +616,51 @@ function resetAiOptions(label){if(!hasSource())return;aiOptionHistory.reset(aiOp
 function renderAiOptionsHistory(){if(!document.getElementById('ai-settings-history'))return;historyList(aiSettingsList,aiOptionHistory.entries,aiOptionHistory.cursor,{disabled:busy||aiHistoryBusy||portraitChecking||running(currentJob?.status),onSelect:restoreAiOptions});}
 function recordAiOptions(event){if(!aiOptionReady||aiHistoryRestoring||aiHistoryBusy||busy||portraitChecking||running(currentJob?.status))return;const label=event.target.closest('label')?.textContent?.trim().slice(0,35)||event.target.textContent?.trim().slice(0,35)||'修改参数';if(aiOptionHistory.push(aiOptionsSnapshot(),label)){aiRedoJobs=[];renderAiOptionsHistory();updateControls();}}
 function restoreAiOptions(index){const o=aiOptionHistory.move(index);if(!o)return;aiHistoryRestoring=true;try{modelPicker.set(o.model);$('prompt').value=o.prompt;$('prompt-mode').value=o.promptMode;$('edit-style').value=o.style;$('paint-level').value=o.paintLevel;$('preserve').checked=o.preserve;$('portrait-protect-bg').checked=o._portraitProtect;const strength=document.querySelector('[name="strength"][value="'+o.strength+'"]');if(strength)strength.checked=true;document.querySelectorAll('[name="area"]').forEach(n=>n.checked=o.areas.includes(n.value));selection=o.selection;hydrateBelly(o.belly,o._tool);sceneTools.hydrate(o.scene,o._tool);featureTools.hydrate(o.task);if(o.portrait)portraitTools.hydrate(o.portrait);setOperation(o._tool,{autoStyle:false});updateRegion();feedback('已恢复修图设置，未调用AI。',true);}finally{aiHistoryRestoring=false;renderAiOptionsHistory();updateControls();}}
-document.addEventListener('change',event=>{if(event.target.closest('.settings,#prompt-workshop,#model-picker'))recordAiOptions(event);});document.addEventListener('click',event=>{if(event.target.closest('#tool-list button,#apply-template,#reset-prompt'))recordAiOptions(event);});
+document.addEventListener('change',event=>{if(!event.target.closest('.ai-mode-desk')&&event.target.closest('.settings,#prompt-workshop,#model-picker'))recordAiOptions(event);});document.addEventListener('click',event=>{if(event.target.closest('#tool-list button,#apply-template,#reset-prompt'))recordAiOptions(event);});
 
-await registerWorkspaceEditor({tool:'ai',prepare:async()=>{if(!hasSource())return null;if(busy||portraitChecking)throw Error('当前工具仍在保存，请稍后切换。');if(currentJob?.workflowId){const w=await api('/api/workflows/'+currentJob.workflowId),node=currentJob.outputUrl&&currentJob.status==='done'?w.steps.find(n=>n.id==='compose'&&n.status==='done'):w.steps.find(n=>n.id==='source'&&n.status==='done');if(node?.output?.imageAsset)return {workflowId:w.id,assetId:node.output.imageAsset,stepId:node.id,attemptId:node.attempts?.at(-1)?.id};}if(sourceReference?.kind==='workflow')return {workflowId:sourceReference.workflowId,assetId:sourceReference.assetId,stepId:sourceReference.stepId,attemptId:sourceReference.attemptId};if(sourceReference?.jobId){const j=await api('/api/jobs/'+sourceReference.jobId);if(j.workflowId){const w=await api('/api/workflows/'+j.workflowId),n=w.steps.find(n=>n.id===(sourceReference.kind==='result'?'compose':'source')&&n.status==='done');if(n?.output?.imageAsset)return {workflowId:w.id,assetId:n.output.imageAsset,stepId:n.id,attemptId:n.attempts?.at(-1)?.id};}}let blob=sourceFileBlob;if(!blob){const response=await fetch($('source').src);if(!response.ok)throw Error('当前原图暂时无法读取。');blob=await response.blob();}const value=await saveWorkspaceImage(blob,$('file-name').textContent);sourceReference={kind:'workflow',...value};sourceData='';return value;},open:async(value,{isCurrent=()=>true}={})=>{const file=await workspaceFile(value);if(!isCurrent())return;const ok=await setFile(file,{kind:'workflow',...value.origin},{isCurrent});if(!isCurrent())return;if(!ok)throw Error('当前图片未能载入AI修图，原版本保留。');feedback('已接续其他板块的完整尺寸效果，点击生成前不会调用AI。',true);},resume:async value=>{if(sourceReference?.kind==='workflow'&&sourceReference.workflowId===value.workflowId&&sourceReference.assetId===value.assetId)sourceReference={...value.origin,kind:'workflow'};}});
+await registerWorkspaceEditor({tool:'ai',prepare:async()=>{if(!hasSource())return null;if(busy||portraitChecking||aiDesk?.locked())throw Error('当前工具仍在保存，请稍后切换。');if(aiDesk?.active()&&aiDesk.picture())return aiDesk.picture();if(currentJob?.workflowId){const w=await api('/api/workflows/'+currentJob.workflowId),node=currentJob.outputUrl&&currentJob.status==='done'?w.steps.find(n=>n.id==='compose'&&n.status==='done'):w.steps.find(n=>n.id==='source'&&n.status==='done');if(node?.output?.imageAsset)return {workflowId:w.id,assetId:node.output.imageAsset,stepId:node.id,attemptId:node.attempts?.at(-1)?.id};}if(sourceReference?.kind==='workflow')return {workflowId:sourceReference.workflowId,assetId:sourceReference.assetId,stepId:sourceReference.stepId,attemptId:sourceReference.attemptId};if(sourceReference?.jobId){const j=await api('/api/jobs/'+sourceReference.jobId);if(j.workflowId){const w=await api('/api/workflows/'+j.workflowId),n=w.steps.find(n=>n.id===(sourceReference.kind==='result'?'compose':'source')&&n.status==='done');if(n?.output?.imageAsset)return {workflowId:w.id,assetId:n.output.imageAsset,stepId:n.id,attemptId:n.attempts?.at(-1)?.id};}}let blob=sourceFileBlob;if(!blob){const response=await fetch($('source').src);if(!response.ok)throw Error('当前原图暂时无法读取。');blob=await response.blob();}const value=await saveWorkspaceImage(blob,$('file-name').textContent);sourceReference={kind:'workflow',...value};sourceData='';return value;},open:async(value,{isCurrent=()=>true}={})=>{const file=await workspaceFile(value);if(!isCurrent())return;const ok=await setFile(file,{kind:'workflow',...value.origin},{isCurrent});if(!isCurrent())return;if(!ok)throw Error('当前图片未能载入AI修图，原版本保留。');feedback('已接续其他板块的完整尺寸效果，点击生成前不会调用AI。',true);},resume:async value=>{if(sourceReference?.kind==='workflow'&&sourceReference.workflowId===value.workflowId&&sourceReference.assetId===value.assetId)sourceReference={...value.origin,kind:'workflow'};}});
+
+function showClassic(){
+ if(!aiDesk)return;
+ aiDesk.deactivate();
+ restoreDeskModel();
+ document.documentElement.removeAttribute('data-desk-mode');
+ const legacy=document.querySelector('.desk-legacy-settings');if(legacy)legacy.hidden=false;
+ const details=document.getElementById('desk-classic-info');if(details)details.hidden=true;
+ if(currentJob)renderJob(currentJob);else clearResult();
+}
+function paintDeskPicture(ref){
+ const path='/api/workflows/'+ref.workflowId+'/assets/'+ref.assetId;
+ if($('result').getAttribute('src')!==path)$('result').src=path;
+ $('loading').hidden=true;$('result-empty').hidden=true;$('result-frame').hidden=false;$('download').hidden=false;
+ $('download').href=path+'?download=1';$('download').download='AI工作流成片.png';$('footer-hint').hidden=true;
+ photoView.setMode('after');photoView.refresh();
+}
+async function pinAIInput(){if(currentJob?.workflowId){const w=await api('/api/workflows/'+currentJob.workflowId),node=currentJob.outputUrl&&currentJob.status==='done'?w.steps.find(n=>n.id==='compose'&&n.status==='done'):w.steps.find(n=>n.id==='source'&&n.status==='done');if(node?.output?.imageAsset)return {workflowId:w.id,assetId:node.output.imageAsset,stepId:node.id,attemptId:node.attempts?.at(-1)?.id};}if(sourceReference?.kind==='workflow')return {workflowId:sourceReference.workflowId,assetId:sourceReference.assetId,stepId:sourceReference.stepId,attemptId:sourceReference.attemptId};if(sourceReference?.jobId){const j=await api('/api/jobs/'+sourceReference.jobId);if(j.workflowId){const w=await api('/api/workflows/'+j.workflowId),n=w.steps.find(n=>n.id===(sourceReference.kind==='result'?'compose':'source')&&n.status==='done');if(n?.output?.imageAsset)return {workflowId:w.id,assetId:n.output.imageAsset,stepId:n.id,attemptId:n.attempts?.at(-1)?.id};}}let blob=sourceFileBlob;if(!blob){const response=await fetch($('source').src);if(!response.ok)throw Error('当前原图暂时无法读取。');blob=await response.blob();}const value=await saveWorkspaceImage(blob,$('file-name').textContent);sourceReference={kind:'workflow',...value};sourceData='';return value;}
+function installDeskInspector(){
+ const rail=document.querySelector('.settings'),legacy=document.createElement('div');
+ legacy.className='desk-legacy-settings';legacy.append(...[...rail.children]);rail.append(legacy);
+ const pickerNode=$('model-picker'),pickerMarker=document.createComment('单项工具模型选择器'),pickerGroup=document.createElement('details');
+ pickerNode.before(pickerMarker);const title=document.createElement('summary');title.textContent='模型设置';pickerGroup.append(title);
+ restoreDeskModel=()=>pickerMarker.after(pickerNode);
+ aiDesk=createAiDesk({mount:rail,api,pin:pinAIInput,classic:showClassic,showPicture:paintDeskPicture,
+  modelElement:()=>{pickerGroup.append(pickerNode);return pickerGroup;},
+  state:()=>({hasPhoto:hasSource(),signedIn:!!state.account,busy:busy||portraitChecking||packageJob?.status==='building'||running(currentJob?.status),name:$('file-name').textContent||'AI照片',model:modelPicker.value,validModel:modelPicker.valid()}),
+  setClassic(value){legacy.hidden=!value;if(!value){document.documentElement.dataset.deskMode='flow';const holder=$('desk-classic-info');if(holder)holder.hidden=false;}}
+ });
+ const link=document.createElement('a');link.id='desk-classic-info';link.className='desk-unified-link';link.href='/workbench/?panel=ai';link.textContent='单画布修图工作台';rail.append(link);link.hidden=true;
+ const query=new URLSearchParams(location.search),specific=['tool','operation','job','portraitAudit','refineWorkflow'].some(k=>query.has(k));
+ if(location.pathname.startsWith('/ai')&&!specific)aiDesk.open('auto');else aiDesk.deactivate();
+}
+async function restoreDeskSession(){
+ const id=new URLSearchParams(location.search).get('deskRun');if(!id||!/^[a-f0-9-]{36}$/.test(id))return;
+ try{
+  const v=await api('/api/studio/ai-runs/'+id);
+  if(!workspaceStartupCurrent())return;
+  restoringDesk=true;
+  const path='/api/workflows/'+v.origin.workflowId+'/assets/'+v.origin.assetId;
+  const response=await fetch(path);if(!response.ok)throw Error('此工作流的输入图暂时不可用。');const blob=await response.blob();
+  if(await setFile(new File([blob],v.name,{type:blob.type}),v.origin,{isCurrent:workspaceStartupCurrent}))aiDesk.restoreRun(v);
+ }catch(error){feedback(error.message);}finally{restoringDesk=false;}
+}
+await restoreDeskSession();

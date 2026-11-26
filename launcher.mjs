@@ -44,7 +44,7 @@ async function main() {
     console.log('厚涂小站已停止。'); return;
   }
   const show = !process.argv.includes('--no-open');
-  const page = process.argv.includes('--updates')?'/server/#software-updates':process.argv.includes('--manage')?'/server/':'/';
+  const page = process.argv.includes('--updates')?'/server/#software-updates':process.argv.includes('--manage')?'/server/':'/workbench/';
   if (existing) { console.log(`http://127.0.0.1:${existing.port}${page==='/'?'':page}`); if (show) openBrowser(existing.port,page); return; }
   const lockFile = path.join(DATA, 'launch.lock');
   let lock;

@@ -18,6 +18,7 @@ jobs:
       - run: npm run test:culling-ui
       - run: npm run test:picture-preview-ui
       - run: npm run test:retouch-tools-ui
+      - run: npm run test:ai-modes
       - run: npm run test:uploads-ui
       - run: npm run test:history-ui
       - run: npm run test:planner-ui

@@ -6,6 +6,7 @@ import {randomUUID,createHash} from 'node:crypto';
 import sharp from 'sharp';
 import {replaceFile,linkOrCopyFile} from '../lib/files.mjs';
 export const FLOW_STEPS={
+ 'single-canvas':[['source','本版输入',[]],['edit','单画布本机成片',['source']]],
  'layer-composite':[['source','完整原图与画布',[]],['edit','可编辑图层、文字与蒙版',['source']],['export','完整尺寸合成导出',['edit']]],
  'image-handoff':[['source','跨板块保留的完整图片',[]]],
  'agent-batch':[['source','本轮勾选与执行授权',[]],['prepare','为各张建立Agent新流程',['source']],['execute','后台执行与人工检查边界',['prepare']],['deliver','本轮结果与历史',['execute']]],
