@@ -1,6 +1,7 @@
 import {createModelPicker} from '/model-picker.js';
 import {manualOperations as validateStrokes} from '/manual-portrait-engine.js';
 import {createAiDesk} from '/ai-desk.js';
+import {createWorkbenchTools,isWorkbenchToolURL} from './tools.js';
 import {PRESETS} from '/catalog.js';
 import {registerWorkspaceEditor,saveWorkspaceImage,resetWorkspaceImage,trackWorkspaceInput} from '/workspace-continuation.js';
 import {WorkflowClient} from '/color/workflow-client.js';
@@ -10,6 +11,10 @@ import {MAX_IMAGE_UPLOAD_BYTES,IMAGE_UPLOAD_MESSAGE,DESKTOP_PHOTO_PIXELS,MOBILE_
 import {saveDraft,loadDrafts,loadDraft,archiveDraft} from './drafts.js';
 const aiDirectory=PRESETS.map(tool=>({...tool,aliases:{'remove-equipment':'去灯架 去器材','remove-people':'去路人','clear-background':'净场'}[tool.id]||''}));
 'use strict';
+try{
+ const theme=localStorage.getItem('houtu-theme');
+ if(theme==='dark'||theme==='light')document.documentElement.dataset.theme=theme;
+}catch{}
 const $ = id => document.getElementById(id);
 let desk=null,csrf='',signedIn=false,imageRuntimeReady=true,boundBase='',rootMedia=null;
 const isAndroid=Boolean(window.HoutuAndroid)||/Android/i.test(navigator.userAgent);
@@ -40,6 +45,7 @@ const icons = {
   hand:'M7 13V7a1.5 1.5 0 0 1 3 0v5-8a1.5 1.5 0 0 1 3 0v8-7a1.5 1.5 0 0 1 3 0v7-5a1.5 1.5 0 0 1 3 0v8q0 6-6 6h-1q-3 0-5-3l-3-4q-1-2 1-2z',
   minus:'M5 12h14',plus:'M5 12h14m-7-7v14',
   compare:'M3 5h18v14H3z M12 3v18',film:'M3 5h18v14H3z M9 5v14m6-14v14',
+  more:'M5 12h.1 M12 12h.1 M19 12h.1',
   close:'m5 5 14 14M19 5 5 19'
 };
 function icon(name) {
@@ -81,7 +87,7 @@ function freshEdits() {
   return {base:null,rawProfile:null,lutName:'',global:{},local:{},mask:null,strokes:[],caption:{value:'',opacity:80,visible:true}};
 }
 function applyEdit(state, edit) {
-  if(edit.type==='ai-image'){Object.assign(state,freshEdits(),{base:edit.origin});return state;}
+  if(edit.type==='ai-image'||edit.type==='tool-image'){Object.assign(state,freshEdits(),{base:edit.origin});return state;}
   if(edit.type==='raw-develop'){
     state.base=edit.origin;state.rawProfile=edit.profile;state.lutName=edit.lutName||'';
     return state;
@@ -109,9 +115,9 @@ function visibleEdits(){
   const state=editsAt(photo,ui.previewId??photo.cursor);
   return ui.draftStep?applyEdit(state,ui.draftStep):state;
 }
-function append(photo,label,edit) {
+function append(photo,label,edit,{persist=true}={}) {
   const index=photo.nodes.length, parent=photo.cursor;
-  photo.nodes.push({parent,label,action:clone(edit)});photo.redo[parent]=index;photo.cursor=index;safeDraft(photo);
+  photo.nodes.push({parent,label,action:clone(edit)});photo.redo[parent]=index;photo.cursor=index;if(persist)safeDraft(photo);
 }
 function commit(label,edit,refreshPanel=false) {
   const photo=currentPhoto();if(!photo||ui.previewId!==null)return;
@@ -542,6 +548,7 @@ const starts={color:'light',portrait:'gray',layers:'caption',ai:'expand',steps:'
 const scrollPositions=new Map();
 function showSection(section,group,focusId){
   if(!sections[section])return;
+  if(tools.isOpen())tools.close();
   settleCanvasInput();finishPendingEdit();
   scrollPositions.set(ui.section,$('parameterScroll').scrollTop);
   if(ui.section==='ai'&&section!=='ai')desk?.suspend();
@@ -784,6 +791,9 @@ function renderSteps(){
 function renderPanel(){
   ui.redrawLayout=null;
   const holder=$('parameterScroll'),savedScroll=holder.scrollTop;clear(holder);$('panelTitle').textContent=sections[ui.section];
+  const shortcut=sectionTools[ui.section],toolButton=$('sectionTool');
+  toolButton.hidden=!shortcut;
+  if(shortcut){toolButton.textContent=shortcut[0];toolButton.onclick=()=>openAdvanced(shortcut[1]);}
   const aiPanel=ui.section==='ai';$('unified-ai').hidden=!aiPanel;holder.hidden=aiPanel;$('inspector').classList.toggle('ai-section',aiPanel);
   $('sectionKind').textContent=ui.section==='ai'?'工作流':ui.section==='steps'?'当前照片':'本机编辑';
   $('scopeControl')?.remove();$('sectionKind').hidden=false;
@@ -814,7 +824,9 @@ function toolSearch(){
       const directory=aiDirectory.filter(t=>!['outpaint','cos-paint'].includes(t.id)).map(t=>['ai','catalog',t.name,t.group+' '+t.aliases,undefined,t]);
       const matches=q?[...toolIndex,...directory].filter(([section,group,title,aliases])=>(sections[section]+title+aliases).toLowerCase().includes(q)):
         toolIndex.filter(([,g])=>['light','gray','mask','frequency','expand','changes'].includes(g));
-      if(!matches.length){list.append(hint('没有匹配的工具，试试“曝光”或“扩图”。'));return;}
+      const advanced=q?groups.flatMap(([,items])=>items).filter(([label])=>label.toLowerCase().includes(q)):[];
+      if(!matches.length&&!advanced.length){list.append(hint('没有匹配的工具，试试“曝光”或“扩图”。'));return;}
+      for(const [label,url]of advanced)list.append(action(label,()=>openAdvanced(url),'match'));
       for(const [section,group,title,,focus,task]of matches){
         const b=action('',()=>{$('dialog').close();showSection(section,group,focus);if(section==='ai')desk?.search(task?.name||title);},'match');
         b.append(element('strong',title),element('small',sections[section]+' › '+(task?task.group+' › ':'')+title));list.append(b);
@@ -824,15 +836,58 @@ function toolSearch(){
   });
 }
 $('find').onclick=toolSearch;
-function about(){
-  openDialog('工作台说明',body=>{body.append(element('p','用同一张画布调色、修人物或添加文字。AI 修图右栏顶部切换全自动与半自动。'),hint('导入的原图与 AI 工作流保存在本机服务器。手动笔触、调色、文字和历史草稿保存在当前服务的项目目录；导出成片或提交 AI 时，按原尺寸重算。'),hint('Ctrl/⌘ + K 查找工具，Ctrl/⌘ + Z 撤销，按住空格拖动画布。'));});
+const groups=[
+ ['精细调整',[['曲线与 HSL','/color/'],['高级人物工具','/portrait/'],['本机图层工程','/layers/']]],
+ ['AI 与创作',[['单项 AI 精修','/ai/?tool=portrait-polish'],['AI 调色','/ai/color/'],['多图创作与合成','/creative/'],['4K 超分','/upscale/'],['提示词工具','/lab/']]],
+ ['照片与记录',[['照片项目与批量修图','/studio/'],['工作流记录','/workflows/']]]
+];
+const sectionTools={color:groups[0][1][0],portrait:groups[0][1][1],layers:groups[0][1][2],ai:groups[1][1][0],steps:groups[2][1][1]};
+function openAdvanced(url){
+ if($('dialog').open)$('dialog').close();
+ settleCanvasInput();finishPendingEdit();
+ void tools.open(url);
 }
-$('project-menu').onclick=()=>openDialog('工作台菜单',body=>{body.append(action('最近移除',()=>{$('dialog').close();void showRemoved();},'match','recently-removed'));const links=[['照片项目与批量同步','/studio/'],['完整调色与曲线','/color/'],['完整人物修整','/portrait/'],['多图创作与合成','/creative/'],['本机图层工程','/layers/'],['单项 AI 精修','/ai/?tool=portrait-polish'],['本机超分 4K','/upscale/'],['工作流记录','/workflows/'],['账号与版本更新','/server/']];for(const [name,url]of links){const a=element('a',name,'match');a.href=url;body.append(a);}});
-$('about').onclick=about;
-$('sessionInfo').onclick=about;
+$('moreTools').onclick=()=>openDialog('更多修图工具',body=>{
+ for(const [title,items]of groups){
+  const group=element('section',undefined,'tool-menu-group');
+  group.append(element('h3',title));
+  for(const [label,url]of items)group.append(action(label,()=>openAdvanced(url),'match'));
+  body.append(group);
+ }
+});
+$('project-menu').onclick=()=>openDialog('工作台菜单',body=>{
+ body.append(action('照片项目',()=>openAdvanced('/studio/'),'match'));
+ body.append(action('最近移除',()=>{$('dialog').close();void showRemoved();},'match','recently-removed'));
+});
+async function goSettings(target='/settings/'){
+ const original=new URL(target,location.origin),url=new URL('/settings/',location.origin);
+ url.search=original.search;url.hash=original.pathname.startsWith('/logs')?'#logs':original.hash;
+ settleCanvasInput();finishPendingEdit();
+ const photo=currentPhoto();
+ try{
+  if(photo&&!photo.metadataOnly)await saveDraft(photo);
+  try{sessionStorage.setItem('houtou-workbench-return',location.pathname+location.search);}catch{}
+  location.assign(url);
+ }catch(error){announce('照片草稿未保存。'+error.message);}
+}
+$('sessionInfo').onclick=()=>void goSettings('/settings/#storage');
+$('edit-page').onclick=event=>{event.preventDefault();if(tools.isOpen())tools.close();};
+document.addEventListener('click',event=>{
+ if(event.defaultPrevented||event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+ const link=event.target.closest?.('a[href]');
+ if(!link||link.hasAttribute('download'))return;
+ const url=new URL(link.href,location.origin);
+ if(url.origin!==location.origin)return;
+ if(/^\/(settings|server|logs)\/?$/.test(url.pathname)){
+  event.preventDefault();void goSettings(url.href);return;
+ }
+ if(isWorkbenchToolURL(url.href)){
+  event.preventDefault();openAdvanced(url.href);
+ }
+},true);
 document.addEventListener('keydown',e=>{
   const typing=e.target.matches('textarea,input:not([type=range]):not([type=button])')||e.target.isContentEditable;
-  if(e.isComposing||$('dialog').open)return;
+  if(e.isComposing||$('dialog').open||tools.isOpen())return;
   const mod=e.ctrlKey||e.metaKey,key=e.key.toLowerCase();
   if(mod&&key==='k'){e.preventDefault();toolSearch();return;}
   if(typing)return;
@@ -879,7 +934,7 @@ function indexFor(photo,ref){
  if(refKey(photo.origin)===key)return 0;
  const pin=Object.entries(photo.pins||{}).find(([,r])=>refKey(r)===key);
  if(pin)return Number(pin[0]);
- return photo.nodes.findIndex(n=>['ai-image','raw-develop'].includes(n.action?.type)&&refKey(n.action.origin)===key);
+ return photo.nodes.findIndex(n=>['ai-image','raw-develop','tool-image'].includes(n.action?.type)&&refKey(n.action.origin)===key);
 }
 function mediaFor(photo,state){
  if(!state.base||state.base.assetId===photo.origin.assetId&&state.base.workflowId===photo.origin.workflowId)return obtainMedia(photo);
@@ -1049,6 +1104,35 @@ async function signIn(){
  }catch(e){popup?.close();announce(e.message);}
 }
 
+function workbenchIdentity(){
+ const photo=currentPhoto();
+ return photo?{id:photo.id,cursor:ui.previewId??photo.cursor}:null;
+}
+async function acceptAdvanced(ref,label,identity){
+ const photo=currentPhoto(),origin=stable(ref);
+ if(!origin)throw Error('这个工具暂未保存可用的成片。');
+ if(!photo&&!identity){
+  const created=makeFromRef(origin,label||'工具成片');
+  await saveDraft(created);
+  await selectPhoto(created.id);
+  return;
+ }
+ if(!photo||!identity||photo.id!==identity.id||(ui.previewId??photo.cursor)!==identity.cursor)
+  throw Error('当前照片或历史位置已变化，请返回打开工具前的版本再应用。');
+ settleCanvasInput();finishPendingEdit();
+ if((ui.previewId??photo.cursor)!==identity.cursor)throw Error('当前照片已调整，请返回打开工具前的版本。');
+ const before={cursor:photo.cursor,preview:ui.previewId,redo:{...photo.redo}};
+ photo.cursor=identity.cursor;ui.previewId=null;
+ append(photo,label||'应用工具成片',{type:'tool-image',origin},{persist:false});
+ try{await saveDraft(photo);}catch(error){
+  photo.nodes.pop();photo.cursor=before.cursor;photo.redo=before.redo;
+  if(currentPhoto()===photo)ui.previewId=before.preview;
+  throw error;
+ }
+ if(currentPhoto()===photo)refreshEdits();
+}
+const tools=createWorkbenchTools({mount:$('advancedTools'),api,pin:()=>currentPhoto()?pinVisible():null,
+ identify:workbenchIdentity,accept:acceptAdvanced,announce,onSettings:goSettings});
 const deskMount=$('unified-ai');
 desk=createAiDesk({mount:deskMount,api,state:()=>({name:currentPhoto()?.name,hasPhoto:!!activeMedia,signedIn,busy:ui.exporting||!imageRuntimeReady,model:selectedModel(),validModel:picker.valid()}),
   pin:pinVisible,pinDisplayed:pinVisible,showPicture:receivePicture,recordPicture:receivePicture,owns:ref=>currentPhoto()&&indexFor(currentPhoto(),ref)>=0,setClassic(){},login:signIn,modelElement:()=>modelGroup,
@@ -1057,3 +1141,5 @@ $('file').accept=IMAGE_ACCEPT;
 $('file').setAttribute('aria-label','导入照片');
 const initialPanel=new URLSearchParams(location.search).get('panel');if(Object.hasOwn(sections,initialPanel))ui.section=initialPanel;
 await boot();
+const requestedTool=new URLSearchParams(location.search).get('tool');
+if(requestedTool&&isWorkbenchToolURL(requestedTool))openAdvanced(requestedTool);

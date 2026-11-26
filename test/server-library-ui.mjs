@@ -32,5 +32,26 @@ try{
  for(const [width,theme]of [[390,'light'],[320,'dark']]){
   await page.setViewportSize({width,height:1000});await page.goto(origin+'/server/');await page.waitForFunction(()=>document.querySelectorAll('.server-account').length===2);await page.locator('#archive-account').selectOption(first.id);await page.waitForFunction(()=>document.querySelectorAll('.server-image-card').length===1);await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);assert.equal(await page.locator('#server-storage').getAttribute('open'),null);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:path.join(out,width+'-'+theme+'.png'),fullPage:true});
  }
+ // The settings page restores the editor destination and changes sections without a reload.
+ await page.setViewportSize({width:320,height:820});
+ const returned='/workbench/?panel=ai&canvasPhoto=sample';
+ await page.evaluate(href=>sessionStorage.setItem('houtu-workbench-return',href),returned);
+ await page.goto(origin+'/settings/');
+ await page.locator('#settings-logout').waitFor();
+ assert.equal(await page.locator('#settings-workbench').getAttribute('href'),origin+returned);
+ assert.deepEqual(await page.locator('.settings-destinations a').allTextContents(),['修图','设置']);
+ await page.evaluate(()=>window.settingsDOM=document.querySelector('.settings-header'));
+ await page.locator('[data-settings=logs]').click();
+ await page.locator('#logs-export').waitFor();
+ assert.equal(await page.evaluate(()=>window.settingsDOM===document.querySelector('.settings-header')),true);
+ assert.equal(await page.locator('#accounts').isHidden(),true);
+ assert.ok(await page.evaluate(()=>document.querySelector('.settings-menu').getBoundingClientRect().bottom<=document.querySelector('#logs').getBoundingClientRect().top));
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+ await page.locator('[data-settings="software-updates"]').click();
+ await page.waitForFunction(()=>document.querySelector('#updates-versions').textContent.startsWith('当前版本'));
+ await page.locator('[data-settings=help]').click();
+ await page.locator('#theme').click();
+ assert.equal(await page.evaluate(()=>window.settingsDOM===document.querySelector('.settings-header')),true);
+ await page.screenshot({path:path.join(out,'settings-mobile.png'),fullPage:true});
  assert.equal(bridge.calls,0);assert.deepEqual(errors,[]);console.log('PASS server library UI: persisted account records, 29 versions, paging/search/account filter, legacy unknown identity, real thumbnails, empty state and 320px/dark mode without AI calls');
 }finally{await browser.close();await app.close();await rm(directory,{recursive:true,force:true});}

@@ -1,34 +1,105 @@
-﻿<!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>本机服务器 · 厚涂小站</title><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/color/style.css"><script type="module" src="/color/server.js"></script><link rel="stylesheet" href="/update-notice.css"><script type="module" src="/update-notice.js"></script><link rel="stylesheet" href="/workspace.css"><script type="module" src="/workspace.js"></script></head>
-<body><header><a class="brand" href="/">厚涂小站</a><nav aria-label="工作台"><a href="/studio/">照片项目</a><a href="/">人物精修</a><a href="/upscale/">超分4K</a><a href="/color/">调色与蒙版</a><a href="/creative/">特效与合成</a><a href="/workflows/">工作流管理</a><a href="/server/" aria-current="page">本机服务器</a></nav><button id="theme">切换主题</button></header>
-<main class="server-main">
- <div class="titlebar"><div><h1>本机服务器</h1><p>这台电脑的图片档案与账号记录，关闭网页后仍保留。</p></div><button id="refresh-server">刷新全部记录</button></div>
- <p id="server-notice" role="status" aria-live="polite">正在读取服务器记录…</p>
- <div class="server-session"><span id="server-current">正在确认 ChatGPT 登录状态…</span><a href="/">管理 ChatGPT 登录</a></div>
- <section id="software-updates" class="software-updates" aria-labelledby="updates-title">
-  <div class="section-head"><div><h2 id="updates-title">版本与更新</h2><p id="updates-versions" class="hint">正在读取当前版本…</p></div><button id="updates-check">检查更新</button></div>
-  <p class="hint">完整更新同步人物修图、调色、AI工具、提示词、前后端与模型资源。照片、账号、自定义预设和工作流保留；安装前请保存各工作台修改。</p>
-  <p id="updates-status" role="status" aria-live="polite">正在读取更新信息…</p>
-  <label class="updates-auto"><input id="updates-auto" type="checkbox" checked>启动及运行时每15分钟检查 GitHub 更新</label>
-  <p class="hint">网站启动后及运行中每 12 小时检查公开版本。安装由你决定；请先保存其他页面的修改。</p>
-  <progress id="updates-progress" max="100" value="0" hidden aria-label="安装包下载进度"></progress><p id="updates-bytes" class="hint" hidden></p>
-  <div class="updates-actions"><button id="updates-download" hidden>下载并校验更新</button><button id="updates-apply" hidden>重启并安装更新</button><button id="updates-rollback" hidden>回退上个版本</button><a id="updates-release" href="https://github.com/DOOM12138/houtu-studio/releases" target="_blank" rel="noopener">查看公开版本</a></div>
-  <p id="updates-source" class="hint" hidden>当前为源码部署，请按项目的 Git 更新说明操作。网站不会覆盖本地源码或未提交的修改。</p>
-  <details id="updates-notes" hidden><summary>新版本更新说明</summary><pre id="updates-notes-text"></pre></details>
-  <details><summary>备份与回退</summary><p class="hint">便携版安装前会在项目的 backups/software-updates 中备份程序和本机 data。更新失败会尝试恢复原程序；回退只切换程序，不覆盖当前照片、预设、账号和工作流。断电等情况可运行根目录“恢复上次更新.cmd”。</p><a href="https://github.com/DOOM12138/houtu-studio/blob/main/GIT_WORKFLOW.md" target="_blank" rel="noopener">源码更新与 Git 回退说明</a></details>
- </section>
- <section class="software-updates"><div class="section-head"><div><h2>运行日志与诊断</h2><p class="hint">查看失败步骤、模型回执和调度路线，按工作流筛选并导出脱敏 ZIP。</p></div><a href="/logs/">查看与导出日志</a></div></section>
- <div class="server-layout">
-  <aside class="server-sidebar">
-   <details id="server-storage" open><summary>服务器与存储位置</summary><dl id="server-info"></dl><p class="hint">在哪台电脑启动，就在该电脑的项目根目录创建 data。图片、任务和本机登录资料保存在这里。</p><p class="hint">独立启动：启动服务器.cmd<br>打开此页：服务器管理.cmd<br>停止后台：停止服务器.cmd</p></details>
-   <details id="server-accounts" open><summary>ChatGPT 账号记录 <span id="server-account-count"></span></summary><p class="hint">记录已确认的邮箱、套餐与使用时间。历史记录不代表现在仍有有效授权。</p><div id="server-account-list"></div><p class="hint">登录资料留在本站的本机客户端目录，不放入 GitHub 或软件包。需要重新授权时，在人物精修页完成官方登录。</p></details>
-  </aside>
-  <section class="server-gallery" aria-label="已修图片档案">
-   <div class="section-head"><div><h2>图片档案</h2><p id="server-image-count" class="hint">正在读取全部产出版本…</p></div></div>
-   <div class="server-filters"><label for="archive-query">搜索记录<input id="archive-query" type="search" placeholder="名称、账号、模型或任务编号"></label><label for="archive-kind">处理类型<select id="archive-kind"><option value="">全部类型</option><option value="pipeline">照片配方</option><option value="manual-portrait">人物手动修图</option><option value="retouch">AI 人物精修</option><option value="color">调色成品</option><option value="creative">特效与合成</option></select></label><label for="archive-account">关联账号<select id="archive-account"><option value="">全部账号</option><option value="unknown">未记录账号</option></select></label></div>
-   <p class="hint">按产出时间排列，保留历次版本。旧作品没有账号信息时显示“未记录账号”，不会补猜。</p>
-   <div id="server-images" class="server-images"></div><div id="server-empty" class="server-empty" hidden><h3>这里还没有符合条件的图片</h3><p>精修完成、合成交付或调色导出后会自动保存在服务器。也可以清除筛选查看其他记录。</p><a href="/">打开人物精修</a></div>
-   <div id="archive-pages" class="server-pages" hidden><button id="archive-prev">上一页</button><span id="archive-page-label"></span><button id="archive-next">下一页</button></div>
-  </section>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1">
+ <meta name="color-scheme" content="light dark">
+ <title>设置 · 厚涂小站</title>
+ <link rel="icon" href="/favicon.svg">
+ <link rel="stylesheet" href="/color/style.css">
+ <link rel="stylesheet" href="/update-notice.css">
+ <link rel="stylesheet" href="/color/logs.css">
+ <link rel="stylesheet" href="/color/settings.css">
+ <script type="module" src="/color/server.js"></script>
+</head>
+<body class="settings-page">
+<header class="settings-header">
+ <span class="brand">厚涂小站</span>
+ <div class="settings-destinations" role="navigation" aria-label="主页面">
+  <a id="settings-workbench" href="/workbench/">修图</a>
+  <a href="/settings/" aria-current="page">设置</a>
  </div>
-</main></body></html>
+</header>
+<main class="settings-main server-main">
+ <h1>设置</h1>
+ <div class="settings-layout">
+  <nav class="settings-menu" aria-label="设置分类">
+   <a href="#accounts" data-settings="accounts" aria-current="true">账号与模型</a>
+   <a href="#storage" data-settings="storage">存储与档案</a>
+   <a href="#software-updates" data-settings="software-updates">版本更新</a>
+   <a href="#logs" data-settings="logs">运行日志</a>
+   <a href="#help" data-settings="help">外观与帮助</a>
+  </nav>
+  <div class="settings-content">
+   <section id="accounts" class="settings-panel" aria-labelledby="accounts-title">
+    <h2 id="accounts-title" class="settings-heading">账号与模型</h2>
+    <div class="settings-group">
+     <h3>ChatGPT 连接</h3>
+     <p id="server-current" class="hint">正在确认登录状态…</p>
+     <div class="settings-actions">
+      <button id="settings-login" type="button">登录 ChatGPT</button>
+      <button id="settings-logout" type="button" hidden>退出登录</button>
+      <a id="settings-auth-link" target="_blank" rel="noopener noreferrer" hidden>打开官方登录页</a>
+     </div>
+     <p id="settings-auth-status" class="hint" role="status"></p>
+    </div>
+    <div class="settings-group">
+     <h3>默认模型</h3>
+     <div id="settings-model"></div>
+    </div>
+    <details id="server-accounts" class="settings-group"><summary>ChatGPT 账号记录 <span id="server-account-count"></span></summary><p class="hint">记录已确认的邮箱、套餐与使用时间。历史记录不代表现在仍有有效授权。</p><div id="server-account-list"></div></details>
+   </section>
+   <section id="storage" class="settings-panel" aria-labelledby="storage-title" hidden>
+    <div class="section-head"><h2 id="storage-title" class="settings-heading">存储与档案</h2><button id="refresh-server" type="button">刷新记录</button></div>
+    <p id="server-notice" class="hint" role="status">正在读取服务器记录…</p>
+    <div class="server-sidebar settings-group">
+     <details id="server-storage" open><summary>服务器与存储位置</summary><dl id="server-info"></dl><p class="hint">在哪台电脑启动，就在该电脑的项目根目录创建 data。图片、任务和本机登录资料保存在这里。</p></details>
+    </div>
+    <section class="server-gallery" aria-label="已修图片档案">
+     <div class="section-head"><div><h2>图片档案</h2><p id="server-image-count" class="hint">正在读取全部产出版本…</p></div></div>
+     <div class="server-filters"><label for="archive-query">搜索记录<input id="archive-query" type="search" placeholder="名称、账号、模型或任务编号"></label><label for="archive-kind">处理类型<select id="archive-kind"><option value="">全部类型</option><option value="pipeline">照片配方</option><option value="manual-portrait">人物手动修图</option><option value="retouch">AI 人物精修</option><option value="color">调色成品</option><option value="creative">特效与合成</option></select></label><label for="archive-account">关联账号<select id="archive-account"><option value="">全部账号</option><option value="unknown">未记录账号</option></select></label></div>
+     <p class="hint">按产出时间排列，保留历次版本。旧作品没有账号信息时显示“未记录账号”，不会补猜。</p>
+     <div id="server-images" class="server-images"></div><div id="server-empty" class="server-empty" hidden><h3>这里还没有符合条件的图片</h3><p>精修完成、合成交付或调色导出后会自动保存在服务器。也可以清除筛选查看其他记录。</p><a href="/workbench/">打开修图工作台</a></div>
+     <div id="archive-pages" class="server-pages" hidden><button id="archive-prev">上一页</button><span id="archive-page-label"></span><button id="archive-next">下一页</button></div></section>
+   </section>
+   <section id="settings-update-panel" class="settings-panel" aria-label="版本更新" hidden>
+    <section id="software-updates" class="software-updates" aria-labelledby="updates-title">
+     <div class="section-head"><div><h2 id="updates-title">版本与更新</h2><p id="updates-versions" class="hint">正在读取当前版本…</p></div><button id="updates-check">检查更新</button></div>
+     <p class="hint">安装前请先保存修图进度。更新会保留照片、账号、自定义预设和工作流。</p>
+     <p id="updates-status" role="status" aria-live="polite">正在读取更新信息…</p>
+     <label class="updates-auto"><input id="updates-auto" type="checkbox" checked>启动及运行时每15分钟检查 GitHub 更新</label>
+
+     <progress id="updates-progress" max="100" value="0" hidden aria-label="安装包下载进度"></progress><p id="updates-bytes" class="hint" hidden></p>
+     <div class="updates-actions"><button id="updates-download" hidden>下载并校验更新</button><button id="updates-apply" hidden>重启并安装更新</button><button id="updates-rollback" hidden>回退上个版本</button><a id="updates-release" href="https://github.com/DOOM12138/houtu-studio/releases" target="_blank" rel="noopener">查看公开版本</a></div>
+     <p id="updates-source" class="hint" hidden>当前为源码部署，请按项目的 Git 更新说明操作。网站不会覆盖本地源码或未提交的修改。</p>
+     <details id="updates-notes" hidden><summary>新版本更新说明</summary><pre id="updates-notes-text"></pre></details>
+     <details><summary>备份与回退</summary><p class="hint">便携版安装前会在项目的 backups/software-updates 中备份程序和本机 data。更新失败会尝试恢复原程序；回退只切换程序，不覆盖当前照片、预设、账号和工作流。断电等情况可运行根目录“恢复上次更新.cmd”。</p><a href="https://github.com/DOOM12138/houtu-studio/blob/main/GIT_WORKFLOW.md" target="_blank" rel="noopener">源码更新与 Git 回退说明</a></details>
+    </section>
+    <div id="settings-android-update" class="settings-group" hidden>
+     <h2 class="settings-heading">版本更新</h2>
+     <p id="settings-android-version" class="hint" role="status">正在读取 Android 版本…</p>
+     <div class="settings-actions"><button id="settings-android-check" type="button">检查 Android 更新</button></div>
+    </div>
+   </section>
+   <section id="logs" class="settings-panel logs-main" aria-label="运行日志" data-log-panel hidden></section>
+   <section id="help" class="settings-panel" aria-labelledby="help-title" hidden>
+    <h2 id="help-title" class="settings-heading">外观与帮助</h2>
+    <div class="settings-group">
+     <h3>外观</h3>
+     <div class="settings-actions"><button id="theme" type="button">切换主题</button></div>
+    </div>
+    <div class="settings-group">
+     <h3>修图快捷键</h3>
+     <dl class="settings-keys">
+      <dt>查找工具</dt><dd><kbd>Ctrl / ⌘</kbd> + <kbd>K</kbd></dd>
+      <dt>撤销</dt><dd><kbd>Ctrl / ⌘</kbd> + <kbd>Z</kbd></dd>
+      <dt>重做</dt><dd><kbd>Ctrl / ⌘</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd></dd>
+      <dt>暂时平移画布</dt><dd>按住 <kbd>空格</kbd> 拖动</dd>
+      <dt>暂时查看原图</dt><dd>按住 <kbd>\</kbd></dd>
+     </dl>
+    </div>
+   </section>
+  </div>
+ </div>
+</main>
+</body></html>

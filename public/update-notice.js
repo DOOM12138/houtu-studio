@@ -13,12 +13,12 @@ function render(s,native=false){
  if(!s||typeof s.currentVersion!=='string')return;
  if(pageVersion&&pageVersion!==s.currentVersion){const p=panel(s.currentVersion,'reload','程序已更新到 '+s.currentVersion+'，保存本页修改后刷新，即可同步使用全部新功能。');if(p){const b=document.createElement('button');b.type='button';b.textContent='刷新工作台';b.onclick=()=>location.reload();p.append(b);}return;}
  pageVersion??=s.currentVersion;
- if(!native&&location.pathname.startsWith('/server')){remove();return;}
+ if(window.parent!==window||!native&&/^\/(server|settings)(?:\/|$)/.test(location.pathname)){remove();return;}
  const version=s.latest?.version,hidden=native?(!s.settings?.autoCheck||s.dismissedVersion===version):dismissed()===version;
  if(!s.available||!version||hidden){remove();return;}
  const p=panel(version,native?'android':'desktop','厚涂小站 '+version+' 已发布 · 全功能更新');if(!p)return;
  let action;if(native){action=document.createElement('button');action.type='button';action.textContent='查看更新';action.onclick=()=>nativeMessage('checkUpdates');}
- else{action=document.createElement('a');action.href='/server/#software-updates';action.textContent=s.sourceMode?'查看 Git 更新':'查看更新';}
+ else{action=document.createElement('a');action.href='/settings/#software-updates';action.textContent=s.sourceMode?'查看 Git 更新':'查看更新';}
  const later=document.createElement('button');later.type='button';later.textContent='稍后';later.setAttribute('aria-label',native?'暂不提示此版本':'本次会话暂不提示此版本');later.onclick=()=>{if(native)nativeMessage('dismissUpdate',{version});else{memoryDismissed=version;try{sessionStorage.setItem('houtu-update-dismissed',version);}catch{}}remove();};p.append(action,later);
 }
 async function check(){

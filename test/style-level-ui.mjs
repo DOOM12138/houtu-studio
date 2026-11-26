@@ -25,7 +25,7 @@ page.setDefaultTimeout(15000);
 const out=path.resolve('.impeccable/review/style-levels');await mkdir(out,{recursive:true});
 async function level(value){await page.locator('#paint-level').evaluate((input,n)=>{input.value=n;input.dispatchEvent(new Event('input',{bubbles:true}));},String(value));await page.waitForFunction(n=>document.querySelector('#compiled-prompt').textContent.includes('厚涂程度'+n+'/10'),value);assert.equal(await page.locator('#paint-value').textContent(),value+' / 10');}
 try{
-  await page.goto(origin);await page.locator('#target-auto').uncheck(); // Uniform fixture is not a detectable person; scope mechanics are tested separately.
+  await page.goto(origin+'/ai/?tool=full-body');await page.locator('#target-auto').uncheck(); // Uniform fixture is not a detectable person; scope mechanics are tested separately.
 await page.waitForFunction(()=>document.querySelector('#prompt').value.length>0);
   assert.equal(await page.locator('#edit-style option').count(),4);
   assert.equal(await page.locator('#edit-style').inputValue(),'anime');

@@ -1,0 +1,7 @@
+html[data-workbench-pane] body>main{width:100%;max-width:none;padding:10px 16px 24px}
+html[data-workbench-pane] .workspace-transfer-status[data-error=false]{display:none}
+html[data-workbench-pane] .titlebar[data-compact=true]{justify-content:flex-end;margin:0 0 6px;padding:0}
+html[data-workbench-pane] .embedded-checkpoints{margin:6px 0 10px;padding:5px 0;border-bottom:1px solid var(--line)}
+html[data-workbench-pane] .embedded-checkpoints>summary{cursor:pointer;font-size:12px;color:var(--muted)}
+html[data-workbench-pane] .workspace{margin-top:10px}
+@media(max-width:620px){html[data-workbench-pane] body>main{padding:8px 10px 18px}}

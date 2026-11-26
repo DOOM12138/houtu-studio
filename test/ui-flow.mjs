@@ -34,7 +34,7 @@ const browser = await chromium.launch({ executablePath: 'C:/Program Files (x86)/
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
-  await page.goto(site, { waitUntil: 'networkidle' });await page.locator('#target-auto').uncheck();
+  await page.goto(new URL('/ai/?tool=full-body',site).href, { waitUntil: 'networkidle' });await page.locator('#target-auto').uncheck();
   const original = await sharp({ create: { width: 320, height: 400, channels: 3, background: '#c8b9a4' } }).png().toBuffer();
   await page.locator('#file').setInputFiles({ name: '[TEST ONLY] synthetic.png', mimeType: 'image/png', buffer: original });
   await page.waitForFunction(() => !document.querySelector('#source-frame').hidden);

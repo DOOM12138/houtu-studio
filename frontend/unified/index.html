@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="/workbench/unified.css"><link rel="stylesheet" href="/ai-desk.css"><script type="module" src="/workbench/unified.js"></script><script type="module" src="/update-notice.js"></script><link rel="stylesheet" href="/update-notice.css"></head>
 <body><div id="app">
 <header id="topbar">
- <button class="brand" id="project-menu" aria-label="工作台菜单"><img alt="" id="logo" src="/favicon.svg"><span>厚涂小站</span></button><span class="rule"></span><span class="project-name">照片工作台</span>
+ <button class="brand" id="project-menu" aria-label="工作台菜单"><img alt="" id="logo" src="/favicon.svg"><span>厚涂小站</span></button><span class="rule"></span><nav class="app-sections" aria-label="应用页面"><a href="/workbench/" aria-current="page" id="edit-page">修图</a><a href="/settings/" id="settings-page">设置</a></nav>
  <button id="find" class="with-icon search-trigger push" title="查找工具 (Ctrl / ⌘ + K)" aria-label="查找工具"><i data-icon="search"></i><span>找工具</span><kbd>⌘/Ctrl K</kbd></button>
  <div class="toolbar-group"><button id="undo" class="icon-only" title="撤销 (Ctrl / ⌘ + Z)" aria-label="撤销"><i data-icon="undo"></i></button><button id="redo" class="icon-only" title="重做 (Ctrl / ⌘ + Shift + Z)" aria-label="重做"><i data-icon="redo"></i></button></div>
  <span class="rule"></span><button id="open" class="with-icon outline"><i data-icon="import"></i>导入</button><button id="export" class="with-icon primary"><i data-icon="export"></i>导出</button>
@@ -13,10 +13,10 @@
 <div id="workbench-update-slot"></div>
 <nav id="rail" aria-label="修图工具分类">
  <button class="rail-tool" data-section="color"><i data-icon="sliders"></i>调色</button><button class="rail-tool" data-section="portrait"><i data-icon="brush"></i>人物</button><button class="rail-tool" data-section="layers"><i data-icon="layers"></i>图层</button><button class="rail-tool" data-section="ai"><i data-icon="spark"></i>AI 修图</button>
- <button class="rail-tool rail-tail" data-section="steps"><i data-icon="steps"></i>步骤</button><button class="rail-tool help" id="about"><i data-icon="info"></i>说明</button>
+ <button class="rail-tool rail-tail" data-section="steps"><i data-icon="steps"></i>步骤</button><button class="rail-tool" id="moreTools"><i data-icon="more"></i>更多</button>
 </nav>
 <main id="desk">
- <div id="documentbar"><i data-icon="image"></i><strong id="docName">打开照片</strong><span id="docSize"></span><button class="push" id="sessionInfo" title="查看试用说明与会话保存范围"><span id="ioState" role="status"></span></button></div>
+ <div id="documentbar"><i data-icon="image"></i><strong id="docName">打开照片</strong><span id="docSize"></span><button class="push" id="sessionInfo" title="查看本机保存位置"><span id="ioState" role="status"></span></button></div>
  <div id="mat"><div id="unified-empty"><strong>打开一张照片，开始修图</strong><button type="button" id="empty-import" class="primary">导入照片</button></div><canvas id="stage" aria-label="修图画布，滚轮缩放，拖动平移；选择画笔后可在图上修整" tabindex="0"></canvas><span id="viewMode" hidden></span><label id="dividerWrap" hidden>原图<input type="range" min="1" max="99" value="50" id="splitPosition" aria-label="移动对比分界线">成片</label></div>
  <div id="viewbar">
   <button id="pan" class="icon-only" aria-label="平移画布" title="平移画布，按空格临时平移"><i data-icon="hand"></i></button>
@@ -26,7 +26,12 @@
  </div>
  <section id="film" aria-label="当前项目的照片"><div id="filmHead"><span id="filmLabel">照片</span><span class="muted" id="filmSummary"></span><button class="push" id="batch">多选</button><button class="soft" id="sync" hidden>同步调色</button><button id="remove-photos" hidden>移除</button></div><div id="filmPhotos"></div></section>
 </main>
-<aside id="inspector" aria-label="当前工具参数"><div id="panelHead"><h1 id="panelTitle">调色</h1><span class="push" id="sectionKind"></span><button id="mobilePanel" class="mobile-only push">收起参数</button></div><div id="parameterScroll"></div><div id="unified-ai" hidden></div></aside>
+<aside id="inspector" aria-label="当前工具参数"><div id="panelHead"><h1 id="panelTitle">调色</h1><span class="push" id="sectionKind"></span><button id="sectionTool" class="outline" hidden></button><button id="mobilePanel" class="mobile-only push">收起参数</button></div><div id="parameterScroll"></div><div id="unified-ai" hidden></div></aside>
+<section id="advancedTools" class="advanced-tools" aria-label="修图工具" hidden>
+ <header class="advanced-head"><button id="closeAdvanced" type="button" class="outline">返回画布</button><h2 id="advancedTitle"></h2><button id="applyAdvanced" class="primary" type="button" hidden>应用到当前照片</button></header>
+ <p id="advancedStatus" role="status" hidden></p>
+ <div id="advancedFrame"></div>
+</section>
 </div>
 <dialog id="dialog" aria-labelledby="dialogTitle"><div class="dialog-head"><h2 id="dialogTitle"></h2><button id="closeDialog" class="icon-only" aria-label="关闭"><i data-icon="close"></i></button></div><div id="dialogBody" class="dialog-content"></div></dialog>
 <div id="toast" role="status" hidden></div>

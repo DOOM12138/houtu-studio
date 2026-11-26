@@ -1,0 +1,50 @@
+:root[data-theme="light"]{color-scheme:light}
+:root[data-theme="dark"]{color-scheme:dark}
+.settings-page [hidden]{display:none!important}
+.settings-header{min-height:54px;gap:22px;padding:8px 28px}
+.settings-header .brand{white-space:nowrap}
+.settings-destinations{display:flex;gap:4px;align-items:center}
+.settings-destinations a{padding:6px 12px;border-radius:7px;text-decoration:none;color:var(--muted)}
+.settings-destinations [aria-current="page"]{color:var(--accent);background:var(--soft);font-weight:650}
+.settings-main{max-width:1260px;padding:26px 28px 56px}
+.settings-main h1{margin:0 0 20px;font-size:25px}
+.settings-layout{display:grid;grid-template-columns:164px minmax(0,1fr);gap:26px;align-items:start}
+.settings-menu{display:grid;gap:4px;position:sticky;top:12px;order:0}
+.settings-menu a{padding:9px 11px;border:1px solid transparent;border-radius:7px;min-height:42px}
+.settings-menu a:hover{text-decoration:underline}
+.settings-menu a[aria-current]{background:var(--soft);border-color:var(--line)}
+.settings-panel{min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:24px}
+.settings-heading,.settings-panel .titlebar h2{font-size:20px}
+.settings-panel h3{font-size:14px;margin:0}
+.settings-group{margin-top:17px;padding-top:14px;border-top:1px solid var(--line)}
+.settings-group details{margin:13px 0 0}
+.server-sidebar.settings-group>details:first-child{padding-top:0;margin:0;border:0}
+.settings-panel .model-picker{max-width:475px;margin:10px 0 0}
+.settings-panel .model-picker-row{display:flex;align-items:center;gap:8px}
+.settings-panel .model-picker-row select{min-width:0}
+.settings-panel .model-picker-row button{white-space:nowrap}
+.settings-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
+.settings-panel .software-updates{padding:0;margin:0;border:0}
+.settings-panel .software-updates .section-head h2{font-size:20px}
+.settings-panel .logs-title{font-size:20px}
+.settings-panel .log-head h2{font-size:14px}
+.settings-panel .server-image-frame{height:170px}
+.settings-panel .server-images{grid-template-columns:repeat(auto-fill,minmax(min(196px,100%),1fr))}
+.settings-keys{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:9px 15px;max-width:500px}
+.settings-keys dd{margin:0}
+.settings-keys kbd{padding:2px 4px;background:var(--bg);border:1px solid var(--line);border-radius:4px;font:inherit;font-size:12px}
+.settings-error,.settings-panel #server-notice.error{color:#9c2b1e}
+:root[data-theme="dark"] .settings-error,:root[data-theme="dark"] #server-notice.error{color:#ffb4a5}
+@media(max-width:700px){
+ .settings-header{padding:8px 12px;gap:12px}
+ .settings-main{padding:17px 12px 30px}
+ .settings-main h1{margin-bottom:12px;font-size:21px}
+ .settings-layout{grid-template-columns:minmax(0,1fr);gap:10px}
+ .settings-menu{position:static;display:flex;flex-wrap:wrap;gap:4px}
+ .settings-menu a{min-height:40px;padding:7px 8px;white-space:nowrap;font-size:13px}
+ .settings-panel{padding:16px 12px}
+ .settings-panel .server-images{grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr))}
+ .settings-panel .section-head{align-items:flex-start;flex-wrap:wrap}
+ .settings-panel .software-updates .section-head{flex-direction:column}
+ .settings-panel button{min-height:40px}
+}

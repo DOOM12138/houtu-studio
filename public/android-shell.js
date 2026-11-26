@@ -8,4 +8,4 @@ window.houtuInterceptBlobDownloads(async (blob, name) => {
   type:'saveUrl',name:receipt.name,mime:receipt.mime,url:new URL(receipt.downloadUrl,location.origin).href
  }));
 });
-document.addEventListener('DOMContentLoaded',()=>{for(const e of document.querySelectorAll('header nav'))e.setAttribute('aria-hidden','true');for(const e of document.querySelectorAll('h1'))if(e.textContent==='本机服务器')e.textContent='手机图片档案';for(const e of document.querySelectorAll('.titlebar p'))if(e.textContent.includes('这台电脑的图片档案'))e.textContent='这台手机的图片档案与账号记录，关闭页面后仍保留。';});
+document.addEventListener('DOMContentLoaded',()=>{for(const e of document.querySelectorAll('header nav:not(.app-sections)'))e.setAttribute('aria-hidden','true');for(const e of document.querySelectorAll('h1'))if(e.textContent==='本机服务器')e.textContent='手机图片档案';for(const e of document.querySelectorAll('.titlebar p'))if(e.textContent.includes('这台电脑的图片档案'))e.textContent='这台手机的图片档案与账号记录，关闭页面后仍保留。';});

@@ -313,11 +313,15 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self'; img-src 'self' blob: data:; connect-src 'self' blob: data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
+    const pagePolicy="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self'; img-src 'self' blob: data:; connect-src 'self' blob: data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+    res.setHeader('Content-Security-Policy',pagePolicy);
     if (!/^(127\.0\.0\.1|localhost):\d+$/.test(host)) return json(res, 403, { error: '仅允许本机访问。' });
     let trackedOperation=false,diagnosticOperation='UNKNOWN';
     try {
       const url = new URL(req.url, `http://${host}`);
+      const embedded = req.method==='GET'&&url.searchParams.get('embedded')==='workbench'&&
+        /^\/(?:color|portrait|layers|ai(?:\/color)?|creative|upscale|studio|workflows|lab)\/?$/.test(url.pathname);
+      if(embedded)res.setHeader('Content-Security-Policy',pagePolicy.replace("frame-ancestors 'none'","frame-ancestors 'self'"));
       const route = url.pathname;diagnosticOperation=req.method+'.'+(/^\/api\/(layers|workspace|logs|retouch-agents|retouch-agent-capabilities|studio|workflows|jobs|updates|color|creative|superres|image-imports|account|models|login|templates)(?:\/|$)/.exec(route)?.[1]||'other');if(clientPlatform==='android'&&(route==='/api/packages'||route.startsWith('/downloads/package/')||/^\/api\/updates\/(prepare|apply|rollback)$/.test(route)))return json(res,409,{error:'安卓版请使用应用菜单中的安卓版更新。'});if(isClosing&&!['/api/health','/api/shutdown'].includes(route))return json(res,503,{error:'网站正在停止，请稍后重开。'});
       if (!['GET', 'POST'].includes(req.method)) return json(res, 405, { error: '不支持的请求。' });
       if(req.method==='POST'&&(req.headers.origin!==`http://${host}`||req.headers['x-paint-csrf']!==csrf))return json(res,403,{error:'请从本站页面发起操作。'});
@@ -638,16 +642,22 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
           return json(res, 200, publicJob(job));
         }
       }
+      if(req.method==='GET'&&route==='/'){
+        const oldEditor=['job','operation','refineWorkflow','refineAsset','portraitAudit'].some(key=>url.searchParams.has(key))||
+          (url.searchParams.has('tool')&&!url.searchParams.get('tool').startsWith('/'));
+        const location=oldEditor?'/workbench/?tool='+encodeURIComponent('/ai/'+url.search):'/workbench/'+url.search;
+        res.writeHead(302,{Location:location});res.end();return;
+      }
       let file;
       const imageMatch = /^\/images\/([a-f0-9-]{36})\/(source\.(?:png|jpg|webp)|result(?:-[a-f0-9-]{36})?\.(?:png|jpg|webp))$/.exec(route);
       if (imageMatch && req.method === 'GET' && jobs.has(imageMatch[1])) {
         file = path.join(jobsDirectory, imageMatch[1], imageMatch[2]);
         const imageJob=jobs.get(imageMatch[1]);if(imageMatch[2].startsWith('source.')&&imageJob.operation==='outpaint'&&imageJob.workflowId){const originalWorkflow=await workflows.get(imageJob.workflowId),originalAsset=originalWorkflow.steps.find(n=>n.id==='source')?.output?.imageAsset;if(originalAsset)file=(await workflows.asset(originalWorkflow.id,originalAsset)).file;}
         if (url.searchParams.has('download')) res.setHeader('Content-Disposition', `attachment; filename="anime-paint-${imageMatch[1].slice(0,8)}.${path.extname(file).slice(1)}"`);
-      } else if(req.method==='GET'&&/^\/workbench(?:\/?|\/(?:unified\.js|drafts\.js|worker\.js|unified\.css))$/.test(route)){file=path.join(ROOT,'frontend','unified',route.endsWith('.js')||route.endsWith('.css')?path.basename(route):'index.html');
+      } else if(req.method==='GET'&&/^\/workbench(?:\/?|\/(?:unified\.js|drafts\.js|tools\.js|worker\.js|unified\.css))$/.test(route)){file=path.join(ROOT,'frontend','unified',route.endsWith('.js')||route.endsWith('.css')?path.basename(route):'index.html');
       } else if(req.method==='GET'&&(route==='/layers'||route==='/layers/')){file=path.join(ROOT,'frontend','layer-workbench.html');
       } else if(req.method==='GET'&&(route==='/logs'||route==='/logs/')){file=path.join(ROOT,'frontend','logs.html');
-      } else if(req.method==='GET'&&(route==='/server'||route==='/server/')){
+      } else if(req.method==='GET'&&['/settings','/settings/','/server','/server/'].includes(route)){
         file=path.join(ROOT,'frontend','server.html');
       } else if (req.method === 'GET' && (route === '/color' || route === '/color/' || route === '/ai/color' || route === '/ai/color/')) {
         file=path.join(ROOT,'frontend','index.html');
@@ -661,18 +671,24 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
         file=path.join(ROOT,'frontend','workflows.html');
       } else if(req.method==='GET'&&(route==='/creative'||route==='/creative/')){
         file=path.join(ROOT,'frontend','creative.html');
-      } else if (req.method === 'GET' && /^\/color\/(app\.js|engine\.js|worker\.js|masks\.js|workflow-client\.js|workflows\.js|effects\.js|creative\.js|creative-multi\.js|server\.js|studio\.js|studio-agent\.js|scene-guide-panel\.js|studio-planner\.js|studio-culling\.js|studio-layout\.(?:js|css)|logs\.(?:js|css)|layer-(?:workbench\.(?:js|css)|document\.js)|features\.(?:js|css)|lab\.js|tonal-looks\.js|tone-controls\.js|upscale\.js|updates\.js|style\.css)$/.test(route)) {
+      } else if (req.method === 'GET' && /^\/color\/(app\.js|engine\.js|worker\.js|masks\.js|workflow-client\.js|workflows\.js|effects\.js|creative\.js|creative-multi\.js|server\.js|studio\.js|studio-agent\.js|scene-guide-panel\.js|studio-planner\.js|studio-culling\.js|studio-layout\.(?:js|css)|logs\.(?:js|css)|settings\.css|layer-(?:workbench\.(?:js|css)|document\.js)|features\.(?:js|css)|lab\.js|tonal-looks\.js|tone-controls\.js|upscale\.js|updates\.js|style\.css)$/.test(route)) {
         file=path.join(ROOT,'frontend',path.basename(route));
       } else if (req.method === 'GET' && /^\/vision\/(vision_bundle\.mjs|wasm\/vision_wasm_(?:nosimd_)?internal\.(?:js|wasm))$/.test(route)) {
         file=path.join(ROOT,'node_modules','@mediapipe','tasks-vision',route.slice('/vision/'.length));
       } else if (req.method === 'GET' && /^\/models\/(selfie_multiclass_256x256\.tflite|face_landmarker\.task|hand_landmarker\.task)$/.test(route)) {
         file=path.join(ROOT,'models',path.basename(route));
       } else {
-        const files = { '/ai-desk.js':'ai-desk.js','/ai-desk.css':'ai-desk.css','/desk-controls.js':'desk-controls.js','/scene-guide.js':'scene-guide.js','/manual-frequency.js':'manual-frequency.js','/manual-neutral.js':'manual-neutral.js','/outpaint-layout.js':'outpaint-layout.js','/outpaint-controls.js':'outpaint-controls.js','/outpaint.css':'outpaint.css', '/retouch-agent-options.js':'retouch-agent-options.js','/retouch-agent-knowledge.js':'retouch-agent-knowledge.js','/workflow-pictures.js':'workflow-pictures.js','/studio-photos.js':'studio-photos.js','/studio-planning.js':'studio-planning.js','/editor-history.js':'editor-history.js','/editor-history.css':'editor-history.css','/upload-limits.js':'upload-limits.js','/portrait':'portrait.html','/portrait/':'portrait.html','/ai':'index.html','/ai/':'index.html','/image-import.js':'image-import.js','/image-formats.js':'image-formats.js','/workspace.js':'workspace.js','/workspace-continuation.js':'workspace-continuation.js','/capabilities.js':'capabilities.js','/workspace.css':'workspace.css','/workflow-sections.js':'workflow-sections.js','/manual-portrait.js':'manual-portrait.js','/manual-portrait-worker.js':'manual-portrait-worker.js','/manual-portrait-engine.js':'manual-portrait-engine.js','/manual-portrait.css':'manual-portrait.css', '/local-exports.js':'local-exports.js','/desktop-downloads.js':'desktop-downloads.js','/android-shell.js':'android-shell.js','/android-shell.css':'android-shell.css','/superres-options.js':'superres-options.js', '/superres.css':'superres.css', '/editor-layout.css':'editor-layout.css', '/image-viewer.js':'image-viewer.js','/view-geometry.js':'view-geometry.js','/image-viewer.css':'image-viewer.css', '/update-notice.js':'update-notice.js','/update-notice.css':'update-notice.css', '/paint-profile.js':'paint-profile.js','/feature-expansion.js':'feature-expansion.js','/prompt-contract.js':'prompt-contract.js','/feature-ui.js':'feature-ui.js','/target-policy.js':'target-policy.js','/target-masks.js':'target-masks.js','/vision-target.html':'vision-target.html', '/': 'index.html', '/app.js': 'app.js', '/catalog.js': 'catalog.js', '/style.css': 'style.css', '/favicon.svg': 'favicon.svg','/portrait-options.js':'portrait-options.js','/portrait-ui.js':'portrait-ui.js','/model-picker.js':'model-picker.js','/model-options.js':'model-options.js','/scene-options.js':'scene-options.js','/belly-options.js':'belly-options.js','/scene-ui.js':'scene-ui.js','/subject-mask.js':'subject-mask.js' };
+        const files = { '/ai-desk.js':'ai-desk.js','/ai-desk.css':'ai-desk.css','/desk-controls.js':'desk-controls.js','/scene-guide.js':'scene-guide.js','/manual-frequency.js':'manual-frequency.js','/manual-neutral.js':'manual-neutral.js','/outpaint-layout.js':'outpaint-layout.js','/outpaint-controls.js':'outpaint-controls.js','/outpaint.css':'outpaint.css', '/retouch-agent-options.js':'retouch-agent-options.js','/retouch-agent-knowledge.js':'retouch-agent-knowledge.js','/workflow-pictures.js':'workflow-pictures.js','/studio-photos.js':'studio-photos.js','/studio-planning.js':'studio-planning.js','/editor-history.js':'editor-history.js','/editor-history.css':'editor-history.css','/upload-limits.js':'upload-limits.js','/portrait':'portrait.html','/portrait/':'portrait.html','/ai':'index.html','/ai/':'index.html','/image-import.js':'image-import.js','/image-formats.js':'image-formats.js','/workspace.js':'workspace.js','/workspace-continuation.js':'workspace-continuation.js','/capabilities.js':'capabilities.js','/workspace.css':'workspace.css','/workflow-sections.js':'workflow-sections.js','/manual-portrait.js':'manual-portrait.js','/manual-portrait-worker.js':'manual-portrait-worker.js','/manual-portrait-engine.js':'manual-portrait-engine.js','/manual-portrait.css':'manual-portrait.css', '/workbench-embedded.css':'workbench-embedded.css','/workbench-embedded.js':'workbench-embedded.js','/local-exports.js':'local-exports.js','/desktop-downloads.js':'desktop-downloads.js','/android-shell.js':'android-shell.js','/android-shell.css':'android-shell.css','/superres-options.js':'superres-options.js', '/superres.css':'superres.css', '/editor-layout.css':'editor-layout.css', '/image-viewer.js':'image-viewer.js','/view-geometry.js':'view-geometry.js','/image-viewer.css':'image-viewer.css', '/update-notice.js':'update-notice.js','/update-notice.css':'update-notice.css', '/paint-profile.js':'paint-profile.js','/feature-expansion.js':'feature-expansion.js','/prompt-contract.js':'prompt-contract.js','/feature-ui.js':'feature-ui.js','/target-policy.js':'target-policy.js','/target-masks.js':'target-masks.js','/vision-target.html':'vision-target.html', '/': 'index.html', '/app.js': 'app.js', '/catalog.js': 'catalog.js', '/style.css': 'style.css', '/favicon.svg': 'favicon.svg','/portrait-options.js':'portrait-options.js','/portrait-ui.js':'portrait-ui.js','/model-picker.js':'model-picker.js','/model-options.js':'model-options.js','/scene-options.js':'scene-options.js','/belly-options.js':'belly-options.js','/scene-ui.js':'scene-ui.js','/subject-mask.js':'subject-mask.js' };
         if (!Object.hasOwn(files, route) || req.method !== 'GET') return json(res, 404, { error: '页面不存在。' });
         file = path.join(ROOT, 'public', files[route]);
       }
-      let bytes = await readFile(file);if(path.extname(file)==='.html')bytes=Buffer.from(bytes.toString('utf8').replace('<head>',clientPlatform==='android'?'<head><script src="/local-exports.js"></script><script src="/android-shell.js"></script><link rel="stylesheet" href="/android-shell.css">':'<head><script src="/local-exports.js"></script><script src="/desktop-downloads.js"></script>'));
+      let bytes = await readFile(file);
+      if(path.extname(file)==='.html'){
+        const downloads='<script src="/local-exports.js"></script>';
+        const shell=embedded?'':clientPlatform==='android'?'<script src="/android-shell.js"></script><link rel="stylesheet" href="/android-shell.css">':'<script src="/desktop-downloads.js"></script>';
+        const editor=embedded?'<link rel="stylesheet" href="/workbench-embedded.css"><script type="module" src="/workbench-embedded.js"></script>':'';
+        bytes=Buffer.from(bytes.toString('utf8').replace('<head>','<head>'+downloads+editor+shell));
+      }
       res.writeHead(200, { 'Content-Type': ({'.mjs':'text/javascript; charset=utf-8','.wasm':'application/wasm'})[path.extname(file)] || MIME[path.extname(file)] || 'application/octet-stream' }); res.end(bytes);
     } catch (error) {
       void diagnostics.record({event:'request.failed',level:error.status&&error.status<500?'warn':'error',workflowId:error.workflowId,data:{operation:diagnosticOperation,httpStatus:error.code==='ENOENT'?404:error.status||400},error});

@@ -24,7 +24,7 @@ page.on('pageerror',error=>errors.push(error.message));page.setDefaultTimeout(15
 const out=path.resolve('.impeccable/review/models');await mkdir(out,{recursive:true});
 const select=()=>page.locator('#model-picker-select');
 try{
- await page.goto(origin);await page.waitForFunction(()=>document.querySelector('#model-picker').textContent.includes('请先使用ChatGPT登录'));assert.equal(await select().isDisabled(),true);
+ await page.goto(origin+'/ai/?tool=full-body');await page.waitForFunction(()=>document.querySelector('#model-picker').textContent.includes('请先使用ChatGPT登录'));assert.equal(await select().isDisabled(),true);
  bridge.signedIn=true;await page.reload();await page.waitForFunction(()=>document.querySelectorAll('#model-picker-select option').length===3);
  await select().selectOption(B);assert.equal(bridge.images,0);
  await page.getByRole('button',{name:'编辑提示词',exact:true}).click();await page.locator('#prompt-mode').selectOption('custom');assert.equal(await select().isDisabled(),false);await page.getByRole('button',{name:'编辑提示词',exact:true}).click();await page.locator('#prompt-mode').selectOption('guided');

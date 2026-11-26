@@ -68,7 +68,7 @@ try {
   for(const route of ['/color/updates.js','/update-notice.js','/update-notice.css','/image-viewer.js','/view-geometry.js','/image-viewer.css','/editor-layout.css','/upscale/','/color/upscale.js','/superres-options.js','/superres.css'])assert.equal((await fetch(origin+route)).status,200,route);
   for(const entry of ['检查更新.cmd','回退版本.cmd','scripts/apply-update.mjs','scripts/extract-update.ps1'])assert.ok((await stat(path.join(installed,entry))).size>50);
   const updates=await(await fetch(origin+'/api/updates/status')).json();assert.equal(updates.currentVersion,manifest.version);assert.equal(updates.sourceMode,false);assert.equal(updates.settings.autoCheck,true);
-  assert.ok((await run(runtime,[launcher,'--updates','--no-open'],{cwd:extracted})).includes('/server/#software-updates'));
+  assert.ok((await run(runtime,[launcher,'--updates','--no-open'],{cwd:extracted})).includes('/settings/#software-updates'));
   for(const route of ['/lab/','/feature-expansion.js','/prompt-contract.js','/feature-ui.js','/target-policy.js','/target-masks.js','/vision-target.html'])assert.equal((await fetch(origin+route)).status,200,route);
   const lab=await(await fetch(origin+'/api/prompt-lab')).json();assert.equal(lab.features.length,75);assert.ok(lab.features.every(f=>f.records.length===0),'private evaluation photos must not enter the package');assert.equal(lab.trialSummary.firstRound,75);assert.equal(lab.trialSummary.targetedRevisions,4);
   for(const [name,size]of [['face_landmarker.task',3758596],['hand_landmarker.task',7819105]])assert.equal((await stat(path.join(installed,'models',name))).size,size);

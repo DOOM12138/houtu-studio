@@ -110,7 +110,8 @@ public final class MainActivity extends Activity {
 
           public void onPageFinished(WebView v, String u) {
             if (own(u)) {
-              unifiedPage = "/workbench/".equals(Uri.parse(u).getPath());
+              String path = Uri.parse(u).getPath();
+              unifiedPage = "/workbench/".equals(path) || "/settings/".equals(path);
               if (nav != null) nav.setVisibility(unifiedPage ? View.GONE : View.VISIBLE);
               attachDownloads();
             }
@@ -307,7 +308,7 @@ public final class MainActivity extends Activity {
               go("/workflows/");
               break;
             case 2:
-              go("/server/");
+              go("/settings/");
               break;
             case 3:
               go("/lab/");

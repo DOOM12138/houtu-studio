@@ -15,7 +15,7 @@ try {
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    await page.goto(site, { waitUntil: 'networkidle' });
+    await page.goto(new URL('/ai/?tool=full-body',site).href, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => document.querySelector('#prompt').value.length > 0);
     assert.equal(await page.locator('#generate').isDisabled(), true);
     assert.equal(await page.locator('#tool-list button').count(), 75);

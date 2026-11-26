@@ -1,6 +1,6 @@
 {
   "name": "anime-paint-studio",
-  "version": "1.39.1",
+  "version": "1.40.0",
   "description": "自研综合修图工作台：本机图层、人物、调色、AI工作流与Agent",
   "main": "server.mjs",
   "scripts": {
@@ -37,7 +37,7 @@
     "test:culling-ui": "node scripts/project-node.mjs test/studio-culling-ui.mjs",
     "test:picture-preview-ui": "node scripts/project-node.mjs test/studio-picture-preview-ui.mjs && node scripts/project-node.mjs test/local-passthrough-ui.mjs",
     "test:retouch-tools-ui": "node scripts/project-node.mjs test/retouch-tools-ui.mjs",
-    "test:ai-modes": "node scripts/project-node.mjs test/ai-desk-ui.mjs"
+    "test:ai-modes": "node scripts/project-node.mjs test/ai-desk-ui.mjs && node scripts/project-node.mjs test/workbench-shell-ui.mjs"
   },
   "keywords": [],
   "author": "",

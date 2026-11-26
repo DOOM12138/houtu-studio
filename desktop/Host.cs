@@ -62,7 +62,7 @@ internal sealed class StudioWindow : Form {
         view.Dock=DockStyle.Fill;view.Visible=false;Controls.Add(view);Controls.Add(message);exportsBar.Items.Add(exportText);exportsBar.Items.Add(exportFolder);
         exportFolder.Click+=(s,e)=>{try{Process.Start(new ProcessStartInfo(Path.Combine(Program.Root,"data","exports")){UseShellExecute=true});}catch{}};
         Controls.Add(exportsBar);exportsBar.Visible=false;
-        var menu=new ContextMenuStrip();menu.Items.Add("打开厚涂小站",null,(s,e)=>Restore());menu.Items.Add("检查更新",null,(s,e)=>{Restore();if(origin!=null)view.CoreWebView2.Navigate(origin+"/server/#software-updates");});menu.Items.Add("退出程序",null,async(s,e)=>await Exit());
+        var menu=new ContextMenuStrip();menu.Items.Add("打开厚涂小站",null,(s,e)=>Restore());menu.Items.Add("检查更新",null,(s,e)=>{Restore();if(origin!=null)view.CoreWebView2.Navigate(origin+"/settings/#software-updates");});menu.Items.Add("退出程序",null,async(s,e)=>await Exit());
         tray.Icon=Icon;tray.Text="厚涂小站";tray.ContextMenuStrip=menu;tray.DoubleClick+=(s,e)=>Restore();
         http.Timeout=TimeSpan.FromSeconds(2);timer.Interval=1500;timer.Tick+=async(s,e)=>await Tick();
         Shown+=async(s,e)=>await Start();FormClosing+=Closing;FormClosed+=(s,e)=>{timer.Stop();tray.Dispose();view.Dispose();http.Dispose();try{var record=Program.Read(Path.Combine(Program.Root,"data/desktop-session.json"));if(Convert.ToString(record["sessionId"])==Program.Session)File.Delete(Path.Combine(Program.Root,"data/desktop-session.json"));}catch{}};
