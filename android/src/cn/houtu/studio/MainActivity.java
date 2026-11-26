@@ -495,7 +495,7 @@ public final class MainActivity extends Activity {
                   HttpURLConnection c =
                       (HttpURLConnection)
                           new URL(url.startsWith("/") ? RuntimeHost.origin + url : url)
-                              .openConnection();
+                              .openConnection(java.net.Proxy.NO_PROXY);
                   c.setRequestProperty("Authorization", "Bearer " + RuntimeHost.token);
                   c.setInstanceFollowRedirects(false);
                   c.setConnectTimeout(15000);

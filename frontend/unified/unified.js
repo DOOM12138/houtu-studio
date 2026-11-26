@@ -446,7 +446,7 @@ function exportDialog(){
         const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('图片编码失败。')),mime,.94));
         const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=p.name.replace(/\.[^.]+$/,'')+'-成片.'+(mime==='image/jpeg'?'jpg':'png');
         document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
-        if(button.isConnected)$('dialog').close();announce('成片已交给浏览器下载');
+        if(button.isConnected)$('dialog').close();announce(window.houtuDesktopExports?'正在保存成片…':'成片已交给浏览器下载');
       }catch(error){announce(error.message);}finally{ui.exporting=false;button.disabled=false;button.textContent='导出图片';updateChrome();}
     },'primary wide','doExport');
     body.append(button);

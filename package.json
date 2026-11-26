@@ -1,6 +1,6 @@
 {
   "name": "anime-paint-studio",
-  "version": "1.38.1",
+  "version": "1.38.2",
   "description": "自研综合修图工作台：本机图层、人物、调色、AI工作流与Agent",
   "main": "server.mjs",
   "scripts": {
