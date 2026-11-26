@@ -1,13 +1,13 @@
 {
   "schema": "houtu-release-status",
   "version": 1,
-  "checkedAt": "2026-11-26T13:44:40.741Z",
+  "checkedAt": "2026-11-26T14:38:19.062Z",
   "repository": "DOOM12138/houtu-studio",
-  "latestVerified": "v1.37.0",
+  "latestVerified": "v1.38.0",
   "scope": "Release publication, available workflow attempts, artifact inventory and supplied checksum lists against GitHub asset digests. Historical binaries were not all reinstalled; real AI quality and ARM physical-device coverage remain separately recorded.",
   "counts": {
-    "applications": 35,
-    "published": 28,
+    "applications": 36,
+    "published": 29,
     "failedOrStopped": 7,
     "recovered": 3,
     "knownIssues": 4,
@@ -15,6 +15,50 @@
     "dependencyReleases": 1
   },
   "applications": [
+    {
+      "tag": "v1.38.0",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-26T14:35:34Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.38.0",
+      "assetCount": 5,
+      "assets": [
+        {
+          "name": "houtu-studio-1.38.0-Android-arm64-v8a.apk",
+          "bytes": 205669407,
+          "digest": "sha256:74fdf980e31b1a39f86f8f8f050f614498d5b9759bc6c4a18bc2ad277987dbd1"
+        },
+        {
+          "name": "houtu-studio-1.38.0-Android-x86_64.apk",
+          "bytes": 213283859,
+          "digest": "sha256:e05404ee45260e32c7ee22cabbfcd5044e2a2f6456b0e8db373cb369dcbf9030"
+        },
+        {
+          "name": "houtu-studio-1.38.0-SHA256.txt",
+          "bytes": 423,
+          "digest": "sha256:8fadd3c3ccd223cecc8eb4b6de7056b4b84e2002022673041cb0c51c4d3fa1a4"
+        },
+        {
+          "name": "houtu-studio-1.38.0-Windows-x64-Setup.exe",
+          "bytes": 186422248,
+          "digest": "sha256:483ee3c21ac6271eb32ebe4d87e0d705c05f17fb32dd65b20b60cb1d7929a1e8"
+        },
+        {
+          "name": "houtu-studio-1.38.0-Windows-x64.zip",
+          "bytes": 268206852,
+          "digest": "sha256:b6bb6a53165dc33896612026cd6ffaf38496778e84ccffcbf559341f667e28ed"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": {
+        "runId": 45837215794,
+        "latestAttempt": 1,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45837215794"
+      },
+      "note": "单画布 RAW 显影支持 V-Log 灰片和 3D .cube LUT。已用松下 GH5 RW2 与官方 E-E LUT 检查显影输出；Windows 安装和安卓独立入口已验证。"
+    },
     {
       "tag": "v1.37.0",
       "status": "published",

@@ -1,8 +1,8 @@
 # 全部版本发布状态
 
-核查日期：2026-11-26。最新完整验证版：[v1.37.0](https://github.com/DOOM12138/houtu-studio/releases/tag/v1.37.0)。
+核查日期：2026-11-26。最新完整验证版：[v1.38.0](https://github.com/DOOM12138/houtu-studio/releases/tag/v1.38.0)。
 
-现有35条应用Release中，28条已公开、7条发布失败／中止；已公开版本中另标3条恢复交付、4条已知运行问题。另有6个历史源码标签和1条安卓构建依赖。具体原因和后续跟进规则见 [RELEASE_RECOVERY.md](RELEASE_RECOVERY.md)，机器可读目录见 [RELEASE_STATUS.json](RELEASE_STATUS.json)。
+现有36条应用Release中，29条已公开、7条发布失败／中止；已公开版本中另标3条恢复交付、4条已知运行问题。另有6个历史源码标签和1条安卓构建依赖。具体原因和后续跟进规则见 [RELEASE_RECOVERY.md](RELEASE_RECOVERY.md)，机器可读目录见 [RELEASE_STATUS.json](RELEASE_STATUS.json)。
 
 核查覆盖发布状态、现存工作流尝试、附件清单，以及已提供的SHA清单与GitHub附件摘要；仅最新版本另核对实际Windows安装、安卓模拟器及本机更新回执。旧版并未逐个重新安装或重做AI画质验收。草稿仅维护者可见，失败版本原有Git标签和运行记录保留。
 
@@ -31,6 +31,7 @@
 
 ## 其余已公开版本
 
+- **v1.38.0 · 发布成功**：5个发布附件。单画布支持 RAW 的 V-Log 灰片、标准 sRGB 切换与 .cube LUT。真实 GH5 原片、松下 LUT、Windows 安装和安卓独立运行已验证。[运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45837215794)。
 - **v1.37.0 · 发布成功**：5个发布附件。单画布右栏可切换全自动与半自动；半自动可从75项功能中勾选并逐步确认。Windows实际安装与安卓独立入口通过验证。[运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45828482024)。
 - **v1.36.0 · 发布成功**：5个发布附件。三类场景自动精修、角色候选和参考来源，七组教程各五支；Windows实际安装与安卓独立入口通过验证。[运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45811061807)。
 - **v1.35.0 · 发布成功**：5个发布附件；高低频与中性灰的安卓独立保存、扩图预览、Windows实际安装及资料保留检查通过。 [运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45786096954)。
