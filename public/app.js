@@ -41,6 +41,7 @@ const editOptions = () => ({ operation: $('prompt-mode').value === 'custom' ? 'c
   task:featureTools.options(),...featureTools.target(),references:featureTools.references(),strength: document.querySelector('[name="strength"]:checked').value, paintLevel:Number($('paint-level').value), preserve: $('preserve').checked,
   belly:bellyOptions({level:Number($('belly-level').value),fabric:$('belly-fabric').value,transition:$('belly-transition').value,scope:$('belly-scope').value},operation),scene:sceneTools.options(),areas: operation==='portrait-polish'?Object.entries(portraitTools.options().levels).filter(([,n])=>n>0).map(([id])=>id):selectedAreas(), selection, parentId,...(operation==='portrait-polish'?{portrait:portraitTools.options()}:{}) });
 const featureTools=createFeatureTools({getOperation:()=>$('prompt-mode').value==='custom'?'custom':operation,getAreas:()=>({areas:selectedAreas(),...(operation==='portrait-polish'?{portrait:portraitTools.options()}:{})}),getImage:()=>$('source'),getSource:()=>sourceReference?{source:sourceReference}:{image:sourceData},api,onBusy:value=>{portraitChecking=value;portraitTaskType=value?'target':'';updateControls();},getTool:()=>PRESETS.find(p=>p.id===operation),onChange:optionsChanged,feedback});
+$('source').addEventListener('load',()=>{featureTools.refresh();updateControls();});
 const sceneTools=createSceneTools({getImage:()=>$('source'),onChange:optionsChanged,onBusy:value=>{portraitChecking=value;portraitTaskType=value?'mask':'';updateControls();},feedback});
 const portraitTools=createPortraitTools({api,getImage:()=>$('source'),getSource:()=>({...((sourceReference)?{source:sourceReference}:{image:sourceData}),model:modelPicker.value}),onChange:optionsChanged,onBusy:(value,type)=>{portraitChecking=value;portraitTaskType=type||'';updateControls();},feedback});
 
@@ -166,8 +167,8 @@ function updateControls() {
   $('belly-panel').inert=working||custom;
   document.querySelector('.strength-field').hidden=scene||isBellyOperation(operation)&&!custom;
   if(scene||isBellyOperation(operation)&&!custom)$('preserve').checked=true;
-  $('generate').disabled = state.imageRuntime?.ready===false || !modelPicker.valid() || !hasSource() || !state.account || working || !$('prompt').value.trim() || (!custom && ['full-body','portrait-polish'].includes(operation) && !editOptions().areas.length);
-  $('generate').querySelector('span').textContent = packing ? '打包中，稍后精修' : portraitChecking ? (portraitTaskType==='audit'?'正在检查人物…':'正在分析人物蒙版…') : working ? '正在精修…' : ready ? '先检查主体保护' : isCleanupOperation(operation)&&!custom ? '开始场照清理' : isBellyOperation(operation)&&!custom ? '开始平滑收腹' : selection ? '精修选区' : '开始精修';
+  $('generate').disabled = state.imageRuntime?.ready===false || !modelPicker.valid() || !hasSource() || !state.account || working || !$('prompt').value.trim() || (!custom && operation==='outpaint'&&!featureTools.validCanvas()) || (!custom && ['full-body','portrait-polish'].includes(operation) && !editOptions().areas.length);
+  $('generate').querySelector('span').textContent = packing ? '打包中，稍后精修' : portraitChecking ? (portraitTaskType==='audit'?'正在检查人物…':'正在分析人物蒙版…') : working ? (operation==='outpaint'&&!custom?'正在 AI 扩图…':'正在精修…') : ready ? '先检查主体保护' : isCleanupOperation(operation)&&!custom ? '开始场照清理' : isBellyOperation(operation)&&!custom ? '开始平滑收腹' : operation==='outpaint'&&!custom ? '开始 AI 扩图' : selection ? '精修选区' : '开始精修';
   $('cancel').hidden = !running(currentJob?.status)&&!(portraitChecking&&portraitTaskType==='audit');
   $('cancel').disabled = currentJob?.status === 'cancelling';
   $('cancel').textContent = portraitChecking&&portraitTaskType==='audit'?'停止画面检查':currentJob?.status === 'cancelling' ? '正在停止…' : '停止生成';

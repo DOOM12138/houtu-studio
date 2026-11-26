@@ -1,5 +1,11 @@
 # 公开资料与实现边界
 
+## 本机高低频与中性灰（2026-11-26）
+
+- GIMP公开粒度分离／合并模式说明：https://docs.gimp.org/3.0/en/layer-mode-group-inversion.html 。用于核对低频与带符号纹理差值的概念；本站分块低频和重组代码为自研实现。
+- W3C柔光混合公式：https://www.w3.org/TR/compositing-1/#blendingsoftlight 。中性灰场保留精确零点，笔触重放和保护区由本站处理。
+- Adobe加深／减淡的局部曝光工作场景：https://helpx.adobe.com/photoshop/desktop/repair-retouch/adjust-light-tone/dodge-or-burn-image-areas.html 。仅参考可公开观察的用途，不调用Photoshop。
+
 ## 综合工作台与本机图层（2026-11-26）
 
 用户将目标明确为PS、LR、人像工作台、耀／幻象同类AI方向、工作流、Agent与独立ChatGPT登录的自研结合体。仅参照可公开观察的功能场景，未复用商业软件本体、私有源码、提示词或模型。

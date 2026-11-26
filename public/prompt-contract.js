@@ -1,3 +1,4 @@
+import {outpaintCanvas} from './outpaint-layout.js';
 export const PROMPT_VERSION='2026.11.25-r8';
 export const DEFAULT_EDIT_BRIEF='以原图为准做最小必要的细节整理：只修明确问题，已经自然的部位保持。人物仍像本人，肤色、衣料与环境光协调，保留真实纹理和原有设计，不做整片磨皮、过度锐化或夸张塑形。';
 export function featureDefault(tool){if(tool?.id?.endsWith('-extract'))return '仅提取明确指定的原物，设计、比例、颜色与可见细节保持，不虚构被遮挡部分；输出干净普通底图。';if(tool?.output==='outpaint')return '保留完整原图，只补新增边缘的环境和空间，不补画画外人物。';if(tool?.changes?.includes('medium'))return '以原角色设计为准进行指定媒介转换，保持身份、姿态、配色和服饰要素。';return DEFAULT_EDIT_BRIEF;}
@@ -8,7 +9,7 @@ export function taskOptions(input={}){
  if(![1024,2048,4096,8192].includes(longEdge))throw Error('输出最长边请选择1024/2048/4096/8192。');
  if(!Number.isInteger(padding)||padding<5||padding>50)throw Error('扩图比例为5–50%。');
  if(!['all','left','right','top','bottom'].includes(direction))throw Error('扩图方向无效。');
- const sourceRetention=input.sourceRetention??0;if(!Number.isInteger(sourceRetention)||sourceRetention<0||sourceRetention>95)throw Error('原图融合比例为0–95%。');return {level,longEdge,padding,direction,autoTarget:input.autoTarget===true,sourceRetention,target:String(input.target||'').slice(0,500)};
+ const sourceRetention=input.sourceRetention??0;if(!Number.isInteger(sourceRetention)||sourceRetention<0||sourceRetention>95)throw Error('原图融合比例为0–95%。');return {level,longEdge,padding,direction,autoTarget:input.autoTarget===true,sourceRetention,target:String(input.target||'').slice(0,500),...(input.canvas!==undefined?{canvas:outpaintCanvas(input.canvas)}:{})};
 }
 export function aestheticContract(tool,{painting=false}={}){
  const changes=new Set(tool.changes||[]),fixed=tool.id.endsWith('-extract')?['原物款式、比例、颜色与可见纹样']:['人物身份与神态','发色和配饰数量'];if(tool.id!=='iris-color'&&!tool.id.endsWith('-extract'))fixed.push('原瞳色');

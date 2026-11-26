@@ -12,9 +12,11 @@ export const CAPABILITY_GROUPS=[
   {name:'印刷与镜头标定',status:'planned',description:'CMYK、打印软打样、相机标定与完整镜头配置文件仍需专用实现。'}]},
  {id:'portrait',name:'本机人物修图',direction:'高效人像工作台',url:'/portrait/',items:[
   {name:'人物与衣料修整',status:'ready',description:'平滑推拉、收缩膨胀、纹理取样、平滑、加深减淡与恢复；操作和保护区可撤销、保存重开。'},
+  {name:'高低频与中性灰',status:'ready',description:'低频匀色／取样、高频纹理取样／柔化；独立50%灰层柔光加深、减淡与擦除。支持检查视图、笔触撤销及原尺寸保存，后续成片仍为8位sRGB。'},
   {name:'语义自动美颜',status:'partial',description:'本机可识别部分人物／面部区域，手动工具处理真实像素；没有商业专有一键美颜引擎或确定厘米数的调整。'}]},
  {id:'ai',name:'AI人物、厚涂与场照',direction:'耀／幻象同类创作方向',url:'/ai/',items:[
   {name:'75项原创AI任务',status:'ready',description:'人物与部位细化、衣褶、假发、眼妆、瘦腹、去路人灯架、原场馆净场、特效、参考迁移和3D质感图片。'},
+  {name:'AI扩展画布',status:'ready',description:'按方向或四边独立比例扩展，常用画幅、尺寸与原图位置预览；保护完整原图区域，保存准备／生成／合成尝试。实际生成需要已登录账号。'},
   {name:'自然与厚涂1–10',status:'ready',description:'保留原画风、自然摄影、二次元及真人COS厚涂；参考图角色、提示词版本与实际模型分别记录。'},
   {name:'真实效果验收',status:'partial',description:'已有实图与反例记录，仍有待改进项；同类任务入口不代表商业模型、速度或审美效果完全一致。'},
   {name:'独立AI实现边界',status:'partial',description:'不包含对方私有提示词、LoRA、模型或PS原生生成填充。本站使用独立ChatGPT登录下实际可用的能力。'}]},
