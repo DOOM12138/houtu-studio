@@ -1,24 +1,68 @@
 {
   "schema": "houtu-release-status",
   "version": 1,
-  "checkedAt": "2026-11-26T07:20:15.553Z",
+  "checkedAt": "2026-11-26T09:15:50.300Z",
   "repository": "DOOM12138/houtu-studio",
-  "latestVerified": "v1.34.0",
+  "latestVerified": "v1.35.0",
   "scope": "Release publication, available workflow attempts, artifact inventory and supplied checksum lists against GitHub asset digests. Historical binaries were not all reinstalled; real AI quality and ARM physical-device coverage remain separately recorded.",
   "counts": {
-    "applications": 32,
-    "published": 25,
+    "applications": 33,
+    "published": 26,
     "failedOrStopped": 7,
     "recovered": 3,
-    "knownIssues": 3,
+    "knownIssues": 4,
     "historicalSourceTags": 6,
     "dependencyReleases": 1
   },
   "applications": [
     {
-      "tag": "v1.34.0",
+      "tag": "v1.35.0",
       "status": "published",
       "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-26T09:08:23Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.35.0",
+      "assetCount": 5,
+      "assets": [
+        {
+          "name": "houtu-studio-1.35.0-Android-arm64-v8a.apk",
+          "bytes": 205575199,
+          "digest": "sha256:42f320e09bb7a317bbddd546f790f813136168f181a24c3089303c36b6316e85"
+        },
+        {
+          "name": "houtu-studio-1.35.0-Android-x86_64.apk",
+          "bytes": 213185555,
+          "digest": "sha256:8c9ab38c4c1329f1186df6243166d18cc599bd3c4e5f00028a4688c957723c02"
+        },
+        {
+          "name": "houtu-studio-1.35.0-SHA256.txt",
+          "bytes": 423,
+          "digest": "sha256:4b458a0f3e04685a57e594b947f9dabe392f2b09d964edf69bbea4e46aa9fd53"
+        },
+        {
+          "name": "houtu-studio-1.35.0-Windows-x64-Setup.exe",
+          "bytes": 186351127,
+          "digest": "sha256:39cca603411b201d609a8be510dd1fc1a1ad5b5ea9f841e6954efa71e80492f1"
+        },
+        {
+          "name": "houtu-studio-1.35.0-Windows-x64.zip",
+          "bytes": 268097144,
+          "digest": "sha256:81a2f11dc679ce6d608d4a64ffdc6ebcbb75b82ea3b3ae0db9248f17bf7636e7"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": {
+        "runId": 45786096954,
+        "latestAttempt": 1,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45786096954"
+      },
+      "note": "高低频、中性灰与AI扩图画布控制；原图保留、检查视图与成片分离、笔触历史和完整尺寸接续。Windows实际安装与安卓独立模拟器验证通过；未调用真实AI出图。"
+    },
+    {
+      "tag": "v1.34.0",
+      "status": "known-issue",
+      "label": "已知问题·扩图原图视角",
       "draft": false,
       "publishedAt": "2026-11-26T07:12:56Z",
       "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.34.0",
@@ -57,7 +101,10 @@
         "latestConclusion": "success",
         "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45771173444"
       },
-      "note": "选片筛选、批量评分与标记、快捷键及撤销；精确步骤预览与跨板块接续，修复图层蒙版缩放。Windows实际安装及安卓独立模拟器已验证，未调用真实AI出图。"
+      "note": "扩图占位底图曾覆盖原图显示缓存，导致原图对比或从原图继续的来源不正确；原始素材仍在工作流保留，已在v1.35.0验证修复。旧安装附件保持原样。",
+      "replacement": "v1.35.0",
+      "fixedIn": "v1.35.0",
+      "fixStatus": "已在v1.35.0验证修复"
     },
     {
       "tag": "v1.33.0",
