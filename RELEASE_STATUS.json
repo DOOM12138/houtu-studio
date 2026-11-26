@@ -1,13 +1,13 @@
 {
   "schema": "houtu-release-status",
   "version": 1,
-  "checkedAt": "2026-11-26T15:14:28.770Z",
+  "checkedAt": "2026-11-26T15:51:04.491Z",
   "repository": "DOOM12138/houtu-studio",
-  "latestVerified": "v1.38.1",
+  "latestVerified": "v1.38.2",
   "scope": "Release publication, available workflow attempts, artifact inventory and supplied checksum lists against GitHub asset digests. Historical binaries were not all reinstalled; real AI quality and ARM physical-device coverage remain separately recorded.",
   "counts": {
-    "applications": 37,
-    "published": 30,
+    "applications": 38,
+    "published": 31,
     "failedOrStopped": 7,
     "recovered": 4,
     "knownIssues": 4,
@@ -15,6 +15,50 @@
     "dependencyReleases": 1
   },
   "applications": [
+    {
+      "tag": "v1.38.2",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-26T15:48:43Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.38.2",
+      "assetCount": 5,
+      "assets": [
+        {
+          "name": "houtu-studio-1.38.2-Android-arm64-v8a.apk",
+          "bytes": 205673503,
+          "digest": "sha256:e0e8889ef7c035585bc3523a0c6f8b5ec40961233f73bbceecd1f71cd444aadf"
+        },
+        {
+          "name": "houtu-studio-1.38.2-Android-x86_64.apk",
+          "bytes": 213283859,
+          "digest": "sha256:ac3ed60407a30d9335a0f657672e3b78ac1e270487e58008cc48bb4be4614eb8"
+        },
+        {
+          "name": "houtu-studio-1.38.2-SHA256.txt",
+          "bytes": 423,
+          "digest": "sha256:801bf518372a2c1843f8f03a6ffbdf2e51a246153cf9d835a71a73957f9deb7d"
+        },
+        {
+          "name": "houtu-studio-1.38.2-Windows-x64-Setup.exe",
+          "bytes": 186462121,
+          "digest": "sha256:aedf45cfb7ef4271266339950a732deeff47aac4dea86259a4a4bcc98d4e6510"
+        },
+        {
+          "name": "houtu-studio-1.38.2-Windows-x64.zip",
+          "bytes": 268217101,
+          "digest": "sha256:3c078e3865d6000c8e05585e691ad5f43b1fa65e19b8c7ed55f0802451cac1ae"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": {
+        "runId": 45849585428,
+        "latestAttempt": 1,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45849585428"
+      },
+      "note": "Windows 原生客户端可直接下载日志 ZIP、PNG、JPEG 及历史工作流附件。已核对私有样张输出与公开安装包，私有样张仅用于本机验收。"
+    },
     {
       "tag": "v1.38.1",
       "status": "recovered",
