@@ -1,7 +1,7 @@
 {
   "schema": "houtu-release-status",
   "version": 1,
-  "checkedAt": "2026-11-26T04:45:31.370Z",
+  "checkedAt": "2026-11-26T06:38:45.877Z",
   "repository": "DOOM12138/houtu-studio",
   "latestVerified": "v1.33.0",
   "scope": "Release publication, available workflow attempts, artifact inventory and supplied checksum lists against GitHub asset digests. Historical binaries were not all reinstalled; real AI quality and ARM physical-device coverage remain separately recorded.",
@@ -10,15 +10,15 @@
     "published": 24,
     "failedOrStopped": 7,
     "recovered": 3,
-    "knownIssues": 2,
+    "knownIssues": 3,
     "historicalSourceTags": 6,
     "dependencyReleases": 1
   },
   "applications": [
     {
       "tag": "v1.33.0",
-      "status": "published",
-      "label": "发布成功",
+      "status": "known-issue",
+      "label": "已知问题·图层蒙版",
       "draft": false,
       "publishedAt": "2026-11-26T04:29:49Z",
       "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.33.0",
@@ -56,7 +56,9 @@
         "latestAttempt": 1,
         "latestConclusion": "success",
         "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45753504909"
-      }
+      },
+      "note": "部分上传或人物图层蒙版在缩略预览／非100%缩放时可能失败或错位；修复在1.34隔离工作区验证，原附件保留。",
+      "fixStatus": "1.34.0验证中"
     },
     {
       "tag": "v1.32.2",

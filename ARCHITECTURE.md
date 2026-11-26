@@ -1,5 +1,9 @@
 # 前后端与运行边界
 
+选片与批量：`public/studio-photos.js`统一筛选、稳定排序、可见范围、导航和元数据校验；`frontend/studio-culling.js`提供选片／批量面板，`studio.js`协调照片条、快捷键、焦点和项目历史。`POST /api/studio/projects/:id/photos/batch`在项目队列内检查revision，原子更新最多200张的selected／rating／flag，不创建图片版本或调用AI。项目历史的photos条目可附metadata前后值，旧条目兼容；无变化不增加revision或撤销记录，单张接口保留photo响应。
+
+画布快照：`public/workflow-pictures.js`从真实完成尝试构建图片引用，Agent未完成节点只引用有记录的完成输入。Studio只读预览不移动当前照片版本；链接同时固定工作流、图片、步骤及尝试。Workspace交接记录的可选`resumeSources`将各编辑器原先查看的来源与当前传递图片分开，Studio返回URL携带view快照，可在缓存指针过期后继续核对；项目／照片是可验证的恢复提示，不能阻断仍存在的历史素材。重新选择来源可清空旧编辑器恢复关系。
+
 本机图层工作台：`frontend/layer-document.js` 统一文档验证与变换语义，`backend/layer-render.mjs` 顺序执行透明度、混合、独立蒙版和复用的sRGB调色。`backend/layer-worker.mjs` 在Worker中完成预览／完整尺寸计算，`backend/layer-projects.mjs` 保存 `layer-composite` 的 source/edit/export、工程迁移与校验；预览只放previewAsset，只有完整尺寸export可带给其他板块。`/layers/` 不读取AI账号、不调用商业软件。文字由当前浏览器本机字体栅格化并保留可编辑参数与缓存。功能中心的真实能力目录在 `public/capabilities.js`。
 
 跨板块接续由 `public/workspace-continuation.js` 拦截工作区导航，各编辑器提供完整尺寸保存与载入适配器；Android `MainActivity.go` 走相同异步入口。`backend/workspace-handoffs.mjs` 在 `data/workspace/` 保存小型不可变交接记录，当前指针与每张图分离，原图及版本保持在工作流。`lib/workflow-image.mjs` 统一校验确切的已完成步骤／尝试；目标流程写 `sourceOrigin`，通过 `copyAsset` 复用原有素材。只允许本机工作区地址；过期交接缓存可由URL中固定的来源重新建立，不能改用其他图片。切换不调用模型、不恢复未知生成请求，调色交接使用完整尺寸输出，创作预览按原尺寸保存。

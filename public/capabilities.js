@@ -19,9 +19,9 @@ export const CAPABILITY_GROUPS=[
   {name:'真实效果验收',status:'partial',description:'已有实图与反例记录，仍有待改进项；同类任务入口不代表商业模型、速度或审美效果完全一致。'},
   {name:'独立AI实现边界',status:'partial',description:'不包含对方私有提示词、LoRA、模型或PS原生生成填充。本站使用独立ChatGPT登录下实际可用的能力。'}]},
  {id:'workflow',name:'照片项目与工作流',direction:'选片、同步和交付',url:'/studio/',items:[
-  {name:'批量选片与同步',status:'ready',description:'最多200张、单图最高100MB；星级、保留淘汰、去重、配方和已选参数同步。'},
+  {name:'批量选片与同步',status:'ready',description:'最多200张、单图最高100MB；文件名／星级／状态筛选、排序、快捷选片、批量评分标记及整次撤销，配方和已选参数同步。'},
   {name:'逐步检查点与中途恢复',status:'ready',description:'每步输入、产物、错误和历次尝试可见；全自动、半自动和手动，中间新分支不重跑已确认生成。'},
-  {name:'跨板块带图',status:'ready',description:'完整尺寸结果与准确来源直接接续；原图和历史保留，失败留在原页，切换不自动出图。'},
+  {name:'跨板块带图',status:'ready',description:'完整尺寸结果、步骤／Agent／历史快照按确切尝试接续；复制链接保留来源，原图和历史保留，切换不自动出图。'},
   {name:'批量局部蒙版',status:'partial',description:'可同步全局参数，专属人物／手绘蒙版需逐图分析或修正，不能把某张脸的固定选区盲目复制给整组照片。'}]},
  {id:'agent',name:'Agent与模型调度',direction:'本地与云端协作',url:'/studio/',items:[
   {name:'可检查的修图Agent',status:'ready',description:'按勾选功能读图、找参考、规划、修整、检查与交付；调度和跑图模型独立选择，未勾选的步骤不执行。'},

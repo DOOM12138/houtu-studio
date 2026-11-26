@@ -2,7 +2,7 @@
 
 核查日期：2026-11-26。最新完整验证版：[v1.33.0](https://github.com/DOOM12138/houtu-studio/releases/tag/v1.33.0)。
 
-现有31条应用Release中，24条已公开、7条发布失败／中止；已公开版本中另标3条恢复交付、2条已知运行问题。另有6个历史源码标签和1条安卓构建依赖。具体原因和后续跟进规则见 [RELEASE_RECOVERY.md](RELEASE_RECOVERY.md)，机器可读目录见 [RELEASE_STATUS.json](RELEASE_STATUS.json)。
+现有31条应用Release中，24条已公开、7条发布失败／中止；已公开版本中另标3条恢复交付、3条已知运行问题。另有6个历史源码标签和1条安卓构建依赖。具体原因和后续跟进规则见 [RELEASE_RECOVERY.md](RELEASE_RECOVERY.md)，机器可读目录见 [RELEASE_STATUS.json](RELEASE_STATUS.json)。
 
 核查覆盖发布状态、现存工作流尝试、附件清单，以及已提供的SHA清单与GitHub附件摘要；仅最新版本另核对实际Windows安装、安卓模拟器及本机更新回执。旧版并未逐个重新安装或重做AI画质验收。草稿仅维护者可见，失败版本原有Git标签和运行记录保留。
 
@@ -24,12 +24,12 @@
 
 ## 发布成功但有已知运行问题
 
+- **v1.33.0 · 已知问题·图层蒙版**：已复现部分上传／人物蒙版缩放失败或取样错位，1.34正在验证修复；原安装附件保留。
 - **v1.24.0 · 已知问题·后续已修复**：自动检查更新可能多等一轮，1.24.1修复缓存到期调度。 [运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45600624881)；[替代／恢复版 v1.24.1](https://github.com/DOOM12138/houtu-studio/releases/tag/v1.24.1)。
 - **v1.23.2 · 已知问题·建议升级**：部分Windows精简包缺绘图组件，1.24起补齐。 [运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45581959351)；[替代／恢复版 v1.24.0](https://github.com/DOOM12138/houtu-studio/releases/tag/v1.24.0)。
 
 ## 其余已公开版本
 
-- **v1.33.0 · 发布成功**：5个发布附件。 [运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45753504909)。
 - **v1.32.2 · 发布成功**：5个发布附件。 [运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45738695633)。
 - **v1.30.0 · 发布成功**：5个发布附件。 [运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45715953559)。
 - **v1.29.2 · 发布成功**：5个发布附件。 [运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45697966031)。
@@ -55,4 +55,4 @@
 - v1.10.0、v1.11.0、v1.12.0、v1.7.0、v1.8.0、v1.9.0 是历史源码标签，没有公开Release或现存失败回执，因此未标发布失败。
 - `android-runtime-v0.172.0-r1` 是安卓编译依赖，不是可安装应用。两个运行库归档均与SHA256SUMS一致；独立manifest.json的GitHub摘要也已验证，应用构建继续按runtime-lock固定归档哈希。
 
-本次12个有异常历史的Release已加醒目标题及说明，已公开安装附件保持原样。
+本次13个有异常历史的Release已加醒目标题及说明，已公开安装附件保持原样。
