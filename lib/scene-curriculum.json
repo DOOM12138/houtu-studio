@@ -386,35 +386,31 @@
       }
     },
     {
-      "id": "v-c9bdc92c53c8",
-      "title": "这也能修？约尔cos正片ps后期修图教程",
-      "author": "熊叁映画",
-      "url": "https://www.bilibili.com/video/BV1sz421i7w2/",
-      "durationSeconds": 183,
+      "id": "v-6b7f9651045c",
+      "title": "室内棚拍布光之上下夹光，实拍演示，人像摄影布光入门分享",
+      "author": "一灯和一镜",
+      "url": "https://www.bilibili.com/video/BV1vS4y1k7rN/",
+      "durationSeconds": 208,
       "studies": {
         "studio": {
           "type": "frames",
-          "rule": "区分角色手持道具与干扰反射，不把角色设计当瑕疵。",
+          "rule": "先看上方主光和低位补光的分工，检查鼻下和下颌的自然过渡，保留面部体积。",
           "samples": [
             {
-              "seconds": 5,
-              "observation": "作者在原照片上分别圈出人物头后画框的亮斑和手持道具。"
-            },
-            {
-              "seconds": 37,
-              "observation": "Photoshop 中在手持道具周围局部操作，文本目标是生成金色细长道具。"
-            },
-            {
-              "seconds": 52,
-              "observation": "放大检查手指与金色道具相接位置，继续做局部修整。"
+              "seconds": 20,
+              "observation": "正式布光实拍全景。模特站在白色无花纹背景布前，独立灯架上有上方柔光罩和下方柔光罩。"
             },
             {
               "seconds": 83,
-              "observation": "对背景亮斑的处理在另一局部选区进行，人物和沙发仍处于原构图。"
+              "observation": "讲师指向模特正前方低位柔光罩，较高的柔光罩仍朝模特俯照，两盏灯围绕同一人物轴线布置。"
             },
             {
-              "seconds": 113,
-              "observation": "展示处理后的同一张构图，金色道具清晰，原有绿墙、沙发、服装及姿势保持可辨。"
+              "seconds": 138,
+              "observation": "先完成顶部主灯拍摄后，讲师蹲到低位柔光罩旁演示增加下方补光。"
+            },
+            {
+              "seconds": 179,
+              "observation": "同一模特、构图和背景的实拍照片并列，明确标示上下夹光和仅顶部灯。双灯版面部下方的阴影较柔和。"
             }
           ]
         }
