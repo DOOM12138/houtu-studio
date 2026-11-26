@@ -6,6 +6,7 @@ import {SoftwareUpdates} from './backend/software-updates.mjs';
 import {MobileDownloads} from './backend/mobile-downloads.mjs';
 import {localAccessAllowed} from './lib/local-access.mjs';
 import {APP_VERSION} from './lib/app-version.mjs';
+import {LayerProjects} from './backend/layer-projects.mjs';
 import {WorkspaceHandoffs} from './backend/workspace-handoffs.mjs';
 import {Diagnostics,logFilter} from './backend/diagnostics.mjs';
 import {exportProjectPhotos,backupProject,restoreProject} from './backend/studio-archive.mjs';
@@ -90,7 +91,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
   await templates.load();
   const colors = new ColorStore(directory, path.join(ROOT, 'defaults', 'color-presets.json'));
   await colors.load();
-  const workflows=new WorkflowStore(directory,{onReadError:(workflowId,error)=>{void diagnostics.record({event:'workflow.load-failed',workflowId,level:'warn',error});},onWrite:(previous,current)=>diagnostics.observeWorkflow(previous,current)});await workflows.load();const workspace=new WorkspaceHandoffs(directory,{workflows,studio:()=>studio,jobs});await workspace.load();const imageImports=new ImageImports(workflows,{mobile:clientPlatform==='android'});const promptLab=new PromptLab(directory);await promptLab.load();
+  const workflows=new WorkflowStore(directory,{onReadError:(workflowId,error)=>{void diagnostics.record({event:'workflow.load-failed',workflowId,level:'warn',error});},onWrite:(previous,current)=>diagnostics.observeWorkflow(previous,current)});await workflows.load();const workspace=new WorkspaceHandoffs(directory,{workflows,studio:()=>studio,jobs});await workspace.load();const layerProjects=new LayerProjects({workflows,vision:targetVision,mobile:clientPlatform==='android'});const imageImports=new ImageImports(workflows,{mobile:clientPlatform==='android'});const promptLab=new PromptLab(directory);await promptLab.load();
   const packages = new Map();
   let activePackage = null, latestPackage = null;
   const packageView = value => value && ({ id: value.id, status: value.status, message: value.message, bytes: value.bytes, sha256: value.sha256, downloadUrl: value.status === 'done' ? `/downloads/package/${value.id}` : null });
@@ -98,7 +99,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
   let critiqueActive = false;let portraitAuditControl=null,portraitAuditTask=null,isClosing=false,closingPromise=null;
   let login = null, loginStartedAt = 0;
   let loginError = '';
-  const runtimeBusy=()=>Boolean(active||activePackage||critiqueActive||studio?.active||studio?.archiving||mobileDownloads?.active||diagnostics.activeExports||workspace.active||imageImports.active||(clientPlatform==='android'&&login&&Date.now()-loginStartedAt<15*60*1000));
+  const runtimeBusy=()=>Boolean(active||activePackage||critiqueActive||studio?.active||studio?.archiving||mobileDownloads?.active||diagnostics.activeExports||workspace.active||layerProjects.active||imageImports.active||(clientPlatform==='android'&&login&&Date.now()-loginStartedAt<15*60*1000));
   const platform=suppliedPlatform||new PlatformBrowser(directory);
   const creative=new CreativeService({workflows,bridge,platform,acquire:id=>{if(active||activePackage||critiqueActive||studio?.active||studio?.archiving)return false;active='creative-'+id;return true;},release:id=>{if(active==='creative-'+id)active=null;}});
   const jobWrites=new Map();
@@ -310,11 +311,11 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     let trackedOperation=false,diagnosticOperation='UNKNOWN';
     try {
       const url = new URL(req.url, `http://${host}`);
-      const route = url.pathname;diagnosticOperation=req.method+'.'+(/^\/api\/(workspace|logs|retouch-agents|retouch-agent-capabilities|studio|workflows|jobs|updates|color|creative|superres|image-imports|account|models|login|templates)(?:\/|$)/.exec(route)?.[1]||'other');if(clientPlatform==='android'&&(route==='/api/packages'||route.startsWith('/downloads/package/')||/^\/api\/updates\/(prepare|apply|rollback)$/.test(route)))return json(res,409,{error:'安卓版请使用应用菜单中的安卓版更新。'});if(isClosing&&!['/api/health','/api/shutdown'].includes(route))return json(res,503,{error:'网站正在停止，请稍后重开。'});
+      const route = url.pathname;diagnosticOperation=req.method+'.'+(/^\/api\/(layers|workspace|logs|retouch-agents|retouch-agent-capabilities|studio|workflows|jobs|updates|color|creative|superres|image-imports|account|models|login|templates)(?:\/|$)/.exec(route)?.[1]||'other');if(clientPlatform==='android'&&(route==='/api/packages'||route.startsWith('/downloads/package/')||/^\/api\/updates\/(prepare|apply|rollback)$/.test(route)))return json(res,409,{error:'安卓版请使用应用菜单中的安卓版更新。'});if(isClosing&&!['/api/health','/api/shutdown'].includes(route))return json(res,503,{error:'网站正在停止，请稍后重开。'});
       if (!['GET', 'POST'].includes(req.method)) return json(res, 405, { error: '不支持的请求。' });
       if(req.method==='POST'&&(req.headers.origin!==`http://${host}`||req.headers['x-paint-csrf']!==csrf))return json(res,403,{error:'请从本站页面发起操作。'});
-      let localCheckpoint=false;if(req.method==='POST'&&(studio.active||studio.archiving)){localCheckpoint=['/api/workflows','/api/workspace/copy','/api/workspace/images'].includes(route);const localRoute=/^\/api\/workflows\/([a-f0-9-]{36})\/(assets|begin|complete|fail|restart)$/.exec(route);if(localRoute)localCheckpoint=['manual-portrait','color'].includes((await workflows.get(localRoute[1])).kind);}
-      if(req.method==='POST'&&(studio.active||studio.archiving)&&!localCheckpoint&&!route.startsWith('/api/studio/')&&!route.startsWith('/api/mobile/downloads')&&route!=='/api/shutdown'&&!route.startsWith('/api/updates/')&&route!=='/api/logs/export'&&route!=='/api/workspace/handoffs'&&!/^\/api\/jobs\/[a-f0-9-]{36}\/cancel$/.test(route)&&!/^\/api\/retouch-agents\/[a-f0-9-]{36}\/(pause|cancel)$/.test(route))return json(res,409,{error:'照片流程正在运行，请先完成本步并暂停。'});
+      let localCheckpoint=false;if(req.method==='POST'&&(studio.active||studio.archiving)){localCheckpoint=['/api/workflows','/api/workspace/copy','/api/workspace/images'].includes(route);const localRoute=/^\/api\/workflows\/([a-f0-9-]{36})\/(assets|begin|complete|fail|restart)$/.exec(route);if(localRoute)localCheckpoint=['manual-portrait','color','layer-composite'].includes((await workflows.get(localRoute[1])).kind);}
+      if(req.method==='POST'&&(studio.active||studio.archiving)&&!localCheckpoint&&!route.startsWith('/api/studio/')&&!route.startsWith('/api/mobile/downloads')&&route!=='/api/shutdown'&&!route.startsWith('/api/updates/')&&route!=='/api/logs/export'&&route!=='/api/workspace/handoffs'&&!route.startsWith('/api/layers/')&&route!=='/api/layers/import'&&!/^\/api\/jobs\/[a-f0-9-]{36}\/cancel$/.test(route)&&!/^\/api\/retouch-agents\/[a-f0-9-]{36}\/(pause|cancel)$/.test(route))return json(res,409,{error:'照片流程正在运行，请先完成本步并暂停。'});
       if(updates.handoff&&route.startsWith('/api/')&&!route.startsWith('/api/updates/')&&!['/api/health','/api/shutdown'].includes(route))return json(res,409,{error:'网站即将重启安装更新，请等待完成后重新打开。'});
       if(route.startsWith('/api/')&&!route.startsWith('/api/updates/')&&!['/api/health','/api/shutdown'].includes(route)){pendingOperations++;trackedOperation=true;}
       if(mobileDownloads&&route==='/api/mobile/downloads'&&req.method==='POST')return json(res,201,await mobileDownloads.create(req,{name:url.searchParams.get('name')||'导出文件',mime:url.searchParams.get('mime')||'application/octet-stream'}));
@@ -349,6 +350,8 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
           return json(res,201,{projectId:project.id,photoId:photo.id,workflowId:photo.workflowId,url:'/upscale/?project='+project.id});
         }finally{if(active===reservation)active=null;}
       }
+      if(route==='/api/layers/import'&&req.method==='POST')return json(res,201,await layerProjects.restore(await body(req,210*1024*1024)));
+      const layerRoute=/^\/api\/layers\/([a-f0-9-]{36})(?:\/(preview|document|export|project|reference|subject|fork))?$/.exec(route);if(layerRoute){const [,id,action]=layerRoute;if(!action&&req.method==='GET')return json(res,200,await layerProjects.get(id));if(action==='project'&&req.method==='GET'){const value=await layerProjects.project(id),bytes=Buffer.from(JSON.stringify(value));res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','Content-Length':bytes.length,'Content-Disposition':'attachment; filename="houtu-layer-project.json"'});res.end(bytes);return;}if(req.method==='POST'){const input=await body(req,1024*1024);if(action==='preview'){const result=await layerProjects.render(id,input.document,{maxEdge:1280});res.writeHead(200,{'Content-Type':'image/png','X-Houtu-Preview-Width':result.width,'X-Houtu-Preview-Height':result.height});res.end(result.bytes);return;}if(action==='fork')return json(res,201,await layerProjects.fork(id,input.document));if(action==='document')return json(res,200,await layerProjects.save(id,input.document,input.revision));if(action==='export')return json(res,200,await layerProjects.export(id,input));if(action==='reference')return json(res,201,await layerProjects.reference(id,input.source));if(action==='subject')return json(res,200,await layerProjects.subjectMask(id,input.assetId));}return json(res,405,{error:'不支持此图层操作。'});}
       if(route==='/api/workspace/copy'&&req.method==='POST'){const input=await body(req,4096);return json(res,201,await workspace.copySource(input.workflowId,input.source));}
       if(route==='/api/workspace/active'&&req.method==='GET')return json(res,200,await workspace.current());
       const handoffRoute=/^\/api\/workspace\/handoffs\/([a-f0-9-]{36})$/.exec(route);if(handoffRoute&&req.method==='GET')return json(res,200,await workspace.get(handoffRoute[1]));
@@ -439,7 +442,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       const importView=/^\/api\/image-imports\/([a-f0-9-]{36})$/.exec(route);if(importView&&req.method==='GET')return json(res,200,await imageImports.view(importView[1]));
       const importMatch=/^\/api\/image-imports\/([a-f0-9-]{36})\/(develop|original)$/.exec(route);if(importMatch){if(importMatch[2]==='develop'&&req.method==='POST')return json(res,200,await imageImports.develop(importMatch[1],await body(req,4096)));if(importMatch[2]==='original'&&req.method==='GET'){const asset=await imageImports.original(importMatch[1]);res.writeHead(200,{'Content-Type':'application/octet-stream','Content-Length':asset.bytes,'Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(asset.name)}`});await pipeline(createReadStream(asset.file),res);return;}}
       if(route==='/api/workflows'&&req.method==='GET')return json(res,200,{workflows:await workflows.list({section:url.searchParams.get('section')||'',status:url.searchParams.get('status')||'',query:(url.searchParams.get('q')||'').slice(0,200)})});
-      if(route==='/api/workflows'&&req.method==='POST'){const input=await body(req,4096);const w=await workflows.create({kind:input.kind==='manual-portrait'?'manual-portrait':'color',name:input.name,parentId:input.parentId});if(input.sourceOrigin)await workspace.bindOrigin(w.id,input.sourceOrigin);return json(res,201,await workflows.get(w.id));}
+      if(route==='/api/workflows'&&req.method==='POST'){const input=await body(req,4096);const w=await workflows.create({kind:['manual-portrait','layer-composite'].includes(input.kind)?input.kind:'color',name:input.name,parentId:input.parentId});if(input.sourceOrigin)await workspace.bindOrigin(w.id,input.sourceOrigin);return json(res,201,await workflows.get(w.id));}
       const workflowMatch=/^\/api\/workflows\/([a-f0-9-]{36})(?:\/(begin|complete|fail|restart|retry|assets)(?:\/([a-f0-9]{64}))?)?$/.exec(route);
       if(workflowMatch){
         const [,id,action,assetId]=workflowMatch;
@@ -464,7 +467,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
               return json(res,202,publicJob(job));
             }finally{if(active==='reserved')active=null;}
           }
-          const w=await workflows.get(id);if(!['color','manual-portrait'].includes(w.kind))return json(res,409,{error:'精修工作流由图片任务执行，请使用步骤重试。'});
+          const w=await workflows.get(id);if(!['color','manual-portrait','layer-composite'].includes(w.kind))return json(res,409,{error:'精修工作流由图片任务执行，请使用步骤重试。'});
           const input=await body(req,24*1024*1024);let result;
           if(action==='begin')result=await workflows.begin(id,input.step,input.revision);
           else if(action==='complete')result=await workflows.complete(id,input.step,input.token,input);
@@ -615,6 +618,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       if (imageMatch && req.method === 'GET' && jobs.has(imageMatch[1])) {
         file = path.join(jobsDirectory, imageMatch[1], imageMatch[2]);
         if (url.searchParams.has('download')) res.setHeader('Content-Disposition', `attachment; filename="anime-paint-${imageMatch[1].slice(0,8)}.${path.extname(file).slice(1)}"`);
+      } else if(req.method==='GET'&&(route==='/layers'||route==='/layers/')){file=path.join(ROOT,'frontend','layer-workbench.html');
       } else if(req.method==='GET'&&(route==='/logs'||route==='/logs/')){file=path.join(ROOT,'frontend','logs.html');
       } else if(req.method==='GET'&&(route==='/server'||route==='/server/')){
         file=path.join(ROOT,'frontend','server.html');
@@ -630,14 +634,14 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
         file=path.join(ROOT,'frontend','workflows.html');
       } else if(req.method==='GET'&&(route==='/creative'||route==='/creative/')){
         file=path.join(ROOT,'frontend','creative.html');
-      } else if (req.method === 'GET' && /^\/color\/(app\.js|engine\.js|worker\.js|masks\.js|workflow-client\.js|workflows\.js|effects\.js|creative\.js|creative-multi\.js|server\.js|studio\.js|studio-agent\.js|studio-planner\.js|studio-layout\.(?:js|css)|logs\.(?:js|css)|lab\.js|tonal-looks\.js|tone-controls\.js|upscale\.js|updates\.js|style\.css)$/.test(route)) {
+      } else if (req.method === 'GET' && /^\/color\/(app\.js|engine\.js|worker\.js|masks\.js|workflow-client\.js|workflows\.js|effects\.js|creative\.js|creative-multi\.js|server\.js|studio\.js|studio-agent\.js|studio-planner\.js|studio-layout\.(?:js|css)|logs\.(?:js|css)|layer-(?:workbench\.(?:js|css)|document\.js)|features\.(?:js|css)|lab\.js|tonal-looks\.js|tone-controls\.js|upscale\.js|updates\.js|style\.css)$/.test(route)) {
         file=path.join(ROOT,'frontend',path.basename(route));
       } else if (req.method === 'GET' && /^\/vision\/(vision_bundle\.mjs|wasm\/vision_wasm_(?:nosimd_)?internal\.(?:js|wasm))$/.test(route)) {
         file=path.join(ROOT,'node_modules','@mediapipe','tasks-vision',route.slice('/vision/'.length));
       } else if (req.method === 'GET' && /^\/models\/(selfie_multiclass_256x256\.tflite|face_landmarker\.task|hand_landmarker\.task)$/.test(route)) {
         file=path.join(ROOT,'models',path.basename(route));
       } else {
-        const files = { '/retouch-agent-options.js':'retouch-agent-options.js','/retouch-agent-knowledge.js':'retouch-agent-knowledge.js','/studio-planning.js':'studio-planning.js','/editor-history.js':'editor-history.js','/editor-history.css':'editor-history.css','/upload-limits.js':'upload-limits.js','/portrait':'portrait.html','/portrait/':'portrait.html','/ai':'index.html','/ai/':'index.html','/image-import.js':'image-import.js','/image-formats.js':'image-formats.js','/workspace.js':'workspace.js','/workspace-continuation.js':'workspace-continuation.js','/workspace.css':'workspace.css','/workflow-sections.js':'workflow-sections.js','/manual-portrait.js':'manual-portrait.js','/manual-portrait-worker.js':'manual-portrait-worker.js','/manual-portrait-engine.js':'manual-portrait-engine.js','/manual-portrait.css':'manual-portrait.css', '/android-shell.js':'android-shell.js','/android-shell.css':'android-shell.css','/superres-options.js':'superres-options.js', '/superres.css':'superres.css', '/editor-layout.css':'editor-layout.css', '/image-viewer.js':'image-viewer.js','/view-geometry.js':'view-geometry.js','/image-viewer.css':'image-viewer.css', '/update-notice.js':'update-notice.js','/update-notice.css':'update-notice.css', '/paint-profile.js':'paint-profile.js','/feature-expansion.js':'feature-expansion.js','/prompt-contract.js':'prompt-contract.js','/feature-ui.js':'feature-ui.js','/target-policy.js':'target-policy.js','/target-masks.js':'target-masks.js','/vision-target.html':'vision-target.html', '/': 'index.html', '/app.js': 'app.js', '/catalog.js': 'catalog.js', '/style.css': 'style.css', '/favicon.svg': 'favicon.svg','/portrait-options.js':'portrait-options.js','/portrait-ui.js':'portrait-ui.js','/model-picker.js':'model-picker.js','/model-options.js':'model-options.js','/scene-options.js':'scene-options.js','/belly-options.js':'belly-options.js','/scene-ui.js':'scene-ui.js','/subject-mask.js':'subject-mask.js' };
+        const files = { '/retouch-agent-options.js':'retouch-agent-options.js','/retouch-agent-knowledge.js':'retouch-agent-knowledge.js','/studio-planning.js':'studio-planning.js','/editor-history.js':'editor-history.js','/editor-history.css':'editor-history.css','/upload-limits.js':'upload-limits.js','/portrait':'portrait.html','/portrait/':'portrait.html','/ai':'index.html','/ai/':'index.html','/image-import.js':'image-import.js','/image-formats.js':'image-formats.js','/workspace.js':'workspace.js','/workspace-continuation.js':'workspace-continuation.js','/capabilities.js':'capabilities.js','/workspace.css':'workspace.css','/workflow-sections.js':'workflow-sections.js','/manual-portrait.js':'manual-portrait.js','/manual-portrait-worker.js':'manual-portrait-worker.js','/manual-portrait-engine.js':'manual-portrait-engine.js','/manual-portrait.css':'manual-portrait.css', '/android-shell.js':'android-shell.js','/android-shell.css':'android-shell.css','/superres-options.js':'superres-options.js', '/superres.css':'superres.css', '/editor-layout.css':'editor-layout.css', '/image-viewer.js':'image-viewer.js','/view-geometry.js':'view-geometry.js','/image-viewer.css':'image-viewer.css', '/update-notice.js':'update-notice.js','/update-notice.css':'update-notice.css', '/paint-profile.js':'paint-profile.js','/feature-expansion.js':'feature-expansion.js','/prompt-contract.js':'prompt-contract.js','/feature-ui.js':'feature-ui.js','/target-policy.js':'target-policy.js','/target-masks.js':'target-masks.js','/vision-target.html':'vision-target.html', '/': 'index.html', '/app.js': 'app.js', '/catalog.js': 'catalog.js', '/style.css': 'style.css', '/favicon.svg': 'favicon.svg','/portrait-options.js':'portrait-options.js','/portrait-ui.js':'portrait-ui.js','/model-picker.js':'model-picker.js','/model-options.js':'model-options.js','/scene-options.js':'scene-options.js','/belly-options.js':'belly-options.js','/scene-ui.js':'scene-ui.js','/subject-mask.js':'subject-mask.js' };
         if (!Object.hasOwn(files, route) || req.method !== 'GET') return json(res, 404, { error: '页面不存在。' });
         file = path.join(ROOT, 'public', files[route]);
       }
@@ -655,7 +659,7 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
     for(const state of creative.running.values())state.stop=true;
     await imageImports.close();await updates.close();await platform.close();
     await agents.close();await planner.close();await bridge.stop(); for (const j of jobs.values()) clearTimeout(j.deadline);
-    await creative.drain();await studio.drain();await agents.drain();await targetVision.close();if(portraitAuditTask)await Promise.allSettled([portraitAuditTask]);
+    await creative.drain();await studio.drain();await agents.drain();await layerProjects.close();await targetVision.close();if(portraitAuditTask)await Promise.allSettled([portraitAuditTask]);
     await Promise.allSettled([...jobWrites.values()]);
     await Promise.allSettled([accounts.queue,library.queue,...library.pendingThumbs.values()]);
     await workspace.queue;await diagnostics.close();server.closeAllConnections(); await new Promise(resolve => server.close(resolve));

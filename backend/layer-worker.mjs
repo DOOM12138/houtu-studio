@@ -1,0 +1,2 @@
+import fs from 'node:fs/promises';import {parentPort,workerData} from 'node:worker_threads';import {renderLayers} from './layer-render.mjs';
+try{const output=await renderLayers(workerData.document,async id=>{const file=workerData.assets[id];if(!file)throw Error('工程图片缺失。');return fs.readFile(file);},workerData.options);parentPort.postMessage({bytes:output.bytes,width:output.width,height:output.height,engine:output.engine});}catch(error){parentPort.postMessage({error:error.message});}

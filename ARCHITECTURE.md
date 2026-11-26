@@ -1,5 +1,7 @@
 # 前后端与运行边界
 
+本机图层工作台：`frontend/layer-document.js` 统一文档验证与变换语义，`backend/layer-render.mjs` 顺序执行透明度、混合、独立蒙版和复用的sRGB调色。`backend/layer-worker.mjs` 在Worker中完成预览／完整尺寸计算，`backend/layer-projects.mjs` 保存 `layer-composite` 的 source/edit/export、工程迁移与校验；预览只放previewAsset，只有完整尺寸export可带给其他板块。`/layers/` 不读取AI账号、不调用商业软件。文字由当前浏览器本机字体栅格化并保留可编辑参数与缓存。功能中心的真实能力目录在 `public/capabilities.js`。
+
 跨板块接续由 `public/workspace-continuation.js` 拦截工作区导航，各编辑器提供完整尺寸保存与载入适配器；Android `MainActivity.go` 走相同异步入口。`backend/workspace-handoffs.mjs` 在 `data/workspace/` 保存小型不可变交接记录，当前指针与每张图分离，原图及版本保持在工作流。`lib/workflow-image.mjs` 统一校验确切的已完成步骤／尝试；目标流程写 `sourceOrigin`，通过 `copyAsset` 复用原有素材。只允许本机工作区地址；过期交接缓存可由URL中固定的来源重新建立，不能改用其他图片。切换不调用模型、不恢复未知生成请求，调色交接使用完整尺寸输出，创作预览按原尺寸保存。
 
 `backend/diagnostics.mjs` 观测已提交的工作流变化、图片任务状态、客户端事件与请求异常；记录和回读均按允许字段重建，不写自由格式输入输出。`/api/logs` 只读筛选，`POST /api/logs/export` 经同源与CSRF校验后生成有校验清单的ZIP；文件留在私有 `data/logs/`。`/logs/` 和 `frontend/logs.js` 共用Windows、安卓及独立前端代理。日志队列与工作流持久化分离，磁盘异常退回有限内存，导出占用纳入更新忙锁。使用与保留规则见 `public/docs/LOGS.md`。

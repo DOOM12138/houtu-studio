@@ -1,5 +1,16 @@
 # 公开资料与实现边界
 
+## 综合工作台与本机图层（2026-11-26）
+
+用户将目标明确为PS、LR、人像工作台、耀／幻象同类AI方向、工作流、Agent与独立ChatGPT登录的自研结合体。仅参照可公开观察的功能场景，未复用商业软件本体、私有源码、提示词或模型。
+
+- Adobe公开图层概念：https://helpx.adobe.com/photoshop/desktop/create-manage-layers/color-adjustment-fill-layers/adjustment-and-fill-layers-overview.html 。用于核对非破坏性调整层与蒙版的工作场景。
+- W3C公开合成与混合算法：https://www.w3.org/TR/compositing-1/ 。本项目的透明度与混合计算在 `backend/layer-render.mjs`，预览和完整尺寸共用；没有调用PS程序。
+- 像素蛋糕公开调色目录：https://wiki.pixcakeai.com/guide/9398.html 。仅核对工具类型和批量场景，本站仍为自己的8位sRGB编辑管线。
+- 耀公开展示：https://vip.yao-ai.top/ ，绘影／幻象公开介绍与日志：https://www.hueyingai.cn/about 、https://www.hueyingai.cn/logs 。公开展示不意味着取得私有实现或可宣称效果等价。
+
+图层工程使用本站格式，缓存文字栅格以保留已保存外观；修改文字时取当前设备系统字体。不承诺PSD完整互通、CMYK或全无损RAW。素材、图层工程与真实测试图均留在私有data或F盘测试目录，不随公开源码分发。
+
 核对日期：2026-11-24。下面是功能调研依据，不是本网站取得商业产品源码或模型的证明。
 
 ## 1.5 平台登录与3D范围

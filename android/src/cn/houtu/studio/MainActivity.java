@@ -284,6 +284,8 @@ public final class MainActivity extends Activity {
     PopupMenu p = new PopupMenu(this, anchor);
     String[] titles = {"AI特效与合成", "工作流管理", "图片档案", "提示词实验室", "检查安卓版更新", "分享最近成片", "复制诊断", "照片项目", "超分4K"};
     for (int i = 0; i < titles.length; i++) p.getMenu().add(0, i, i, titles[i]);
+    p.getMenu().add(0, 10, 10, "本机图层合成");
+    p.getMenu().add(0, 11, 11, "功能中心");
     p.getMenu().add(0, 9, 9, "自动检查GitHub更新").setCheckable(true).setChecked(AndroidUpdates.enabled(this));
     p.setOnMenuItemClickListener(
         item -> {
@@ -302,6 +304,12 @@ public final class MainActivity extends Activity {
               break;
             case 4:
               AndroidUpdates.check(this);
+              break;
+            case 10:
+              go("/layers/");
+              break;
+            case 11:
+              go("/features/");
               break;
             case 9:
               AndroidUpdates.configure(this, !AndroidUpdates.enabled(this));

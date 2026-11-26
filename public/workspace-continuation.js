@@ -1,5 +1,5 @@
 const TAB_KEY='houtu-workspace-context-v1';const readTab=()=>{try{return JSON.parse(sessionStorage.getItem(TAB_KEY));}catch{return null;}},saveTab=value=>{try{sessionStorage.setItem(TAB_KEY,JSON.stringify(value));}catch{}};
-const ROUTES={portrait:'/portrait/',color:'/color/',aiColor:'/ai/color/',ai:'/ai/',creative:'/creative/',upscale:'/upscale/',studio:'/studio/'};
+const ROUTES={portrait:'/portrait/',color:'/color/',aiColor:'/ai/color/',ai:'/ai/',creative:'/creative/',upscale:'/upscale/',studio:'/studio/',layers:'/layers/'};
 export function workspaceTool(path){if(path==='/')return 'ai';return Object.entries(ROUTES).find(([,url])=>path.replace(/\/$/,'')===url.replace(/\/$/,''))?.[0]||null;}
 let registrationDone;const registered=new Promise(r=>registrationDone=r);const pendingInputs=new Set();export function trackWorkspaceInput(value){const work=Promise.resolve(value);pendingInputs.add(work);work.then(()=>pendingInputs.delete(work),()=>pendingInputs.delete(work));return work;}
 export function workspaceStartupCurrent(){return selectionEpoch===0;}
