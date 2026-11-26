@@ -1,13 +1,13 @@
 {
   "schema": "houtu-release-status",
   "version": 1,
-  "checkedAt": "2026-11-26T11:52:24.893Z",
+  "checkedAt": "2026-11-26T13:44:40.741Z",
   "repository": "DOOM12138/houtu-studio",
-  "latestVerified": "v1.36.0",
+  "latestVerified": "v1.37.0",
   "scope": "Release publication, available workflow attempts, artifact inventory and supplied checksum lists against GitHub asset digests. Historical binaries were not all reinstalled; real AI quality and ARM physical-device coverage remain separately recorded.",
   "counts": {
-    "applications": 34,
-    "published": 27,
+    "applications": 35,
+    "published": 28,
     "failedOrStopped": 7,
     "recovered": 3,
     "knownIssues": 4,
@@ -15,6 +15,50 @@
     "dependencyReleases": 1
   },
   "applications": [
+    {
+      "tag": "v1.37.0",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-26T13:42:20Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.37.0",
+      "assetCount": 5,
+      "assets": [
+        {
+          "name": "houtu-studio-1.37.0-Android-arm64-v8a.apk",
+          "bytes": 205669407,
+          "digest": "sha256:05f512957b47223711ad743ce62cf96ed90bdbf15b66c4e7d69969e24fd9180a"
+        },
+        {
+          "name": "houtu-studio-1.37.0-Android-x86_64.apk",
+          "bytes": 213279763,
+          "digest": "sha256:1de4b4cdb839b85a149d5350c51beeaf05b81e79daf76ead40a65d97cc9599b0"
+        },
+        {
+          "name": "houtu-studio-1.37.0-SHA256.txt",
+          "bytes": 423,
+          "digest": "sha256:4ab7cedde36483f986f39801ee5a675b3e55e6d25116acf428ca7e964f688370"
+        },
+        {
+          "name": "houtu-studio-1.37.0-Windows-x64-Setup.exe",
+          "bytes": 186489838,
+          "digest": "sha256:7ccc458ed55316b0a3bfcb5f72c8ebaebe150bd86fcc81f45d187a672d3efa2b"
+        },
+        {
+          "name": "houtu-studio-1.37.0-Windows-x64.zip",
+          "bytes": 268200999,
+          "digest": "sha256:fcdaf093a7a9d34c715b994bc0c99d61855f89cb21df1486fcda8553dcb145a9"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": {
+        "runId": 45828482024,
+        "latestAttempt": 1,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45828482024"
+      },
+      "note": "单画布右栏全自动和半自动，75项功能按顺序逐项确认。Windows实际安装、安卓独立运行和工作流历史已验证。本轮集成测试使用隔离模型回执。"
+    },
     {
       "tag": "v1.36.0",
       "status": "published",
