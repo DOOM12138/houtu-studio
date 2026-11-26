@@ -1,5 +1,5 @@
 ﻿import path from 'node:path';
-import {mkdir,writeFile,readFile,stat,realpath} from 'node:fs/promises';
+import {mkdir,writeFile,readFile,stat,realpath,readdir,lstat,unlink} from 'node:fs/promises';
 import {createHash,randomUUID} from 'node:crypto';
 import sharp from 'sharp';
 import {replaceFile} from '../lib/files.mjs';
@@ -44,6 +44,34 @@ export class ImageLibrary{
   const all=[...this.records.values()],filtered=all.filter(r=>(!kind||r.kind===kind)&&(!account||(account==='unknown'?!r.account:r.account?.id===account||Boolean(accountEmail&&r.account?.email.toLowerCase()===accountEmail)))&&(!query||[r.name,r.account?.email,r.model,r.jobId,r.workflowId].some(v=>String(v||'').toLowerCase().includes(query))));
   return {images:filtered.slice((page-1)*size,page*size),total:filtered.length,page,pageSize:size,totalAll:all.length,counts:Object.fromEntries(['manual-portrait','retouch','color','creative','pipeline'].map(kind=>[kind,all.filter(r=>r.kind===kind).length]))};
  }
+ async cacheFiles(){
+  const directory=await realpath(this.thumbs);
+  if(directory!==path.join(await realpath(this.root),'library','thumbnails'))throw Error('缩略图缓存目录位置无效。');
+  const result=[];
+  for(const item of await readdir(directory,{withFileTypes:true})){
+   if(!item.isFile()||!/^([a-f0-9]{64})\.webp$/.test(item.name))continue;
+   const file=path.join(directory,item.name);
+   try{const info=await lstat(file);if(info.isFile()&&!info.isSymbolicLink())result.push({file,bytes:info.size});}
+   catch(error){if(error.code!=='ENOENT')throw error;}
+  }
+  return result;
+ }
+ async cacheInfo(){
+  const files=await this.cacheFiles();
+  return {count:files.length,bytes:files.reduce((bytes,item)=>bytes+item.bytes,0)};
+ }
+ async clearCache(){
+  if(this.clearingCache||this.pendingThumbs.size)throw Object.assign(Error('缩略图正在生成，请稍后重试。'),{status:409});
+  this.clearingCache=true;
+  try{
+   let count=0,bytes=0,skipped=0;
+   for(const item of await this.cacheFiles()){
+    try{await unlink(item.file);count++;bytes+=item.bytes;}
+    catch(error){if(error.code!=='ENOENT')skipped++;}
+   }
+   return {count,bytes,skipped};
+  }finally{this.clearingCache=false;}
+ }
  async thumbnail(id,jobs,workflows){
   if(!HASH.test(id))throw Error('图片记录编号无效。');const record=this.records.get(id);if(!record)throw Object.assign(Error('图片记录不存在，请刷新图库。'),{status:404});
   let file,allowed;
@@ -51,6 +79,7 @@ export class ImageLibrary{
   else{const job=jobs.get(record.jobId);if(!job)throw Error('图片任务不存在。');file=path.join(job.directory,record.file);allowed=job.directory;}
   const resolved=await realpath(file),relative=path.relative(await realpath(allowed),resolved);if(!relative||relative.startsWith('..')||path.isAbsolute(relative))throw Error('图片位置无效。');
   const info=await stat(resolved),key=digest(id+'|'+info.size+'|'+info.mtimeMs),target=path.join(this.thumbs,key+'.webp');try{await stat(target);return target;}catch(error){if(error.code!=='ENOENT')throw error;}
+  if(this.clearingCache)throw Object.assign(Error('缩略图缓存正在清理，请稍后重试。'),{status:409});
   if(!this.pendingThumbs.has(key)){const task=(async()=>{const temporary=target+'.'+randomUUID()+'.tmp';await sharp(resolved,{limitInputPixels:40000000}).rotate().resize({width:480,height:480,fit:'inside',withoutEnlargement:true}).webp({quality:75}).toFile(temporary);await replaceFile(temporary,target);return target;})().finally(()=>this.pendingThumbs.delete(key));this.pendingThumbs.set(key,task);}
   return this.pendingThumbs.get(key);
  }

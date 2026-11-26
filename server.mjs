@@ -538,6 +538,8 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
         if (activePackage) return json(res, 409, { error: '正在打包，请完成后再停止网站。' });
         json(res, 200, { ok: true }); setTimeout(() => close().catch(() => {}), 60); return;
       }
+      if(route==='/api/server/cache'&&req.method==='GET')return json(res,200,await library.cacheInfo());
+      if(route==='/api/server/cache/clear'&&req.method==='POST')return json(res,200,await library.clearCache());
       if(route==='/api/server/status'&&req.method==='GET'){
         try{await bridge.account();}catch{}
         const images=await library.refresh(jobs,workflows);

@@ -88,3 +88,19 @@ test('a client without a valid email cannot authorize paid AI calls or create a 
  for(email of ['', '@','not-an-email']){assert.equal(await bridge.account(),null);assert.equal(ledger.current().status,'unknown');await assert.rejects(()=>bridge.begin({}),/无法确认/);assert.equal(calls,0);}
  assert.deepEqual(ledger.records(),[]);
 });
+
+test('clearing cache removes generated thumbnails and preserves the archive index',async t=>{
+ const directory=await mkdtemp(path.join(tmpdir(),'thumbnail-clear-'));
+ t.after(()=>rm(directory,{recursive:true,force:true}));
+ const library=new ImageLibrary(directory);await library.load();
+ const valid=path.join(library.thumbs,'a'.repeat(64)+'.webp');
+ const other=path.join(library.thumbs,'keep.txt');
+ await writeFile(valid,'thumbnail');
+ await writeFile(other,'keep');
+ const index=await readFile(library.index,'utf8');
+ assert.deepEqual(await library.cacheInfo(),{count:1,bytes:9});
+ assert.deepEqual(await library.clearCache(),{count:1,bytes:9,skipped:0});
+ assert.equal(await readFile(other,'utf8'),'keep');
+ assert.equal(await readFile(library.index,'utf8'),index);
+ assert.deepEqual(await library.cacheInfo(),{count:0,bytes:0});
+});

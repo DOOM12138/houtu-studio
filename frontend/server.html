@@ -55,6 +55,11 @@
     <div class="server-sidebar settings-group">
      <details id="server-storage" open><summary>服务器与存储位置</summary><dl id="server-info"></dl><p class="hint">在哪台电脑启动，就在该电脑的项目根目录创建 data。图片、任务和本机登录资料保存在这里。</p></details>
     </div>
+    <section class="settings-group" aria-labelledby="cache-title">
+     <h3 id="cache-title">缓存</h3>
+     <p class="hint">清除本机生成的图片档案缩略图。重新查看档案时会按需生成，原图、成片、账号、工作流和模型会保留。</p>
+     <div class="settings-actions"><button id="cache-clear" type="button">清除缩略图缓存</button><span id="cache-result" role="status"></span></div>
+    </section>
     <section class="server-gallery" aria-label="已修图片档案">
      <div class="section-head"><div><h2>图片档案</h2><p id="server-image-count" class="hint">正在读取全部产出版本…</p></div></div>
      <div class="server-filters"><label for="archive-query">搜索记录<input id="archive-query" type="search" placeholder="名称、账号、模型或任务编号"></label><label for="archive-kind">处理类型<select id="archive-kind"><option value="">全部类型</option><option value="pipeline">照片配方</option><option value="manual-portrait">人物手动修图</option><option value="retouch">AI 人物精修</option><option value="color">调色成品</option><option value="creative">特效与合成</option></select></label><label for="archive-account">关联账号<select id="archive-account"><option value="">全部账号</option><option value="unknown">未记录账号</option></select></label></div>

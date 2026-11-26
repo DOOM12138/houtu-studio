@@ -5,6 +5,17 @@ const date=value=>value?new Date(value).toLocaleString('zh-CN',{year:'numeric',m
 async function get(url){const response=await fetch(url,{signal:AbortSignal.timeout(15000)});const data=await response.json();if(!response.ok)throw Error(data.error||'记录暂时无法读取，请重试。');return data;}
 function notice(text,error=false){$('server-notice').textContent=text;$('server-notice').classList.toggle('error',error);}
 function text(tag,value,className){const element=document.createElement(tag);element.textContent=value;if(className)element.className=className;return element;}
+const cacheSize=bytes=>bytes>=1024**2?(bytes/1024**2).toFixed(1)+' MB':Math.ceil(bytes/1024)+' KB';
+$('cache-clear').onclick=async()=>{
+ const button=$('cache-clear'),line=$('cache-result');button.disabled=true;line.textContent='正在读取缓存大小…';
+ try{
+  const info=await get('/api/server/cache');
+  if(!info.count){line.textContent='当前没有缩略图缓存。';return;}
+  if(!confirm('清除 '+info.count+' 个缩略图缓存（'+cacheSize(info.bytes)+'）？')){line.textContent='已取消。';return;}
+  const result=await post('/api/server/cache/clear');
+  line.textContent='已清除 '+result.count+' 个，释放 '+cacheSize(result.bytes)+(result.skipped?'；'+result.skipped+' 个文件未能清除，可稍后重试。':'。');
+ }catch(error){line.textContent=error.message;}finally{button.disabled=false;}
+};
 async function loadStatus(){
  const info=await get('/api/server/status'),current=info.current;
  $('server-current').textContent=current.status==='signedIn'?(current.account?'已登录 · '+current.account.email+' · '+current.account.plan:'已登录 · 客户端未返回账号标识'):current.status==='signedOut'?'ChatGPT 尚未登录，图片档案仍可查看':'账号状态待确认，已有记录仍保留';
