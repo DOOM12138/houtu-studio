@@ -158,10 +158,10 @@ async function selectPhoto(id) {
   if(ui.batch){toggleChecked(id);return;}
   const ticket=++switchTicket;
   if(id===ui.active&&activeMedia)return;
-  desk?.suspend();desk?.sourceChanged(null,photo.id);
+  desk?.suspend();
   settleCanvasInput();finishPendingEdit();
   ui.active=id;ui.previewId=null;ui.draftStep=null;ui.selectionDraft=null;
-  ui.original=false;ui.holdOriginal=false;ui.target='global';activeMedia=null;gestureReset();
+  ui.original=false;ui.holdOriginal=false;ui.target='global';activeMedia=null;gestureReset();desk?.sourceChanged(null,photo.id);
   ++renderSerial;queuedRender=null;status('正在打开…');paintCanvas();updateChrome();renderPanel();renderFilm();
   try{
     if(photo.metadataOnly){const saved=await loadDraft(photo.id);if(ticket!==switchTicket)return;Object.assign(photo,saved,{metadataOnly:false,diskRevision:saved.revision});}
@@ -776,18 +776,24 @@ function receivePicture(origin,run,explicit){
   return;
  }
  let i=p.nodes.findIndex(n=>n.action?.type==='ai-image'&&refKey(n.action.origin)===refKey(ref));
+ if(i>=0&&!explicit)return;
+ let changed=false;
  if(i<0){
   const previous=p.nodes.findLastIndex(n=>n.action?.run===run.id);
   const parent=previous>=0?previous:anchor;
   i=p.nodes.length;
   const step=run.steps.find(s=>s.id===ref.stepId)||run.agent?.steps.find(s=>s.id===ref.stepId);
   p.nodes.push({parent,label:step?.name||'AI 成片',action:{type:'ai-image',origin:ref,run:run.id}});
-  p.redo[parent]=i;
-  if(!explicit&&ui.previewId===null&&(p.cursor===parent||p.cursor===anchor))p.cursor=i;
+  const follows=p.cursor===parent;
+  if(follows||p.redo[parent]===undefined)p.redo[parent]=i;
+  if(!explicit&&follows){p.cursor=i;changed=ui.previewId===null;}
   safeDraft(p);
  }
- if(explicit)ui.previewId=i;
- updateChrome();requestPixels();
+ if(explicit){
+  ui.previewId=explicit==='follow'&&i===p.cursor?null:i;
+  changed=true;
+ }
+ if(changed){updateChrome();requestPixels();}
 }
 function makeFromRef(origin,name){
  const ref=stable(origin);if(!ref)throw Error('输入照片没有可恢复的素材记录。');
@@ -854,7 +860,7 @@ async function signIn(){
 
 const deskMount=$('unified-ai');
 desk=createAiDesk({mount:deskMount,api,state:()=>({name:currentPhoto()?.name,hasPhoto:!!activeMedia,signedIn,busy:ui.exporting||!imageRuntimeReady,model:selectedModel(),validModel:picker.valid()}),
-  pin:pinVisible,pinDisplayed:pinVisible,showPicture:receivePicture,owns:ref=>currentPhoto()&&indexFor(currentPhoto(),ref)>=0,setClassic(){},login:signIn,modelElement:()=>modelGroup,
+  pin:pinVisible,pinDisplayed:pinVisible,showPicture:receivePicture,recordPicture:receivePicture,owns:ref=>currentPhoto()&&indexFor(currentPhoto(),ref)>=0,setClassic(){},login:signIn,modelElement:()=>modelGroup,
   savedRuns:()=>currentPhoto()?.runs,remember:(mode,id)=>{const p=currentPhoto();if(!p||p.metadataOnly||p.runs?.[mode]===id)return;p.runs||={};if(id)p.runs[mode]=id;else delete p.runs[mode];safeDraft(p);}});
 $('file').setAttribute('aria-label','导入照片');
 const initialPanel=new URLSearchParams(location.search).get('panel');if(Object.hasOwn(sections,initialPanel))ui.section=initialPanel;

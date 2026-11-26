@@ -10,7 +10,9 @@ const f=await deskFixture(),errors=[],out=path.resolve('.impeccable/review/ai-mo
 const browser=await chromium.launch({executablePath:await browserExecutable(),headless:true});
 const ctx=await browser.newContext({viewport:{width:1440,height:950},acceptDownloads:true});
 await ctx.addInitScript(()=>{
- const counts=window.uiProbe={decode:0,encode:0,posts:0};
+ const counts=window.uiProbe={decode:0,encode:0,posts:0,renders:0};
+ const post=Worker.prototype.postMessage;
+ Worker.prototype.postMessage=function(message,...rest){if(['preview','export'].includes(message?.kind))counts.renders++;return post.call(this,message,...rest);};
  const decode=HTMLImageElement.prototype.decode;HTMLImageElement.prototype.decode=function(...args){counts.decode++;return decode.apply(this,args);};
  const encode=HTMLCanvasElement.prototype.toBlob;HTMLCanvasElement.prototype.toBlob=function(...args){counts.encode++;return encode.apply(this,args);};
  const native=window.fetch;window.fetch=(url,init)=>{if(init?.method==='POST'&&String(url).includes('/ai-runs'))counts.posts++;return native(url,init);};
@@ -35,7 +37,7 @@ try{
  await page.locator('#desk-mode-semi').click();await selectTool('soft-glow','柔光');await selectTool('lighting','人物光影');
  await page.locator('#desk-mode-auto').click();await page.locator('#desk-auto-paint').check();const level=page.getByRole('spinbutton',{name:'厚涂程度 1–10'});await level.fill('');assert.ok(await page.locator('#desk-start').isDisabled());await level.fill('5');assert.ok(!await page.locator('#desk-start').isDisabled());await page.locator('#desk-auto-paint').uncheck();await page.locator('#desk-mode-semi').click();
  const after=await page.evaluate(()=>({...window.uiProbe,zoom:document.querySelector('#zoomLabel').value,url:location.href,same:window.stageIdentity===document.querySelector('#stage')}));
- assert.equal(after.same,true);for(const key of ['decode','encode','posts','zoom','url'])assert.equal(after[key],before[key],key);
+ assert.equal(after.same,true);for(const key of ['decode','encode','posts','renders','zoom','url'])assert.equal(after[key],before[key],key);
  assert.equal(f.bridge.images.length,0);assert.equal(f.bridge.reads.length,0);
  assert.match(await page.locator('.desk-sequence').textContent(),/柔光.*人物光影/);
  await page.getByRole('button',{name:'上移人物光影',exact:true}).click();assert.match(await page.locator('.desk-sequence').textContent(),/人物光影.*柔光/);
@@ -46,7 +48,14 @@ try{
  const draftsBefore=await read('/api/studio/canvas-drafts');assert.equal(draftsBefore.photos.length,1);await page.reload();await waitPic('stage1');assert.equal((await read('/api/studio/canvas-drafts')).photos.length,1);await page.waitForFunction(()=>!document.querySelector('#desk-start').disabled);assert.equal(f.bridge.images.length,1);
  await page.locator('#desk-start').click();await waitPic('deliver');assert.equal(f.bridge.images.length,2);assert.equal(f.bridge.images[1].op,'soft-glow');
  v=await read('/api/studio/ai-runs/'+runId);assert.ok(v.done);
+ await page.locator('[data-desk-step=stage1] button').click();
+ assert.ok(await page.locator('#desk-follow').isVisible());
+ await page.locator('#desk-follow').click();assert.equal(await page.locator('#desk-follow').count(),0);
  await page.locator('[data-section=color]').click();await page.locator('#contrast').evaluate(e=>{e.value='10';e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));});await page.waitForFunction(()=>document.querySelector('#ioState')?.textContent==='本机草稿');
+ const renderCount=await page.evaluate(()=>window.uiProbe.renders);
+ await page.locator('[data-section=ai]').click();await waitPic('deliver');
+ await page.locator('#desk-mode-auto').click();await page.locator('#desk-mode-semi').click();await waitPic('deliver');
+ await page.locator('[data-section=color]').click();assert.equal(await page.evaluate(()=>window.uiProbe.renders),renderCount);
  await page.locator('#undo').click();await page.waitForFunction(()=>document.querySelector('#contrast')?.value==='0');
  await page.locator('#export').click();const download=page.waitForEvent('download');await page.locator('#doExport').click();
  const actual=await sharp(await fs.readFile(await(await download).path())).raw().toBuffer();

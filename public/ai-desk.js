@@ -88,6 +88,7 @@ export function createAiDesk(host){
  let mode='auto',epoch=0,boundKey='',draft=deskDefaults(),runs={auto:null,semi:null},active=false,locked=false,scopePicker=null;
  let notice='',adopted=null,paintedKey='',timer=null,polling=false,shownState='',readyToRecover=null;
  let pendingPreparations={auto:null,semi:null};
+ let inspected={auto:null,semi:null};
  const models={plan:host.planningModel||null,image:host.generationModel||null};
  const modeButtons={};const chosen=()=>runs[mode];const stateAt=id=>draft.parameters[id]||(draft.parameters[id]={});
  function tell(s){notice=s;message.textContent=s;}
@@ -119,14 +120,24 @@ export function createAiDesk(host){
   const key=keyFor(pic);if(explicit||paintedKey!==key){host.showPicture(pic,chosen(),explicit);paintedKey=key;}
   adopted=pic;
  }
+ function newestPicture(run){
+  if(run.mode==='auto'&&!run.done){
+   const latest=run.agent?.steps.findLast(s=>s.status==='done'&&s.picture&&['clean','person','color','effects','deliver','repair','upscale'].includes(s.id));
+   if(latest)return latest.picture;
+  }
+  return run.result;
+ }
  function accept(run,force){
   runs[mode]=run;host.remember?.(mode,run.id);persist();if(!active)return;
   restorePointer(run);
   const nextKey=JSON.stringify([run.id,run.revision,run.queue,run.busy,run.message,run.agent?.steps.map(s=>s.status)]);
   if(force||shownState!==nextKey){
    shownState=nextKey;render();
-   if(run.result)picture(run.result);
-   if(run.mode==='auto'&&run.agent?.steps){const last=[...run.agent.steps].reverse().find(s=>s.status==='done'&&s.picture&&['clean','person','color','effects','deliver','repair','upscale'].includes(s.id));if(!run.done&&last)picture(last.picture);}
+   const latest=newestPicture(run);
+   if(latest){
+    if(inspected[mode]===run.id)host.recordPicture?.(latest,run);
+    else picture(latest);
+   }
   }
   armPoll();
  }
@@ -177,7 +188,7 @@ export function createAiDesk(host){
   if(p.effects)select('特效',[['sparkles','微光粒子'],['rim','暖色轮廓光'],['mist','薄雾'],['snow','飘雪'],['rain','雨丝'],['bokeh','光斑'],['petals','花瓣']],p.effect,v=>{p.effect=v;persist();},dataArea);
  }
  function catalog(){
-  dataArea.append(el('h3','勾选要做的功能'),el('p','按勾选顺序执行。每一步完成后，先看成片，再决定是否继续。'));
+  dataArea.append(el('h3','勾选要做的功能'),el('p','选好功能和顺序，每修完一步等你确认。'));
   const s=el('input');s.type='search';s.id='desk-search';s.value=draft.query||'';s.placeholder='找功能，如 灯架、扩图';s.setAttribute('aria-label','搜索已有修图功能');
   const list=el('div',undefined,'desk-list'),selected=el('ol',undefined,'desk-sequence'),settings=el('div');
   dataArea.append(s,list,selected,settings);
@@ -223,7 +234,7 @@ export function createAiDesk(host){
    const steps=run.agent?.steps||run.steps;const list=el('ol',undefined,'desk-progress');
    for(const s of steps){
     const li=el('li'),label=el('span',s.name,'step-label');li.dataset.deskStep=s.id;if(s.id===run.next||s.status==='running')li.setAttribute('aria-current','step');
-    li.append(label,el('small',s.skipped?'已跳过':statuses[s.status]||s.status));if(s.picture&&s.status==='done'){const b=button('查看',()=>{picture(s.picture,true);tell('正在查看：'+s.name);});b.setAttribute('aria-label','查看'+s.name);li.append(b);}
+    li.append(label,el('small',s.skipped?'已跳过':statuses[s.status]||s.status));if(s.picture&&s.status==='done'){const b=button('查看',()=>{inspected[mode]=run.id;picture(s.picture,true);tell('正在查看「'+s.name+'」');render();});b.setAttribute('aria-label','查看'+s.name);li.append(b);}
     if(s.child&&['error','interrupted'].includes(s.status)){const link=el('a','处理此步');link.href='/workflows/?id='+s.child;li.append(link);}
     list.append(li);
    }
@@ -239,11 +250,14 @@ export function createAiDesk(host){
    if(next?.type==='retouch'&&!run.busy&&!next.inputsFrozen&&run.current)other.append(button('跳过本项',()=>act(async guard=>{const v=await host.api('/api/studio/ai-runs/'+run.id+'/next',{decision:'skip',workflowId:run.workflowId,step:next.id,revision:run.revision});if(guard())accept(v,true);}),'','desk-skip'));
    if(run.busy)other.append(button('停止当前任务',()=>act(async guard=>{const v=await host.api('/api/studio/ai-runs/'+run.id+'/cancel',{workflowId:run.workflowId});if(guard())accept(v,true);}),'','desk-stop'));
    if(run.busy)other.append(button('本步后暂停',()=>act(async guard=>{const v=await host.api('/api/studio/ai-runs/'+run.id+'/pause',{});if(guard())accept(v,true);})));
+   if(inspected[mode]===run.id&&newestPicture(run))other.append(button('返回最新成片',()=>{
+    inspected[mode]=null;picture(newestPicture(run),'follow');tell('');render();
+   },'','desk-follow'));
    other.append(button('刷新状态',()=>poll()));
    const a=el('a','完整工作流');a.href='/workflows/?id='+run.workflowId;other.append(a);
    if(run.agent&&(run.queue==='paused'||run.queue==='error')){const g=el('a','检查蒙版或确认质量');g.href='/studio/?project='+run.id+'&photo='+run.photoId+'&agent='+run.agent.id;other.append(g);}
    if(!run.busy)other.append(button('另开一轮',()=>{
-    runs[mode]=null;readyToRecover&&delete readyToRecover[mode];pendingPreparations[mode]=null;host.remember?.(mode,null);restorePointer(null);adopted=adopted||run.result;shownState='';tell('新一轮将使用当前查看的图片。');persist();render();
+    inspected[mode]=null;runs[mode]=null;readyToRecover&&delete readyToRecover[mode];pendingPreparations[mode]=null;host.remember?.(mode,null);restorePointer(null);adopted=adopted||run.result;shownState='';tell('新一轮将使用当前查看的图片。');persist();render();
    }));
   }
   sync();
@@ -282,7 +296,7 @@ export function createAiDesk(host){
   catch(e){if(t===epoch)tell(e.message);}
  }
  function sourceChanged(ref,documentKey){
-  ++epoch;locked=false;stopTimer();runs={auto:null,semi:null};pendingPreparations={auto:null,semi:null};readyToRecover=null;draft=deskDefaults();boundKey=documentKey||keyFor(ref)||'';adopted=null;paintedKey='';notice='';shownState='';
+  ++epoch;locked=false;stopTimer();runs={auto:null,semi:null};pendingPreparations={auto:null,semi:null};inspected={auto:null,semi:null};readyToRecover=null;draft=deskDefaults();boundKey=documentKey||keyFor(ref)||'';adopted=null;paintedKey='';notice='';shownState='';
   try{const raw=boundKey&&JSON.parse(sessionStorage.getItem('houtu-desk:'+boundKey));if(raw){draft=raw.draft||draft;mode=names[raw.mode]?raw.mode:mode;readyToRecover=raw.ids;pendingPreparations=raw.pending||pendingPreparations;}}catch{}
   const saved=host.savedRuns?.();if(saved)readyToRecover={...readyToRecover,...saved};
   render();if(active&&boundKey)void loadSaved(mode);
