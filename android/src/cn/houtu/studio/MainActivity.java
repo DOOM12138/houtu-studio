@@ -140,7 +140,11 @@ public final class MainActivity extends Activity {
                 else if (value.equals(".txt") || value.equals(".cube")) value = "text/plain";
                 if (value.matches("[a-z0-9.+*-]+/[a-z0-9.+*-]+")) types.add(value);
               }
-            if (java.util.Arrays.toString(params.getAcceptTypes()).toLowerCase(java.util.Locale.ROOT).contains(".dng")) { types.clear(); types.add("*/*"); }
+            String accepts = java.util.Arrays.toString(params.getAcceptTypes()).toLowerCase(java.util.Locale.ROOT);
+            if (accepts.contains(".dng") || accepts.contains(".cube")) {
+              types.clear();
+              types.add("*/*");
+            }
             String type = types.size() == 1 ? types.iterator().next() : "*/*";
             pick.setType(type);
             if (types.size() > 1)

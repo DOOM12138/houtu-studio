@@ -1,6 +1,7 @@
 import {readRequestBytes} from './lib/request-body.mjs';
 import {MAX_IMAGE_UPLOAD_BYTES,IMAGE_JSON_BODY_BYTES,LAB_JSON_BODY_BYTES,IMAGE_UPLOAD_MESSAGE} from './public/upload-limits.js';
 import {ImageImports} from './backend/image-imports.mjs';
+import {MAX_CUBE_BYTES} from './backend/raw-vlog.mjs';
 import {superresModels} from './backend/super-resolution.mjs';
 import {SoftwareUpdates} from './backend/software-updates.mjs';
 import {MobileDownloads} from './backend/mobile-downloads.mjs';
@@ -453,6 +454,11 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       }
       if(route==='/api/image-imports'&&req.method==='POST'){const bytes=await readRequestBytes(req,MAX_IMAGE_UPLOAD_BYTES,IMAGE_UPLOAD_MESSAGE),name=String(url.searchParams.get('name')||'original.raw');return json(res,201,await imageImports.create(bytes,name));}
       const importView=/^\/api\/image-imports\/([a-f0-9-]{36})$/.exec(route);if(importView&&req.method==='GET')return json(res,200,await imageImports.view(importView[1]));
+      const logLut=/^\/api\/image-imports\/([a-f0-9-]{36})\/vlog-lut$/.exec(route);
+      if(logLut&&req.method==='POST'){
+        const bytes=await readRequestBytes(req,MAX_CUBE_BYTES,'LUT 最大支持 16 MB。');
+        return json(res,200,await imageImports.applyVLogLut(logLut[1],bytes,url.searchParams.get('name')||'',url.searchParams.get('fromAttempt')));
+      }
       const importMatch=/^\/api\/image-imports\/([a-f0-9-]{36})\/(develop|original)$/.exec(route);if(importMatch){if(importMatch[2]==='develop'&&req.method==='POST')return json(res,200,await imageImports.develop(importMatch[1],await body(req,4096)));if(importMatch[2]==='original'&&req.method==='GET'){const asset=await imageImports.original(importMatch[1]);res.writeHead(200,{'Content-Type':'application/octet-stream','Content-Length':asset.bytes,'Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(asset.name)}`});await pipeline(createReadStream(asset.file),res);return;}}
       if(route==='/api/workflows'&&req.method==='GET')return json(res,200,{workflows:await workflows.list({section:url.searchParams.get('section')||'',status:url.searchParams.get('status')||'',query:(url.searchParams.get('q')||'').slice(0,200)})});
       if(route==='/api/workflows'&&req.method==='POST'){const input=await body(req,4096);const w=await workflows.create({kind:['manual-portrait','layer-composite','single-canvas'].includes(input.kind)?input.kind:'color',name:input.name,parentId:input.parentId});if(input.sourceOrigin)await workspace.bindOrigin(w.id,input.sourceOrigin);return json(res,201,await workflows.get(w.id));}

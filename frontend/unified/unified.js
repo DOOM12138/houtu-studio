@@ -5,6 +5,7 @@ import {PRESETS} from '/catalog.js';
 import {registerWorkspaceEditor,saveWorkspaceImage,resetWorkspaceImage,trackWorkspaceInput} from '/workspace-continuation.js';
 import {WorkflowClient} from '/color/workflow-client.js';
 import {stepPicture} from '/workflow-pictures.js';
+import {IMAGE_ACCEPT,RAW_EXTENSIONS,extension} from '/image-formats.js';
 import {saveDraft,loadDrafts,loadDraft} from './drafts.js';
 const aiDirectory=PRESETS.map(tool=>({...tool,aliases:{'remove-equipment':'去灯架 去器材','remove-people':'去路人','clear-background':'净场'}[tool.id]||''}));
 'use strict';
@@ -76,10 +77,14 @@ function makePhoto(id,name,source) {
     ai:{ratio:'1:1',amount:3},rehearsal:null};
 }
 function freshEdits() {
-  return {base:null,global:{},local:{},mask:null,strokes:[],caption:{value:'',opacity:80,visible:true}};
+  return {base:null,rawProfile:null,lutName:'',global:{},local:{},mask:null,strokes:[],caption:{value:'',opacity:80,visible:true}};
 }
 function applyEdit(state, edit) {
   if(edit.type==='ai-image'){Object.assign(state,freshEdits(),{base:edit.origin});return state;}
+  if(edit.type==='raw-develop'){
+    state.base=edit.origin;state.rawProfile=edit.profile;state.lutName=edit.lutName||'';
+    return state;
+  }
   if(edit.type==='tone') Object.assign(state[edit.target],edit.values);
   if(edit.type==='replace-tone') state.global={...edit.values};
   if(edit.type==='mask'){state.mask=edit.rect;if(!edit.rect)state.local={};}
@@ -452,6 +457,7 @@ const toolIndex=[
   ['color','light','光线','曝光 提亮 压暗 阴影 对比度', 'exposure'],
   ['color','color','颜色','色温 冷暖 饱和度 自然饱和度','temperature'],
   ['color','looks','风格预设','暖调 胶片 电影 清透'],
+  ['color','raw','RAW 显影','V-Log Vlog 灰片 灰档 灰阶 LUT cube RAW'],
   ['color','mask','局部调色','蒙版 选区 框选 范围'],
   ['portrait','gray','中性灰','局部 加深 减淡 修肤 提亮 擦除'],
   ['portrait','frequency','高低频','高频 低频 毛孔 纹理 皮肤 匀色'],
@@ -549,7 +555,77 @@ function toneRange(parent,key,label,min,max,step){
     input:n=>{ui.draftStep={type:'tone',target,values:{[key]:n}};requestPixels();},
     change:n=>commit((target==='local'?'局部':'')+label+' '+format(n),{type:'tone',target,values:{[key]:n}})});
 }
+function rawProfileSection(photo){
+  if(photo?.origin.stepId!=='develop'||!RAW_EXTENSIONS.includes(extension(photo.name)))return;
+  accordion('raw','RAW 显影',box=>{
+    const state=visibleEdits();
+    if(state.base&&state.base.workflowId!==photo.origin.workflowId){
+      box.append(hint('在「步骤」中返回 RAW 显影版本，即可切换灰片或 LUT。'));
+      return;
+    }
+    const profile=state.rawProfile||'standard',busy=Boolean(photo.rawDeveloping);
+    const labels={standard:'标准 sRGB',vlog:'V-Log 灰片','vlog-lut':'V-Log LUT'};
+    const info=element('p',labels[profile]+(state.lutName?' · '+state.lutName:''),'hint');
+    info.id='rawWorkingProfile';info.setAttribute('role','status');box.append(info);
+    const lut=document.createElement('input');
+    lut.type='file';lut.id='rawLutFile';lut.accept='.cube';lut.hidden=true;
+    lut.onchange=()=>{const file=lut.files[0];lut.value='';if(file)void applyRawProfile(photo,'vlog-lut',file);};
+    const actions=element('div',undefined,'panel-actions');
+    for(const mode of ['standard','vlog']){
+      const control=action(labels[mode],()=>applyRawProfile(photo,mode),undefined,'raw-'+mode);
+      control.setAttribute('aria-pressed',String(profile===mode));control.disabled=busy||profile===mode;actions.append(control);
+    }
+    const load=action('导入 .cube LUT',()=>lut.click(),undefined,'raw-import-lut');
+    load.disabled=busy;actions.append(load);box.append(actions,lut);
+    box.append(hint(photo.rawError||(busy?'正在从 RAW 重新显影…':'选择 V-Log/V-Gamut → Rec.709 的 LUT。')));
+    const original=element('a','下载原始 RAW','small');
+    original.href='/api/image-imports/'+photo.origin.workflowId+'/original';
+    const links=element('div',undefined,'panel-actions'),history=element('a','显影记录与母版','small');
+    history.href='/workflows/?id='+photo.origin.workflowId+'&step=develop';
+    links.append(original,history);box.append(links);
+  });
+}
+async function applyRawProfile(photo,profile,file){
+  if(currentPhoto()!==photo||photo.rawDeveloping||ui.previewId!==null)return;
+  settleCanvasInput();finishPendingEdit();
+  const index=photo.cursor,source=editsAt(photo,index).base||photo.origin;
+  if(source.workflowId!==photo.origin.workflowId||source.stepId!=='develop')return;
+  photo.rawDeveloping=true;photo.rawError='';renderPanel();
+  try{
+    const route='/api/image-imports/'+source.workflowId;
+    let result;
+    if(file){
+      if(!/\.cube$/i.test(file.name)||file.size===0||file.size>16*1024*1024)throw Error('请选择 16 MB 以内的 .cube 3D LUT。');
+      if(!csrf)csrf=(await api('/api/health')).csrf;
+      const query=new URLSearchParams({name:file.name,fromAttempt:source.attemptId||''});
+      const response=await fetch(route+'/vlog-lut?'+query,{method:'POST',headers:{'X-Paint-CSRF':csrf,'Content-Type':'application/octet-stream'},body:file});
+      result=await response.json();
+      if(!response.ok)throw Error(result.error||'LUT 应用失败。');
+    }else if(profile==='standard'){
+      // The canvas already pins the first standard rendition.
+      result={source:photo.origin};
+    }else result=await api(route+'/develop',{profile,fromAttempt:source.attemptId});
+    const origin=stable(result.source);
+    if(!origin||origin.workflowId!==photo.origin.workflowId||origin.stepId!=='develop')throw Error('本次显影未返回可用的照片版本。');
+    if(photo.cursor!==index){
+      throw Error('当前编辑步骤已变化。显影结果已保存在工作流中，可回到原步骤后再应用。');
+    }
+    append(photo,profile==='standard'?'RAW · 标准 sRGB':profile==='vlog'?'RAW · V-Log 灰片':'RAW LUT · '+result.options.lutName,
+      {type:'raw-develop',origin,profile,...(profile==='vlog-lut'?{lutName:result.options.lutName}:{})});
+    if(currentPhoto()===photo){
+      refreshEdits();
+      announce(profile==='standard'?'已恢复标准显影，调色参数保留。':'已应用 RAW 显影，调色参数保留。');
+    }
+  }catch(e){
+    photo.rawError=e.message;
+    if(currentPhoto()===photo)announce(e.message);
+  }finally{
+    photo.rawDeveloping=false;
+    if(currentPhoto()===photo&&ui.section==='color')renderPanel();
+  }
+}
 function renderColor(){
+  rawProfileSection(currentPhoto());
   accordion('light','基础光线',box=>{
     toneRange(box,'exposure','曝光',-2,2,.05);toneRange(box,'contrast','对比度',-60,60,1);toneRange(box,'shadows','阴影',-80,80,1);
   });
@@ -721,10 +797,10 @@ function indexFor(photo,ref){
  if(refKey(photo.origin)===key)return 0;
  const pin=Object.entries(photo.pins||{}).find(([,r])=>refKey(r)===key);
  if(pin)return Number(pin[0]);
- return photo.nodes.findIndex(n=>n.action?.type==='ai-image'&&refKey(n.action.origin)===key);
+ return photo.nodes.findIndex(n=>['ai-image','raw-develop'].includes(n.action?.type)&&refKey(n.action.origin)===key);
 }
 function mediaFor(photo,state){
- if(!state.base)return obtainMedia(photo);
+ if(!state.base||state.base.assetId===photo.origin.assetId&&state.base.workflowId===photo.origin.workflowId)return obtainMedia(photo);
  const key=refKey(state.base);
  return obtainMedia({id:key,name:photo.name,source:assetPath(state.base)});
 }
@@ -803,14 +879,14 @@ function makeFromRef(origin,name){
 }
 async function readSource(file){
  if(file.size>100*1024*1024)throw Error('单图最高100 MB。');
- if(['image/jpeg','image/png','image/webp'].includes(file.type)){
+ if(!RAW_EXTENSIONS.includes(extension(file.name))&&['image/jpeg','image/png','image/webp'].includes(file.type)){
   const saved=await saveWorkspaceImage(file,file.name),w=await api('/api/workflows/'+saved.workflowId);
   return stepPicture(w,'source');
  }
  if(!csrf)csrf=(await api('/api/health')).csrf;
  const response=await fetch('/api/image-imports?name='+encodeURIComponent(file.name),{method:'POST',headers:{'X-Paint-CSRF':csrf,'Content-Type':'application/octet-stream'},body:file});
  const value=await response.json();if(!response.ok)throw Error(value.error||'此格式无法导入。');
- const w=await api('/api/workflows/'+value.workflowId);return stepPicture(w,'develop');
+ return value.source;
 }
 async function loginState(){
  try{const v=await api('/api/state');signedIn=!!v.account;imageRuntimeReady=v.imageRuntime?.ready!==false;}catch{signedIn=false;}
@@ -862,6 +938,7 @@ const deskMount=$('unified-ai');
 desk=createAiDesk({mount:deskMount,api,state:()=>({name:currentPhoto()?.name,hasPhoto:!!activeMedia,signedIn,busy:ui.exporting||!imageRuntimeReady,model:selectedModel(),validModel:picker.valid()}),
   pin:pinVisible,pinDisplayed:pinVisible,showPicture:receivePicture,recordPicture:receivePicture,owns:ref=>currentPhoto()&&indexFor(currentPhoto(),ref)>=0,setClassic(){},login:signIn,modelElement:()=>modelGroup,
   savedRuns:()=>currentPhoto()?.runs,remember:(mode,id)=>{const p=currentPhoto();if(!p||p.metadataOnly||p.runs?.[mode]===id)return;p.runs||={};if(id)p.runs[mode]=id;else delete p.runs[mode];safeDraft(p);}});
+$('file').accept=IMAGE_ACCEPT;
 $('file').setAttribute('aria-label','导入照片');
 const initialPanel=new URLSearchParams(location.search).get('panel');if(Object.hasOwn(sections,initialPanel))ui.section=initialPanel;
 await boot();

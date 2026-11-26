@@ -16,6 +16,10 @@ function action(a){
  if(!a||typeof a!=='object')throw error('编辑历史内容无效。');
  if(a.type==='stroke')return {type:a.type,stroke:manualOperations([a.stroke])[0]};
  if(a.type==='ai-image'){if(!uuid.test(a.run))throw error('AI 步骤缺少来源。');return {type:a.type,origin:ref(a.origin),run:a.run};}
+ if(a.type==='raw-develop'){
+  if(!['standard','vlog','vlog-lut'].includes(a.profile))throw error('RAW 显影模式无效。');
+  return {type:a.type,origin:ref(a.origin),profile:a.profile,...(a.profile==='vlog-lut'?{lutName:String(a.lutName||'').slice(0,120)}:{})};
+ }
  if(a.type==='caption'){
   const v=a.values||{},values={};
   if(v.value!==undefined){if(typeof v.value!=='string'||v.value.length>80)throw error('题字最多80字。');values.value=v.value;}
@@ -57,7 +61,8 @@ export class CanvasDrafts{
   const history=nodes.map((node,i)=>{if(i&&(!Number.isInteger(node.parent)||node.parent<0||node.parent>=i))throw error('草稿分支不连续。');return {label:String(node.label||'调整').slice(0,100),parent:node.parent,action:i?action(node.action):null};});
   const pins={};
   for(const [index,v]of Object.entries(input.pins||{})){if(!/^(0|[1-9]\d*)$/.test(index)||!history[index])throw error('快照步骤不存在。');pins[index]=ref(v);}
-  const refs=doc=>[doc.origin,...Object.values(doc.pins),...doc.nodes.filter(n=>n.action?.type==='ai-image').map(n=>n.action.origin)];
+  const refs=doc=>[doc.origin,...Object.values(doc.pins),...doc.nodes.filter(n=>['ai-image','raw-develop'].includes(n.action?.type)).map(n=>n.action.origin)];
+  if(history.some(node=>node.action?.type==='raw-develop'&&(origin.stepId!=='develop'||node.action.origin.stepId!=='develop'||node.action.origin.workflowId!==origin.workflowId)))throw error('RAW 显影版本须来自同一原片。');
   const known=new Set(current?refs(current).map(x=>JSON.stringify(x)):[]);
   for(const r of refs({origin,nodes:history,pins})){const k=JSON.stringify(r);if(!known.has(k)){await workflowImage(this.workflows,r);known.add(k);}}
   const redo={};for(const [a,b]of Object.entries(input.redo||{}))if(/^\d+$/.test(a)&&Number.isInteger(b)&&history[b]?.parent===Number(a))redo[a]=b;

@@ -5,6 +5,7 @@ import sharp from 'sharp';
 import {chromium} from 'playwright-core';
 import {browserExecutable} from '../backend/platform-browser.mjs';
 import {deskFixture} from './helpers/desk-fixture.mjs';
+import {rawFixture} from './helpers/raw-fixture.mjs';
 
 const f=await deskFixture(),errors=[],out=path.resolve('.impeccable/review/ai-modes');
 const browser=await chromium.launch({executablePath:await browserExecutable(),headless:true});
@@ -71,6 +72,40 @@ try{
  await page.goto(f.origin+'/ai/');await page.locator('#desk-mode-auto').waitFor();assert.equal(await page.locator('#desk-mode-auto').getAttribute('aria-selected'),'true');
  await page.locator('#desk-mode-semi').click();assert.ok(await page.locator('#desk-search').isVisible());await page.getByRole('button',{name:'单项精修工具',exact:true}).click();
  assert.ok(await page.locator('#operation-title').isVisible());
+ // A RAW profile changes the base without clearing previous non-destructive adjustments.
+ await page.goto(f.origin+'/workbench/?panel=color');
+ await page.locator('#file').setInputFiles({name:'V-Log 样片.dng',mimeType:'application/octet-stream',buffer:rawFixture()});
+ await page.waitForFunction(()=>document.querySelector('#docName')?.textContent==='V-Log 样片.dng'&&!document.querySelector('#export').disabled);
+ await page.locator('#exposure').evaluate(e=>{
+  e.value='.35';e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));
+ });
+ await page.locator('#group-raw summary').click();
+ await page.locator('#raw-vlog').click();
+ await page.waitForFunction(()=>document.querySelector('#rawWorkingProfile')?.textContent==='V-Log 灰片'&&document.querySelector('#ioState')?.textContent==='本机草稿');
+ const cube='LUT_3D_SIZE 2\n0 0 0\n0.5 0 0\n0 0.5 0\n0.5 0.5 0\n0 0 0.5\n0.5 0 0.5\n0 0.5 0.5\n0.5 0.5 0.5\n';
+ await page.locator('#rawLutFile').setInputFiles({name:'test.cube',mimeType:'application/octet-stream',buffer:Buffer.from(cube)});
+ await page.waitForFunction(()=>document.querySelector('#rawWorkingProfile')?.textContent.includes('test.cube'));
+ await page.locator('#undo').click();
+ assert.match(await page.locator('#rawWorkingProfile').textContent(),/V-Log 灰片/);
+ await page.locator('#redo').click();
+ assert.match(await page.locator('#rawWorkingProfile').textContent(),/test\.cube/);
+ const draftId=new URL(page.url()).searchParams.get('canvasPhoto');
+ for(let i=0;i<100;i++){
+  const doc=await read('/api/studio/canvas-drafts/'+draftId);
+  if(doc.nodes?.[doc.cursor]?.action?.profile==='vlog-lut')break;
+  if(i===99)throw Error('RAW profile history did not persist.');
+  await new Promise(r=>setTimeout(r,50));
+ }
+ await page.reload();await page.waitForFunction(()=>document.querySelector('#docName')?.textContent==='V-Log 样片.dng'&&document.querySelector('#ioState')?.textContent==='本机草稿');
+ assert.equal(await page.locator('#exposure').inputValue(),'0.35');
+ await page.setViewportSize({width:320,height:690});
+ await page.locator('#group-raw summary').click();
+ assert.ok(await page.locator('#raw-import-lut').isVisible());
+ assert.match(await page.locator('#rawWorkingProfile').textContent(),/test\.cube/);
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+ await page.locator('#raw-standard').click();
+ assert.equal(await page.locator('#rawWorkingProfile').textContent(),'标准 sRGB');
+ assert.equal(f.bridge.images.length,4);
  assert.deepEqual(errors,[]);console.log(JSON.stringify({pass:true,realGenerations:0,semiSingleStep:true,restoredNoResubmit:true,exactChainedSource:true,fullAuto:true,modeSwitchNoImageIO:true,sameCanvas:true,editAfterAi:true,display320:true,legacySingleTool:true}));
 }catch(e){console.error('URL',page.url(),'pageerrors',errors,'notice',await page.locator('.desk-notice').allTextContents(),'status',await page.locator('#ioState').allTextContents());await page.screenshot({path:path.join(out,'failure.png')});throw e;}
 finally{await ctx.close();await browser.close();await f.close();}

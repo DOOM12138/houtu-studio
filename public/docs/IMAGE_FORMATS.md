@@ -12,6 +12,12 @@
 
 原始文件上传上限 100 MB；传感器尺寸上限 1.6 亿像素。显影输出桌面最多 2400 万像素，Android 最多 1200 万像素；超出时默认尝试半尺寸，仍超出则提示停止。显影位图或母版超过存储尺寸限制时也会停止。较大的文件、特殊相机编码和手机内存限制可能导致解码失败，原始文件保留。
 
+### V-Log 灰片与 LUT
+
+在单画布工作台导入 RAW，打开「调色 → RAW 显影」。V-Log 灰片从保存的原片重新解码，在浮点阶段应用 V-Gamut 转换和松下 V-Log 曲线。灰片为低反差彩色照片。可切回标准 sRGB、撤销、对比原图并继续手动调色，显影记录保留 16 位 PNG 母版。画布与常规成片导出使用 8 位编辑位图。
+
+导入 LUT 时选 V-Log/V-Gamut 输入、Rec.709 输出的 3D `.cube` 文件，支持 2–65 格、最大 16 MB。松下 VariCam 库中的 E-E.CUBE 用于后期调色。LUT、原始 RAW 与显影版本都保存在本机，照片上原有的调色参数会继续应用。V-Log 转换以 LibRaw 的相机颜色矩阵为基础，实际色彩和亮度会随原始相机与拍摄曝光而变化。[松下曲线手册](https://pro-av.panasonic.net/en/cinema_camera_varicam_eva/support/pdf/VARICAM_V-Log_V-Gamut.pdf) · [松下 LUT 库](https://pro-av.panasonic.net/en/cinema_camera_varicam_eva/support/lut/index.html)
+
 ## 其他格式
 
 - JPG/PNG/WebP：直接导入。单图上传统一最高 100 MB；文件字节限制与AI账号额度、像素尺寸限制分别处理，已保存工作流可以通过本机来源引用交接。
