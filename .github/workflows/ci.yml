@@ -12,6 +12,7 @@ jobs:
           node-version: '25'
       - run: npm ci
       - run: npm run check
+      - run: node scripts/project-node.mjs scripts/schedule-checks/check.mjs --self-test
       - run: npm test
       - run: npm run test:studio-ui
       - run: npm run test:uploads-ui
