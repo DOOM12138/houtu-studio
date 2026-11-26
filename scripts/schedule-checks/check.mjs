@@ -6,6 +6,18 @@ import {execFileSync} from 'node:child_process';
 const repo='DOOM12138/houtu-studio',minimumRunId=45753504909;
 const sem=v=>/^v(\d+)\.(\d+)\.(\d+)$/.exec(v||'')?.slice(1).map(Number);
 const cmp=(a,b)=>{for(let i=0;i<3;i++)if(a[i]!==b[i])return a[i]-b[i];return 0;};
+function readGitHub(args,{run,deadline,now=Date.now,pause=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms)}){
+ for(let attempt=0;;attempt++){
+  const remaining=deadline-now();if(remaining<250)throw Error('GitHub precheck time budget exhausted');
+  try{return run(args,Math.min(12000,remaining));}
+  catch(error){
+   const detail=String(error.stderr||'')+' '+String(error.message||'');
+   const transient=error.code==='ETIMEDOUT'||/\bEOF\b|ECONNRESET|ETIMEDOUT|TLS handshake timeout|connection (?:was )?reset|connection timed out/i.test(detail);
+   if(!transient||attempt>=2)throw error;
+   const delay=Math.min(250*(attempt+1),deadline-now()-250);if(delay<=0)throw error;pause(delay);
+  }
+ }
+}
 const complete=r=>r&&!r.draft&&!r.prerelease&&['Windows-x64.zip','Windows-x64-Setup.exe','Android-arm64-v8a.apk','Android-x86_64.apk','SHA256.txt'].every(s=>r.assets?.some(a=>a.name==='houtu-studio-'+r.tag_name.slice(1)+'-'+s&&a.state==='uploaded'&&a.size>0&&/^sha256:[a-f0-9]{64}$/.test(a.digest||'')));
 function pendingReleases(runs,stable,releases,handled,known){
  const pending=[],byTag=new Map(releases.map(r=>[r.tag_name,r]));
@@ -36,12 +48,18 @@ if(process.argv.includes('--self-test')){
  assert.equal(pendingReleases([{...run,conclusion:'success'}],old,[],[],[])[0].reason,'incomplete-release');
  assert.equal(pendingReleases([{...run,conclusion:'success'}],good,[good],[],[])[0].reason,'new-stable-needs-verification');
  assert.equal(pendingReleases([{...run,conclusion:'success'}],good,[good],[],[tag]).length,0);
+ let retryClock=0,retryCalls=0;const retryOptions={deadline:3000,now:()=>retryClock,pause:ms=>retryClock+=ms,run:()=>{retryCalls++;if(retryCalls<3)throw Object.assign(Error('request failed'),{stderr:'unexpected EOF'});return 'ok';}};
+ assert.equal(readGitHub(['api','user'],retryOptions),'ok');assert.equal(retryCalls,3);
+ retryCalls=0;assert.throws(()=>readGitHub(['api','user'],{...retryOptions,run:()=>{retryCalls++;throw Object.assign(Error('request failed'),{stderr:'HTTP 401 Bad credentials'});}}),/request failed/);assert.equal(retryCalls,1);
+ retryCalls=0;assert.throws(()=>readGitHub(['api','user'],{...retryOptions,run:()=>{retryCalls++;throw Object.assign(Error('request failed'),{stderr:'EOF'});}}),/request failed/);assert.equal(retryCalls,3);
+ retryCalls=0;assert.throws(()=>readGitHub(['api','user'],{...retryOptions,deadline:retryClock+100,run:()=>retryCalls++}),/time budget/);assert.equal(retryCalls,0);
  console.log('PASS release precheck: failures, deduplication, superseded runs, cancellations, incomplete and new stable releases');process.exit(0);
 }
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..'),pkg=JSON.parse(await fs.readFile(path.join(root,'package.json'),'utf8'));
 if(pkg.name!=='anime-paint-studio'||!path.isAbsolute(root))throw Error('Unexpected project root');
 process.chdir(root);const directory=path.join(root,'tmp','release-followup');await fs.mkdir(directory,{recursive:true});
-const env={...process.env,TMP:path.join(root,'tmp'),TEMP:path.join(root,'tmp'),TMPDIR:path.join(root,'tmp'),GH_DEBUG:'',HTTPS_PROXY:process.env.HTTPS_PROXY||process.env.HTTP_PROXY||'http://127.0.0.1:7890'},gh=args=>execFileSync('gh',args,{cwd:root,env,windowsHide:true,encoding:'utf8',timeout:20000,maxBuffer:8*1024*1024});
+const env={...process.env,TMP:path.join(root,'tmp'),TEMP:path.join(root,'tmp'),TMPDIR:path.join(root,'tmp'),GH_DEBUG:'',HTTPS_PROXY:process.env.HTTPS_PROXY||process.env.HTTP_PROXY||'http://127.0.0.1:7890'};
+const deadline=Date.now()+50000,gh=args=>readGitHub(args,{deadline,run:(command,timeout)=>execFileSync('gh',command,{cwd:root,env,windowsHide:true,encoding:'utf8',timeout,maxBuffer:8*1024*1024})});
 if(JSON.parse(gh(['api','user'])).login!=='DOOM12138')throw Error('GitHub account differs from the authorised repository owner');
 const runs=JSON.parse(gh(['api','repos/'+repo+'/actions/workflows/release.yml/runs?per_page=30'])).workflow_runs,stable=JSON.parse(gh(['api','repos/'+repo+'/releases/latest'])),releases=gh(['api','--paginate','repos/'+repo+'/releases?per_page=100','--jq','.[] | {tag_name,draft,prerelease,assets:[.assets[]|{name,state,size,digest}]}']).trim().split(/\r?\n/).filter(Boolean).map(line=>JSON.parse(line));
 let handled={keys:[]};try{handled=JSON.parse(await fs.readFile(path.join(directory,'handled.json'),'utf8'));if(!Array.isArray(handled.keys))throw Error('Invalid handled receipt');}catch(e){if(e.code!=='ENOENT')throw e;}
