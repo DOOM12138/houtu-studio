@@ -3,13 +3,19 @@ import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 
+import { browserExecutable } from '../backend/platform-browser.mjs';
+import { deskFixture } from './helpers/desk-fixture.mjs';
+
 const out = path.resolve('.impeccable/review/v3');
-const site = process.env.TEST_SITE_URL || 'http://127.0.0.1:4317';
 await mkdir(out, { recursive: true });
 // Disposable headless test browser: the Cindy webview cannot capture full-page/mobile viewports.
 // This separate profile never signs in or accesses the user's regular browser profile.
-const browser = await chromium.launch({ executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true });
+const fixture = process.env.TEST_SITE_URL ? null : await deskFixture();
+let browser;
 try {
+  if (fixture) fixture.bridge.signed = false;
+  const site = process.env.TEST_SITE_URL || fixture.origin;
+  browser = await chromium.launch({ executablePath: await browserExecutable(), headless: true });
   for (const [name, width, height] of [['desktop',1440,1000],['mobile',390,844],['small-mobile',320,760]]) {
     const context = await browser.newContext({ viewport: { width, height }, colorScheme: 'light', reducedMotion: 'reduce' });
     const page = await context.newPage();
@@ -103,4 +109,6 @@ try {
     console.log(`${name}: prompt editing/templates/export, tools, scopes, selection, dark mode, and login guard passed; no overflow`);
     await context.close();
   }
-} finally { await browser.close(); }
+} finally {
+  try { await browser?.close(); } finally { await fixture?.close(); }
+}
