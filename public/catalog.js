@@ -1,7 +1,8 @@
 // Original task instructions, informed by public feature descriptions; not vendor prompts.
 import {EXTENDED_TOOLS} from './feature-expansion.js';
+import {PAINT_LEVEL_MAX} from './paint-profile.js';
 export const STYLES = [
-  { id: 'anime', painting: true, name: '二次元厚涂', description: '动漫感、柔和色块与自然笔触', instruction: '二次元数字厚涂风格，保持动漫角色辨识度，用干净的色块与柔和明暗塑造体积，弱化生硬线稿，笔触顺应形体，不转为写实油画或塑料3D。' },
+  { id: 'anime', painting: true, name: '二次元厚涂', description: '动漫造型、连贯明暗与干净轮廓', instruction: '二次元数字厚涂风格。以连贯中间调、核心阴影和环境反光表现体积，沿原结构收干净边缘，保留材质和动漫角色辨识度。' },
   { id: 'cos', painting: true, name: 'COS 质感厚涂', description: '可辨的二次元眼妆、面部体积与发束，保留真人摄影感', instruction: 'COS人像质感厚涂，保留原图真人身份、面部结构与摄影空间感，在妆容、眼睛、假发和服装上加入细腻的二次元厚涂处理；不要把真人完全变成平面卡通，也不要过度美颜。' },
   { id: 'natural', painting: false, name: '保留原画风（非厚涂）', description: '照片保留照片感，插画保留原有画风，不加厚涂', instruction: '非厚涂模式：保留原图既有媒介、真实程度、线条和画风，只修整本次选择的细节。不增加绘画笔触、厚涂色块或油画肌理，不将照片卡通化，不重绘已有插画风格。' },
   { id: 'photo', painting: false, name: '自然摄影精修（非厚涂）', description: '保留摄影光感和真实纹理，适合真人与 COS 照片', instruction: '非厚涂摄影精修：保持原照片的真人身份、镜头透视、真实肤质、发丝和织物纹理，克制整理瑕疵、妆面与光影，不增加绘画笔触或厚涂色块，不做卡通化、插画化或塑料磨皮。' },
@@ -49,19 +50,15 @@ export const PRESETS = [
 
 // Retouch intensity and painterly style intensity are independent controls.
 export const PAINT_LEVELS = [
-  {level:1,name:'微量润色',description:'几乎贴近原图，只轻微整理明暗交界。',instruction:'厚涂程度1/10：微量润色，几乎完全贴近原图；只在已选部位轻微柔化明暗交界，不形成明显笔触或大片重绘。'},
-  {level:2,name:'轻度厚涂',description:'细腻轻柔，只带少量厚涂感。',instruction:'厚涂程度2/10：轻度厚涂，保留大部分原有纹理与边缘，只用少量柔和色块整理局部体积，笔触尽量不显眼。'},
-  {level:3,name:'轻柔塑形',description:'柔和塑造体积，保留原有细节。',instruction:'厚涂程度3/10：轻柔厚涂，适度整合零碎明暗，以细腻短笔触表现局部体积，保留原有细节和主要线条。'},
-  {level:4,name:'柔和厚涂',description:'色块逐渐可见，边缘仍细腻。',instruction:'厚涂程度4/10：柔和厚涂，让小面积色块与形体转折清楚可见，轻度归纳纹理和线条，保持柔和、细腻的边缘。'},
-  {level:5,name:'适中厚涂',description:'色块与笔触均衡，厚涂感明确。',instruction:'厚涂程度5/10：适中厚涂，以中等面积色块统一人物明暗，笔触可辨且顺应形体，在原有细节与绘画概括之间保持均衡。'},
-  {level:6,name:'加强塑形',description:'体积更鲜明，笔触更容易辨认。',instruction:'厚涂程度6/10：加强厚涂塑形，适度合并次要纹理，增强中间调和体积转折，清楚呈现随形笔触，但保留五官与服饰关键细节。'},
-  {level:7,name:'清晰笔触',description:'绘画语言更强，边缘有虚实变化。',instruction:'厚涂程度7/10：较强厚涂，以明显但有序的随形笔触重组已选部位，归纳零碎细节，增强边缘虚实与色块层次，不改人物结构。'},
-  {level:8,name:'浓郁厚涂',description:'大色块塑形，保留身份与造型。',instruction:'厚涂程度8/10：浓郁厚涂，以较大色块塑造体积，明显概括原纹理，保留必要的精细五官、发型、服饰图案和身份特征。'},
-  {level:9,name:'强厚涂',description:'大幅强化笔触，画面更加概括。',instruction:'厚涂程度9/10：强厚涂，明显强化绘画笔触、色块重组和软硬边对比，大幅概括非关键纹理，仍严格保留人物身份、姿态和设计。'},
-  {level:10,name:'完整厚涂',description:'所选区域充分厚涂化，不改构图与身份。',instruction:'厚涂程度10/10：在本次允许修改的区域充分厚涂化，以完整统一的色块和笔触重构表面表现，绘画感最强；只改变表现语言，不改变身份、五官结构、姿态、服装设计或未选区域。'},
+ {level:1,name:'微量润色',description:'轻微过渡，贴近原图。',instruction:'厚涂程度1/10：只轻微整理局部明暗交界，保留原有边缘与细节。'},
+ {level:2,name:'轻度厚涂',description:'细腻轻柔，带少量体积。',instruction:'厚涂程度2/10：轻度厚涂，轻柔整理小范围明暗，保留大部分线条与原纹理。'},
+ {level:3,name:'轻柔塑形',description:'结构柔和，细节仍清楚。',instruction:'厚涂程度3/10：适度整合零碎明暗，按形体塑造面部转折，保留主要线条。'},
+ {level:4,name:'柔和厚涂',description:'深浅层次清楚，边缘细腻。',instruction:'厚涂程度4/10：增强中间调与局部阴影的层次，暗面保留反光，边缘按原结构收束。'},
+ {level:5,name:'细腻厚涂',description:'塑形更明确，材质清晰。',instruction:'厚涂程度5/10：统一选区受光，清楚区分肤质、发束与衣料，靠明暗转折形成厚涂体积。'},
+ {level:6,name:'深层厚涂',description:'体积更深，细节和边缘干净。',instruction:'厚涂程度6/10：用更深的中间调、核心阴影与环境反光塑造面部、发束和衣料体积。强化眼妆和原有材质的层次，保持关键五官、纹样、接缝和现场光向。'},
 ];
 export function normalizePaintLevel(value, strength = 'light') {
-  const level = value === undefined ? ({light:2,balanced:5,rich:8}[strength] ?? 2) : value;
+  const level = value === undefined ? ({light:2,balanced:5,rich:PAINT_LEVEL_MAX}[strength] ?? 2) : value;
   if (!Number.isInteger(level) || level < 1 || level > 10) throw new Error('厚涂程度需为1–10的整数。');
-  return level;
+  return Math.min(level,PAINT_LEVEL_MAX);
 }

@@ -13,12 +13,12 @@ export function createStudioPlanner({mount,api,context,notify,onApplied,onRecipe
  const tasks=node('fieldset');tasks.append(node('legend','本轮需要做什么'));const taskInputs=new Map();
  for(const [id,name]of PLANNING_TASKS){const box=node('input');box.type='checkbox';box.id='planner-task-'+id;box.checked=id==='portrait';taskInputs.set(id,box);const l=node('label',null,'studio-check');l.append(box,document.createTextNode(name));tasks.append(l);}
  const style=select('planner-style',[['natural','保留原画风'],['photo','自然摄影'],['anime','二次元厚涂'],['cos','COS质感厚涂']],'natural');
- const level=node('input');level.id='planner-paint-level';level.type='number';level.min='1';level.max='10';level.value='2';
+ const level=node('input');level.id='planner-paint-level';level.type='number';level.min='1';level.max='6';level.value='2';
  const tone=select('planner-tone',[['none','沿用原图影调'],['dark','暗调'],['bright','亮调'],['cinema','电影质感']],'none');
  const budget=select('planner-budget',[['1','最多1次AI跑图／张'],['2','最多2次AI跑图／张'],['3','最多3次AI跑图／张']],'2');
  const goal=node('textarea');goal.id='planner-goal';goal.maxLength=2000;goal.rows=3;goal.placeholder='例如：人物轻微细化、衣褶自然；保留原场景，冷暖关系参考本张功能参考池。';
  const modelMount=node('div');modelMount.id='planner-model';const analysisModel=createModelPicker({mount:modelMount,storageKey:'houtu-planning-model',labelText:'ChatGPT规划模型',noteText:'只用于读图、拆分步骤和编写提示词；规划阶段不生成图片。'});
- form.append(label('调度方式',provider),providerHint,tasks,label('成片风格',style),label('厚涂程度 1–10',level),label('影调取向',tone),label('AI步骤上限',budget),label('补充要求',goal),modelMount);
+ form.append(label('调度方式',provider),providerHint,tasks,label('成片风格',style),label('厚涂程度 1–6',level),label('影调取向',tone),label('AI步骤上限',budget),label('补充要求',goal),modelMount);
  const scope=node('p',null,'hint');scope.id='planner-scope';form.append(scope,node('p','ChatGPT规划与跑图使用已登录账号的可用额度。本机模式使用随包视觉模型和任务规则，不具备大语言模型的复杂审美推理。','hint'));
  const actions=node('div',null,'studio-actions');
  function action(id,text,fn,cls){const b=node('button',text,cls);b.type='button';b.id=id;b.onclick=()=>perform(fn);actions.append(b);return b;}

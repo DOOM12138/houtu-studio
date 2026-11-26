@@ -1,3 +1,4 @@
+import {PAINT_LEVEL_MAX} from './paint-profile.js';
 import {deskDefaults,deskGroups,deskTools,listOperation,moveOperation,stageOptions,missingInput,toolName} from './desk-controls.js';
 import {sceneOptions} from './scene-options.js';
 import {TARGET_POLICIES} from './target-policy.js';
@@ -58,7 +59,7 @@ function parameters(parent,id,p,onDirty){
  }
  const group=details('本步参数',parent);
  if(id==='smooth-belly'||['anime','cos'].includes(tool.style)||tool.extended)
-  numberField(group,'调整程度 1–10',1,10,p.level??2,v=>set('level',v));
+  numberField(group,['anime','cos'].includes(tool.style)?'厚涂程度 1–6':'调整程度 1–10',1,['anime','cos'].includes(tool.style)?PAINT_LEVEL_MAX:10,p.level??2,v=>set('level',v));
  if(tool.output==='outpaint'){
   numberField(group,'扩展比例 %',5,50,p.padding??20,v=>set('padding',v));
   select('扩展方向',[['all','四周'],['left','左侧'],['right','右侧'],['top','上方'],['bottom','下方']],p.direction||'all',v=>set('direction',v),group);
@@ -149,7 +150,7 @@ export function createAiDesk(host){
  function inputProblem(){
   if(mode==='auto'&&!chosen()){
    const p=draft.auto;
-   if(p.paint&&(!Number.isInteger(p.paintLevel)||p.paintLevel<1||p.paintLevel>10))return '厚涂程度需要 1–10 的整数。';
+   if(p.paint&&(!Number.isInteger(p.paintLevel)||p.paintLevel<1||p.paintLevel>PAINT_LEVEL_MAX))return '厚涂程度需要 1–6 的整数。';
    if(p.referenceProvider!=='none'){
     try{sceneGuideOptions({character:p.character?.trim(),work:p.work?.trim()});}
     catch(error){return error.message;}
@@ -161,7 +162,8 @@ export function createAiDesk(host){
   if(p.readError||p.maskError)return p.readError||p.maskError;
   if(currentStep()?.inputsFrozen)return '';
   if(op==='custom'&&!p.prompt?.trim())return '请填写自定义提示词。';
-  if(p.level!==undefined&&(!Number.isInteger(p.level)||p.level<1||p.level>10))return '程度需要 1–10 的整数。';
+  const max=['anime','cos'].includes(deskTools.get(op)?.style)?PAINT_LEVEL_MAX:10;
+  if(p.level!==undefined&&(!Number.isInteger(p.level)||p.level<1||p.level>max))return '程度需要 1–'+max+' 的整数。';
   if(p.padding!==undefined&&(!Number.isInteger(p.padding)||p.padding<5||p.padding>50))return '扩展比例需要 5–50 的整数。';
   return missingInput(op,p);
  }
@@ -243,7 +245,7 @@ export function createAiDesk(host){
   const p=draft.auto;
   referenceSettings(dataArea,p);
   check('加入厚涂',p.paint,v=>{p.paint=v;persist();render();},dataArea).id='desk-auto-paint';
-  if(p.paint)numberField(dataArea,'厚涂程度 1–10',1,10,p.paintLevel,v=>{p.paintLevel=v;persist();sync();});
+  if(p.paint)numberField(dataArea,'厚涂程度 1–6',1,PAINT_LEVEL_MAX,p.paintLevel,v=>{p.paintLevel=v;persist();sync();});
   check('加入小特效',p.effects,v=>{p.effects=v;persist();render();},dataArea).id='desk-auto-effects';
   if(p.effects)select('特效',[['sparkles','微光粒子'],['rim','暖色轮廓光'],['mist','薄雾'],['snow','飘雪'],['rain','雨丝'],['bokeh','光斑'],['petals','花瓣']],p.effect,v=>{p.effect=v;persist();},dataArea);
  }
@@ -359,6 +361,8 @@ export function createAiDesk(host){
  function sourceChanged(ref,documentKey){
   ++epoch;locked=false;stopTimer();runs={auto:null,semi:null};pendingPreparations={auto:null,semi:null};inspected={auto:null,semi:null};readyToRecover=null;draft=deskDefaults();boundKey=documentKey||keyFor(ref)||'';adopted=null;paintedKey='';notice='';shownState='';
   try{const raw=boundKey&&JSON.parse(sessionStorage.getItem('houtu-desk:'+boundKey));if(raw){if(raw.draft)draft={...draft,...raw.draft,auto:{...draft.auto,...raw.draft.auto}};mode=names[raw.mode]?raw.mode:mode;readyToRecover=raw.ids;pendingPreparations=raw.pending||pendingPreparations;}}catch{}
+  if(Number.isInteger(draft.auto.paintLevel)&&draft.auto.paintLevel>PAINT_LEVEL_MAX)draft.auto.paintLevel=PAINT_LEVEL_MAX;
+  for(const [id,p] of Object.entries(draft.parameters||{}))if(['anime','cos'].includes(deskTools.get(id)?.style)&&Number.isInteger(p.level)&&p.level>PAINT_LEVEL_MAX)p.level=PAINT_LEVEL_MAX;
   const saved=host.savedRuns?.();if(saved)readyToRecover={...readyToRecover,...saved};
   render();if(active&&boundKey)void loadSaved(mode);
  }

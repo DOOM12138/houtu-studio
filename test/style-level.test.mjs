@@ -4,10 +4,10 @@ import {paintingPrompt,normalizeEditOptions} from '../lib/painting.mjs';
 import {PAINT_LEVELS,normalizePaintLevel} from '../public/catalog.js';
 import {templateValue,importTemplates} from '../lib/templates.mjs';
 
-test('all ten painterly levels have distinct instructions, independent of retouch effort',()=>{
+test('all six painterly levels have distinct instructions, independent of retouch effort',()=>{
   for(const style of ['anime','cos']){
     const prompts=PAINT_LEVELS.map(({level})=>paintingPrompt({style,paintLevel:level,prompt:'保留身份。'}));
-    assert.equal(new Set(prompts).size,10);
+    assert.equal(new Set(prompts).size,6);
     prompts.forEach((prompt,i)=>assert.ok(prompt.includes('厚涂程度'+(i+1)+'/10')));
     for(const strength of ['light','balanced','rich']){
       const options=normalizeEditOptions({style,strength,paintLevel:4});
@@ -18,7 +18,7 @@ test('all ten painterly levels have distinct instructions, independent of retouc
   for(const value of [0,11,-1,2.5,'5',null,NaN,Infinity])assert.throws(()=>normalizeEditOptions({paintLevel:value}),/1–10/);
   assert.equal(normalizePaintLevel(undefined,'light'),2);
   assert.equal(normalizePaintLevel(undefined,'balanced'),5);
-  assert.equal(normalizePaintLevel(undefined,'rich'),8);
+  assert.equal(normalizePaintLevel(undefined,'rich'),6);
 });
 test('non-painting styles ignore saved painterly level and suppress painting-specific tool instructions',()=>{
   for(const style of ['natural','photo'])for(const operation of ['full-body','eyes','hair','makeup','anime-paint','cos-paint','portrait-polish']){
@@ -33,11 +33,13 @@ test('non-painting styles ignore saved painterly level and suppress painting-spe
 });
 test('template export and legacy import retain valid style levels without private input data',()=>{
   const current=templateValue({name:'9级COS',text:'保留衣服。',options:{style:'cos',strength:'light',paintLevel:9,image:'private'}});
-  assert.equal(current.options.paintLevel,9);
+  assert.equal(current.options.paintLevel,6);
   assert.equal(current.options.image,undefined);
   const imported=importTemplates({schemaVersion:1,templates:[current]});
-  assert.equal(imported[0].options.paintLevel,9);
+  assert.equal(imported[0].options.paintLevel,6);
   const old=templateValue({name:'旧模板',text:'整理细节。',options:{style:'natural',strength:'rich'}});
-  assert.equal(old.options.paintLevel,8);
+  assert.equal(old.options.paintLevel,6);
   assert.equal(old.options.style,'natural');
 });
+
+test('legacy high strengths use the deeper sixth level and retain clean edges',()=>{for(const style of ['cos','anime']){const top=paintingPrompt({style,paintLevel:6});assert.equal(paintingPrompt({style,paintLevel:10}),top);assert.match(top,/厚涂程度6\/10/);assert.match(top,/禁止涂鸦、乱线、粗糙刷痕/);}});

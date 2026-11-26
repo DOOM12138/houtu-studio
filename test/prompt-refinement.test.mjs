@@ -35,6 +35,11 @@ test('new Agent prompts are scoped to the node and legacy recipes retain their i
  assert.doesNotMatch(clothes,/人物细化只处理/);
  const paint=compileAgentPrompt(agentOptions({tasks:['paint'],paintLevel:6}),{id:'person',prompt:'处理面部妆感。'},[]);
  assert.match(paint,/厚涂程度6\/10/);
+ const oldHigh=agentOptions({version:AGENT_VERSION,tasks:['paint'],paintLevel:10});
+ assert.equal(oldHigh.paintLevel,6);
+ const resumed=compileAgentPrompt({...oldHigh,paintLevel:10},{id:'person',prompt:'加强眼妆和脸部体积。'},[]);
+ assert.match(resumed,/程度6\/10/);
+ assert.match(resumed,/禁止涂鸦、乱线、粗糙刷痕/);
  const cleanup=compileAgentPrompt(fresh,{id:'clean',prompt:'清理左侧画面边缘的灯架。'},[]);
  assert.match(cleanup,/原场地与发丝边缘/);
  assert.doesNotMatch(cleanup,/厚涂|原眼妆/);

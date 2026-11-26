@@ -1,3 +1,4 @@
+import {PAINT_LEVEL_MAX} from './paint-profile.js';
 import {normalizeModel} from './model-options.js';
 import {sceneGuideOptions} from './scene-guide.js';
 export const socialReferenceProvider = provider => ['xiaohongshu','douyin'].includes(provider);
@@ -19,7 +20,7 @@ export function agentOptions(input={}){
  const hardware={};if(input.hardwarePolicy!==undefined){if(!['auto','cloud','hybrid'].includes(input.hardwarePolicy)||!['auto','qwen3-vl:4b','qwen3-vl:8b'].includes(input.localAgentModel||'auto'))throw Error('硬件路由或本地视觉Agent选择无效。');hardware.hardwarePolicy=input.hardwarePolicy;hardware.localAgentModel=input.localAgentModel||'auto';}
  const promptRevision=input.promptRevision??(input.version===AGENT_VERSION?null:AGENT_PROMPT_REVISION);
  if(promptRevision!==null&&promptRevision!==AGENT_PROMPT_REVISION)throw Error('Agent提示词版本无效。');
- return {version:AGENT_VERSION,...(promptRevision?{promptRevision}:{}),mode,provider,...hardware,...(input.sceneGuide==null?{}:{sceneGuide:sceneGuideOptions(input.sceneGuide)}),tasks,style,paintLevel,bellyLevel,tone,effect,goal:String(input.goal||'').trim().slice(0,2000),planningModel:normalizeModel(input.planningModel),generationModel:normalizeModel(input.generationModel),autoSearch:input.autoSearch!==false,referenceProvider:['commons','xiaohongshu','douyin'].includes(input.referenceProvider)?input.referenceProvider:'commons',allowPublicFallback:input.allowPublicFallback!==false,materialFallback:input.materialFallback==='pause'?'pause':'original',referenceCount:Math.max(1,Math.min(5,Math.round(Number(input.referenceCount)||5))),quality,autoRepair:repair,maxImageSteps};
+ return {version:AGENT_VERSION,...(promptRevision?{promptRevision}:{}),mode,provider,...hardware,...(input.sceneGuide==null?{}:{sceneGuide:sceneGuideOptions(input.sceneGuide)}),tasks,style,paintLevel:Math.min(paintLevel,PAINT_LEVEL_MAX),bellyLevel,tone,effect,goal:String(input.goal||'').trim().slice(0,2000),planningModel:normalizeModel(input.planningModel),generationModel:normalizeModel(input.generationModel),autoSearch:input.autoSearch!==false,referenceProvider:['commons','xiaohongshu','douyin'].includes(input.referenceProvider)?input.referenceProvider:'commons',allowPublicFallback:input.allowPublicFallback!==false,materialFallback:input.materialFallback==='pause'?'pause':'original',referenceCount:Math.max(1,Math.min(5,Math.round(Number(input.referenceCount)||5))),quality,autoRepair:repair,maxImageSteps};
 }
 export function agentActions(config){
  const tasks=new Set(config.tasks),ids=[];if(tasks.has('clean'))ids.push('clean');if(PERSON_TASKS.some(id=>tasks.has(id)))ids.push('person');for(const id of ['belly','small','large','figure','color','effects','upscale'])if(tasks.has(id))ids.push(id);return ids;

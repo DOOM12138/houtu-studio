@@ -30,12 +30,12 @@ await page.waitForFunction(()=>document.querySelector('#prompt').value.length>0)
   assert.equal(await page.locator('#edit-style option').count(),4);
   assert.equal(await page.locator('#edit-style').inputValue(),'anime');
   await page.locator('#prompt-preview').evaluate(e=>{e.open=true;});
-  for(let n=1;n<=10;n++)await level(n);
+  for(let n=1;n<=6;n++)await level(n);
   await page.locator('#paint-level').focus();await page.keyboard.press('Home');
   await page.waitForFunction(()=>document.querySelector('#paint-value').textContent==='1 / 10');
-  await page.keyboard.press('End');await page.waitForFunction(()=>document.querySelector('#paint-value').textContent==='10 / 10');
-  await level(8);await page.locator('[name="strength"][value="rich"]').check();
-  assert.equal(await page.locator('#paint-level').inputValue(),'8');
+  await page.keyboard.press('End');await page.waitForFunction(()=>document.querySelector('#paint-value').textContent==='6 / 10');
+  await level(6);await page.locator('[name="strength"][value="rich"]').check();
+  assert.equal(await page.locator('#paint-level').inputValue(),'6');
   await page.waitForFunction(()=>document.querySelector('#compiled-prompt').textContent.includes('精修力度：细致'));
   for(const style of ['natural','photo']){
     await page.locator('#edit-style').selectOption(style);
@@ -53,17 +53,17 @@ await page.waitForFunction(()=>document.querySelector('#prompt').value.length>0)
   await page.getByRole('button',{name:'编辑提示词',exact:true}).click();await page.locator('#prompt-mode').selectOption('custom');
   assert.equal(await page.locator('#paint-field').isVisible(),false);assert.equal(await page.locator('#edit-style').isDisabled(),true);
   await page.locator('#prompt').fill('只整理原有饰品。');
-  await page.getByRole('button',{name:'编辑提示词',exact:true}).click();await page.locator('#prompt-mode').selectOption('guided');await page.locator('#edit-style').selectOption('cos');await level(9);
-  await page.getByRole('button',{name:'编辑提示词',exact:true}).click();await page.locator('#template-name').fill('UI厚涂9级');await page.locator('#save-template').click();
+  await page.getByRole('button',{name:'编辑提示词',exact:true}).click();await page.locator('#prompt-mode').selectOption('guided');await page.locator('#edit-style').selectOption('cos');await level(6);
+  await page.getByRole('button',{name:'编辑提示词',exact:true}).click();await page.locator('#template-name').fill('UI厚涂6级');await page.locator('#save-template').click();
   await page.waitForFunction(()=>document.querySelector('#template-feedback').textContent.includes('已保存为新模板'));
-  const saved=await(await fetch(origin+'/api/templates')).json();assert.equal(saved.templates.find(t=>t.name==='UI厚涂9级').options.paintLevel,9);
+  const saved=await(await fetch(origin+'/api/templates')).json();assert.equal(saved.templates.find(t=>t.name==='UI厚涂6级').options.paintLevel,6);
   await level(1);await page.locator('#edit-style').selectOption('photo');await page.locator('#apply-template').click();
-  assert.equal(await page.locator('#edit-style').inputValue(),'cos');assert.equal(await page.locator('#paint-level').inputValue(),'9');
+  assert.equal(await page.locator('#edit-style').inputValue(),'cos');assert.equal(await page.locator('#paint-level').inputValue(),'6');
   await page.locator('#file').setInputFiles({name:'style-test.png',mimeType:'image/png',buffer:picture});
   const request=page.waitForResponse(r=>r.url().endsWith('/api/jobs')&&r.request().method()==='POST');
-  await page.locator('#generate').click();const response=await request;assert.equal(response.status(),202);const job=await response.json();assert.equal(job.paintLevel,9);
-  await page.waitForSelector('#reuse-result:not([hidden])');assert.match(bridge.prompt,/厚涂程度9\/10/);
-  await page.goto(origin+'/?job='+job.id);await page.waitForFunction(()=>document.querySelector('#paint-level').value==='9');
+  await page.locator('#generate').click();const response=await request;assert.equal(response.status(),202);const job=await response.json();assert.equal(job.paintLevel,6);
+  await page.waitForSelector('#reuse-result:not([hidden])');assert.match(bridge.prompt,/厚涂程度6\/10/);
+  await page.goto(origin+'/ai/?job='+job.id);await page.waitForFunction(()=>document.querySelector('#paint-level').value==='6');
   assert.equal(await page.locator('#edit-style').inputValue(),'cos');
   // Hidden preset inputs must not follow a complete custom request.
   await page.locator('#task-references').setInputFiles({name:'visible-guide.png',mimeType:'image/png',buffer:picture});
@@ -77,7 +77,7 @@ await page.waitForFunction(()=>document.querySelector('#prompt').value.length>0)
   const customRequest=page.waitForRequest(r=>r.url().endsWith('/api/jobs')&&r.method()==='POST');await page.locator('#generate').click();
   const sent=(await customRequest).postDataJSON();assert.deepEqual(sent.references,[]);assert.equal('targetMask' in sent,false);
   await page.waitForSelector('#reuse-result:not([hidden])');assert.doesNotMatch(bridge.prompt,/效果参考只约束|当前为非厚涂任务|厚涂表现执行/);
-  await page.goto(origin+'/?job='+job.id);await page.waitForFunction(()=>document.querySelector('#paint-level').value==='9');
+  await page.goto(origin+'/ai/?job='+job.id);await page.waitForFunction(()=>document.querySelector('#paint-level').value==='6');
   for(const [width,theme] of [[1440,'light'],[390,'light'],[320,'dark']]){
     await page.setViewportSize({width,height:1000});await page.evaluate(t=>{document.documentElement.dataset.theme=t;},theme);
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
@@ -86,5 +86,5 @@ await page.waitForFunction(()=>document.querySelector('#prompt').value.length>0)
   await page.locator('#edit-style').selectOption('photo');
   await page.locator('.settings').screenshot({path:path.join(out,'320-nonpainting.png')});
   assert.deepEqual(errors,[]);
-  console.log('PASS style UI: all 10 levels, keyboard control, non-painting override, independent retouch effort, custom mode, template roundtrip, job restore, 320px/dark mode');
+  console.log('PASS style UI: all 6 levels, keyboard control, non-painting override, independent retouch effort, custom mode, template roundtrip, job restore, 320px/dark mode');
 }finally{await browser.close();await app.close();await rm(directory,{recursive:true,force:true});}

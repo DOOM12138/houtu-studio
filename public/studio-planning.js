@@ -1,3 +1,4 @@
+import {PAINT_LEVEL_MAX} from './paint-profile.js';
 import {normalizeModel} from './model-options.js';
 
 export const PLANNING_VERSION='studio-director-v1';
@@ -20,7 +21,7 @@ export function planningOptions(input={}){
  const paintLevel=Number(input.paintLevel??2),maxAiSteps=Number(input.maxAiSteps??2);
  if(!Number.isInteger(paintLevel)||paintLevel<1||paintLevel>10||![1,2,3].includes(maxAiSteps))throw Error('厚涂程度或AI步骤上限无效。');
  const tone=input.tone||'none';if(!['none','dark','bright','cinema'].includes(tone))throw Error('影调选择无效。');
- return {provider:input.provider,photoIds:[...input.photoIds],revision:input.revision,tasks,style,paintLevel,maxAiSteps,tone,goal:text(input.goal,2000),analysisModel:normalizeModel(input.analysisModel),generationModel:normalizeModel(input.generationModel)};
+ return {provider:input.provider,photoIds:[...input.photoIds],revision:input.revision,tasks,style,paintLevel:Math.min(paintLevel,PAINT_LEVEL_MAX),maxAiSteps,tone,goal:text(input.goal,2000),analysisModel:normalizeModel(input.analysisModel),generationModel:normalizeModel(input.generationModel)};
 }
 
 export function localObservation(value,source){
@@ -50,5 +51,5 @@ export function planningPrompt(options,photo,tools){
 用户任务：${JSON.stringify(options.tasks)}；补充要求：${options.goal||'轻微、自然、保持辨识度'}。风格${options.style}，厚涂程度${options.paintLevel}/10；影调${options.tone}。每张最多${options.maxAiSteps}个AI跑图步骤，总步骤不超过8。不要为每个部位分别跑图，尽量把同一目标合并到一次精修，避免多次重绘、偏色和拼贴边界。
 保留身份、发型、服装设计和取景；仅按明确选择的任务改动。没选belly不得瘦身；没选paint不得转画风。不可用隐藏身体部位臆造修改。场照净场保留主角与原场地，需保护蒙版并放在第一步；没有蒙版时方案需等待用户确认。颜色、尺寸和超分优先本机处理。所有AI提示词要具体、克制，保持全图光线、噪声、透视和材质连续。不得编造参考图或声称已经修好。
 可用AI工具：${JSON.stringify(tools)}。
-只返回一个JSON对象：{summary:中文理由,recipe:{name:中文名称,stages:[{type:retouch|grade|upscale|export,name:中文步骤名,options:{...}}]}}。retouch的options使用{operation:工具id,style:natural|photo|anime|cos,paintLevel:1..10,prompt:本步具体中文指令,task:{autoTarget:true,target:必要时描述部位},scene:{protectSubject:true}}；不生成坐标选区。grade使用{look:{id:dark-clean|bright-air|cinema-teal,amount:0..100}}，仅用户选color时安排；upscale使用{model:general-x4v3-dn50|animevideov3,longEdge:4096,amount:65,preserveColor:true}，仅选upscale且原图不足4K时安排。最后必须只有一个export，options:{format:png,quality:92}。不要返回model、路径、URL、代码、账号或收费方案。`;
+只返回一个JSON对象：{summary:中文理由,recipe:{name:中文名称,stages:[{type:retouch|grade|upscale|export,name:中文步骤名,options:{...}}]}}。retouch的options使用{operation:工具id,style:natural|photo|anime|cos,paintLevel:1..6,prompt:本步具体中文指令,task:{autoTarget:true,target:必要时描述部位},scene:{protectSubject:true}}；不生成坐标选区。grade使用{look:{id:dark-clean|bright-air|cinema-teal,amount:0..100}}，仅用户选color时安排；upscale使用{model:general-x4v3-dn50|animevideov3,longEdge:4096,amount:65,preserveColor:true}，仅选upscale且原图不足4K时安排。最后必须只有一个export，options:{format:png,quality:92}。不要返回model、路径、URL、代码、账号或收费方案。`;
 }
