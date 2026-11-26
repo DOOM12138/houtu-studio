@@ -1,13 +1,13 @@
 {
   "schema": "houtu-release-status",
   "version": 1,
-  "checkedAt": "2026-11-26T09:15:50.300Z",
+  "checkedAt": "2026-11-26T11:52:24.893Z",
   "repository": "DOOM12138/houtu-studio",
-  "latestVerified": "v1.35.0",
+  "latestVerified": "v1.36.0",
   "scope": "Release publication, available workflow attempts, artifact inventory and supplied checksum lists against GitHub asset digests. Historical binaries were not all reinstalled; real AI quality and ARM physical-device coverage remain separately recorded.",
   "counts": {
-    "applications": 33,
-    "published": 26,
+    "applications": 34,
+    "published": 27,
     "failedOrStopped": 7,
     "recovered": 3,
     "knownIssues": 4,
@@ -15,6 +15,50 @@
     "dependencyReleases": 1
   },
   "applications": [
+    {
+      "tag": "v1.36.0",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-26T11:50:53Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.36.0",
+      "assetCount": 5,
+      "assets": [
+        {
+          "name": "houtu-studio-1.36.0-Android-arm64-v8a.apk",
+          "bytes": 205620255,
+          "digest": "sha256:c216708f085ee99da70aa07b5fc2bf875c5a82701e9638418b96d1542244ee27"
+        },
+        {
+          "name": "houtu-studio-1.36.0-Android-x86_64.apk",
+          "bytes": 213230611,
+          "digest": "sha256:ca4520bedfa942af13066af4480f61f8fcc38c7f039a3321f0c75577a0f616a3"
+        },
+        {
+          "name": "houtu-studio-1.36.0-SHA256.txt",
+          "bytes": 423,
+          "digest": "sha256:46756b8e9e63037bfa38b381e4982419c0bb2f7d35f3eb1a11a603082357b932"
+        },
+        {
+          "name": "houtu-studio-1.36.0-Windows-x64-Setup.exe",
+          "bytes": 186416519,
+          "digest": "sha256:1725f49b27be0a3ae7c53191224732a027adf02a1f8ed784f066895760c69319"
+        },
+        {
+          "name": "houtu-studio-1.36.0-Windows-x64.zip",
+          "bytes": 268148423,
+          "digest": "sha256:a40ae06838fa0e58f094a5e12944d160ba21f87a8471eab1feac047563eb201f"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": {
+        "runId": 45811061807,
+        "latestAttempt": 1,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45811061807"
+      },
+      "note": "场景判断、虚构角色与公开资料核对、参考图视觉审核和自动修图；安卓独立预设与Windows安装已验证。实图盲测与实际模型出图验收分别记录。"
+    },
     {
       "tag": "v1.35.0",
       "status": "published",
