@@ -212,10 +212,11 @@ test('cancel interrupts the turn and releases the active generation', async t =>
   const { bridge, post, origin } = await setup(t);
   bridge.signedIn = true;
   const job = await (await post('/api/jobs', input)).json();
-  await post(`/api/jobs/${job.id}/cancel`);
-  await settle();
-  const result = await (await fetch(origin + `/api/jobs/${job.id}`)).json();
+  assert.equal((await post(`/api/jobs/${job.id}/cancel`)).status, 200);
+  const result = await waitJob(origin,job.id,'cancelled');
   assert.equal(result.status, 'cancelled');
+  const workflow=await (await fetch(origin+'/api/workflows/'+job.workflowId)).json();
+  assert.notEqual(workflow.steps.find(s=>s.id==='generate').status,'running');
   assert.equal((await post('/api/jobs', input)).status, 202);
 });
 
