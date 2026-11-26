@@ -36,7 +36,8 @@ export async function executeAgentStep(service,w,node,token,run,inputAsset){
     if(!attempted.some(p=>p.query===q.query&&p.purpose===q.purpose))attempted.push(q);await save();
     let pool=[],provider=config.referenceProvider;
     try{if(socialReferenceProvider(provider)&&q.purpose==='style'){
-      if(typeof service.platform.open!=='function')throw Error('此设备未配置独立平台浏览器。');await service.platform.open(provider);const found=await service.platform.search(q.query,provider);pool=(found.results||[]).slice(0,8);
+      if(typeof service.platform.search!=='function')throw Object.assign(Error('此设备未配置独立平台浏览器。'),{code:'PLATFORM_UNAVAILABLE'});
+      const found=await service.platform.search(q.query,provider);pool=(found.results||[]).slice(0,8);
      }else if(!strictSocialReferences(config)){provider='commons';pool=await service.search(q.query);}
     }catch(error){warnings.push(error.message);if(socialReferenceProvider(provider)&&config.allowPublicFallback){provider='commons';try{pool=await service.search(q.query);}catch(e){warnings.push(e.message);}}else if(socialReferenceProvider(provider)&&error?.code!=='PLATFORM_UNAVAILABLE')throw inputRequired('平台需要登录或验证，请完成后继续，或允许公开图库备用。');}
     for(const entry of pool.slice(0,8)){

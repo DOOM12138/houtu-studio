@@ -1,20 +1,39 @@
 {
   "schema": "houtu-release-status",
   "version": 1,
-  "checkedAt": "2026-11-26T15:51:04.491Z",
+  "checkedAt": "2026-11-26T16:12:05.549Z",
   "repository": "DOOM12138/houtu-studio",
   "latestVerified": "v1.38.2",
   "scope": "Release publication, available workflow attempts, artifact inventory and supplied checksum lists against GitHub asset digests. Historical binaries were not all reinstalled; real AI quality and ARM physical-device coverage remain separately recorded.",
   "counts": {
-    "applications": 38,
+    "applications": 39,
     "published": 31,
-    "failedOrStopped": 7,
+    "failedOrStopped": 8,
     "recovered": 4,
     "knownIssues": 4,
     "historicalSourceTags": 6,
     "dependencyReleases": 1
   },
   "applications": [
+    {
+      "tag": "v1.39.0",
+      "status": "stopped",
+      "label": "发布中止·已被替代",
+      "draft": true,
+      "publishedAt": null,
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.39.0",
+      "assetCount": 0,
+      "assets": [],
+      "checksum": "not-published",
+      "replacement": "v1.39.1",
+      "note": "传统照片项目验收卡在参考平台启动的模拟环境，已停止发布。新版修复自动查询与平台窗口打开的关系。",
+      "workflow": {
+        "runId": 45854982639,
+        "latestAttempt": 1,
+        "latestConclusion": "cancelled",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45854982639"
+      }
+    },
     {
       "tag": "v1.38.2",
       "status": "published",
