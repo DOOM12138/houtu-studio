@@ -1,13 +1,13 @@
 {
   "schema": "houtu-release-status",
   "version": 1,
-  "checkedAt": "2026-11-26T17:19:22.141Z",
+  "checkedAt": "2026-11-26T17:41:17.119Z",
   "repository": "DOOM12138/houtu-studio",
-  "latestVerified": "v1.39.1",
+  "latestVerified": "v1.40.2",
   "scope": "Release publication, available workflow attempts, artifact inventory and supplied checksum lists against GitHub asset digests. Historical binaries were not all reinstalled; real AI quality and ARM physical-device coverage remain separately recorded.",
   "counts": {
-    "applications": 42,
-    "published": 32,
+    "applications": 43,
+    "published": 33,
     "failedOrStopped": 10,
     "recovered": 4,
     "knownIssues": 4,
@@ -15,6 +15,50 @@
     "dependencyReleases": 1
   },
   "applications": [
+    {
+      "tag": "v1.40.2",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-26T17:39:49Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.40.2",
+      "assetCount": 5,
+      "assets": [
+        {
+          "name": "houtu-studio-1.40.2-Android-arm64-v8a.apk",
+          "bytes": 205689887,
+          "digest": "sha256:c766b382ace89e31511a3666d576108275ddb69bbfc210df014f0951b8d6eeba"
+        },
+        {
+          "name": "houtu-studio-1.40.2-Android-x86_64.apk",
+          "bytes": 213300243,
+          "digest": "sha256:04d84df48aeed1d49d9d8820ee779207c0d469ee37a67b1051d9b660db903a94"
+        },
+        {
+          "name": "houtu-studio-1.40.2-SHA256.txt",
+          "bytes": 423,
+          "digest": "sha256:6123351e707a9cf0d55fbc4959791626c01be4d185162bfd03b7cac83d8b010d"
+        },
+        {
+          "name": "houtu-studio-1.40.2-Windows-x64-Setup.exe",
+          "bytes": 186472701,
+          "digest": "sha256:9e75c711a03ab66aef9d05530826229b5c3229af11d081bf18b3739cc78002f9"
+        },
+        {
+          "name": "houtu-studio-1.40.2-Windows-x64.zip",
+          "bytes": 268233518,
+          "digest": "sha256:5f9abeffdefbb59991baec88ca366370da4091fadcc0021e00d2a412a1a1a99d"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": {
+        "runId": 45866917798,
+        "latestAttempt": 1,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45866917798"
+      },
+      "note": "应用只保留修图和设置两个主入口，已有工具在修图页内接续当前照片，账号、存储、更新和日志集中到设置。"
+    },
     {
       "tag": "v1.40.1",
       "status": "stopped",
