@@ -1,0 +1,1035 @@
+{
+  "schema": "houtu-release-status",
+  "version": 1,
+  "checkedAt": "2026-11-26T04:45:31.370Z",
+  "repository": "DOOM12138/houtu-studio",
+  "latestVerified": "v1.33.0",
+  "scope": "Release publication, available workflow attempts, artifact inventory and supplied checksum lists against GitHub asset digests. Historical binaries were not all reinstalled; real AI quality and ARM physical-device coverage remain separately recorded.",
+  "counts": {
+    "applications": 31,
+    "published": 24,
+    "failedOrStopped": 7,
+    "recovered": 3,
+    "knownIssues": 2,
+    "historicalSourceTags": 6,
+    "dependencyReleases": 1
+  },
+  "applications": [
+    {
+      "tag": "v1.33.0",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-26T04:29:49Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.33.0",
+      "assetCount": 5,
+      "assets": [
+        {
+          "name": "houtu-studio-1.33.0-Android-arm64-v8a.apk",
+          "bytes": 205554719,
+          "digest": "sha256:32516ec259f860010b7886fcfda39a8ee07faf9e0099645617064d1d2daa5445"
+        },
+        {
+          "name": "houtu-studio-1.33.0-Android-x86_64.apk",
+          "bytes": 213165075,
+          "digest": "sha256:cbcef0a1d01c1fe47c7f7ae7116d7ff818549cf55e2faad04d7da4136de90ed4"
+        },
+        {
+          "name": "houtu-studio-1.33.0-SHA256.txt",
+          "bytes": 423,
+          "digest": "sha256:5d27ed242ffaf97b4122ce301d6fb881ccc7e2ed4a98896992b2a5242d300280"
+        },
+        {
+          "name": "houtu-studio-1.33.0-Windows-x64-Setup.exe",
+          "bytes": 186337046,
+          "digest": "sha256:c59b01715e2f6d4c4b2166fd9acf35fe8504203751ae1c3c8ddbc2ce479f6313"
+        },
+        {
+          "name": "houtu-studio-1.33.0-Windows-x64.zip",
+          "bytes": 268067548,
+          "digest": "sha256:79242ae780771ce98f26e8dc4066778c8f44f02cd96c0ecbe6cd8c072ff9e968"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": {
+        "runId": 45753504909,
+        "latestAttempt": 1,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45753504909"
+      }
+    },
+    {
+      "tag": "v1.32.2",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-26T02:11:44Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.32.2",
+      "assetCount": 5,
+      "assets": [
+        {
+          "name": "houtu-studio-1.32.2-Android-arm64-v8a.apk",
+          "bytes": 205530143,
+          "digest": "sha256:3c9456d8355cdb250cc4537cea319094653210e8797cf79b3d82fed18365d69c"
+        },
+        {
+          "name": "houtu-studio-1.32.2-Android-x86_64.apk",
+          "bytes": 213140499,
+          "digest": "sha256:05d51f0fe4e229200181c9b7a6ac31d98743d7d69941699df4fadc4787f1d798"
+        },
+        {
+          "name": "houtu-studio-1.32.2-SHA256.txt",
+          "bytes": 423,
+          "digest": "sha256:7e66146554410ffadb4ec5cfd4ac073ca48983b221101f79766e66d2e051d1e9"
+        },
+        {
+          "name": "houtu-studio-1.32.2-Windows-x64-Setup.exe",
+          "bytes": 186335543,
+          "digest": "sha256:c3588137a5f940392ff81c4a9a89039e9f6dbcd8d4201d1fe43d0375e0e75047"
+        },
+        {
+          "name": "houtu-studio-1.32.2-Windows-x64.zip",
+          "bytes": 268035323,
+          "digest": "sha256:3f419a568e3a040044a6c879478fa547d33c113b588a671dd85ff635fcd26abc"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": {
+        "runId": 45738695633,
+        "latestAttempt": 1,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45738695633"
+      }
+    },
+    {
+      "tag": "v1.32.1",
+      "status": "stopped",
+      "label": "发布中止·已被替代",
+      "draft": true,
+      "publishedAt": null,
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.32.1",
+      "assetCount": 0,
+      "assets": [],
+      "checksum": "not-published",
+      "replacement": "v1.32.2",
+      "note": "功能测试已PASS，常驻测试驱动收尾未退出，后续修复。",
+      "workflow": {
+        "runId": 45735671520,
+        "latestAttempt": 1,
+        "latestConclusion": "cancelled",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45735671520"
+      }
+    },
+    {
+      "tag": "v1.32.0",
+      "status": "stopped",
+      "label": "发布失败·已中止",
+      "draft": true,
+      "publishedAt": null,
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.32.0",
+      "assetCount": 0,
+      "assets": [],
+      "checksum": "not-published",
+      "replacement": "v1.32.2",
+      "note": "模拟器宿主缺少Playwright安卓触控驱动，已补齐。",
+      "workflow": {
+        "runId": 45734215845,
+        "latestAttempt": 1,
+        "latestConclusion": "failure",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45734215845"
+      }
+    },
+    {
+      "tag": "v1.31.0",
+      "status": "recovered",
+      "label": "重试后已恢复",
+      "draft": false,
+      "publishedAt": "2026-11-25T23:55:18Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.31.0",
+      "assetCount": 5,
+      "assets": [
+        {
+          "name": "houtu-studio-1.31.0-Android-arm64-v8a.apk",
+          "bytes": 205513759,
+          "digest": "sha256:070b8fe0834c1aa53636b06a3d0586cb87a4681b16f3005809b901f24ad7c0d0"
+        },
+        {
+          "name": "houtu-studio-1.31.0-Android-x86_64.apk",
+          "bytes": 213128211,
+          "digest": "sha256:a9e5e91ffe8d1a9de6f7bd11fc320254683e111af3a160e6cbc580c88020a1df"
+        },
+        {
+          "name": "houtu-studio-1.31.0-SHA256.txt",
+          "bytes": 423,
+          "digest": "sha256:c6757b2b0d28bf2f869b56a1b58d9486489f99aff98282c1babdb22591b30e5b"
+        },
+        {
+          "name": "houtu-studio-1.31.0-Windows-x64-Setup.exe",
+          "bytes": 186334679,
+          "digest": "sha256:65b8670e02725b4eaefc9d38f0c5d880a13e5c4287791c741e9b2f6542479f43"
+        },
+        {
+          "name": "houtu-studio-1.31.0-Windows-x64.zip",
+          "bytes": 268021148,
+          "digest": "sha256:d00ccde891994ac46267d7838d41f958762d3ab68896011815902cd6f9a4ab56"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "replacement": "v1.31.0",
+      "note": "NuGet下载可选CUDA组件网络失败，重跑成功；测试宿主安装已加固。",
+      "workflow": {
+        "runId": 45722872866,
+        "latestAttempt": 2,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45722872866"
+      }
+    },
+    {
+      "tag": "v1.30.0",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-25T23:02:40Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.30.0",
+      "assetCount": 5,
+      "assets": [
+        {
+          "name": "houtu-studio-1.30.0-Android-arm64-v8a.apk",
+          "bytes": 205505567,
+          "digest": "sha256:f128e943cdac7ac14b9741d18c0c1c249315e39e666e015aff78aaca5b0d9e9b"
+        },
+        {
+          "name": "houtu-studio-1.30.0-Android-x86_64.apk",
+          "bytes": 213115923,
+          "digest": "sha256:2f9def282f964dd50d0cdc2c8c8575aae6ddcb5393e5b6f11f04f9587e0b1fa5"
+        },
+        {
+          "name": "houtu-studio-1.30.0-SHA256.txt",
+          "bytes": 423,
+          "digest": "sha256:9b61bc1fef071f942d1b7c29ee291c8725322a3fc4be67fa355d5b7045105668"
+        },
+        {
+          "name": "houtu-studio-1.30.0-Windows-x64-Setup.exe",
+          "bytes": 186316133,
+          "digest": "sha256:0a6dd25184dffeb0a01015ecdbe126e571d34fc62bf9f9cda54f3d364cdfa9a5"
+        },
+        {
+          "name": "houtu-studio-1.30.0-Windows-x64.zip",
+          "bytes": 268002802,
+          "digest": "sha256:63c07df7b0730ef919f7727dc805d6853540761a77fe459fe87997eadb92d3f6"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": {
+        "runId": 45715953559,
+        "latestAttempt": 1,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45715953559"
+      }
+    },
+    {
+      "tag": "v1.29.2",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-25T21:03:27Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.29.2",
+      "assetCount": 5,
+      "assets": [
+        {
+          "name": "houtu-studio-1.29.2-Android-arm64-v8a.apk",
+          "bytes": 205480991,
+          "digest": "sha256:1f3a851839e9925e07fc88fb65bac948c5cfc118a498d7e644de0c2d85cc2a78"
+        },
+        {
+          "name": "houtu-studio-1.29.2-Android-x86_64.apk",
+          "bytes": 213091347,
+          "digest": "sha256:9daf48ebdadd2b751c0a145eefb1a6e5fb0ee579f9b73faee317d4146c96e407"
+        },
+        {
+          "name": "houtu-studio-1.29.2-SHA256.txt",
+          "bytes": 423,
+          "digest": "sha256:178fa66a045343fbc07ae00cfc3b6bc4843677a25a835f92f9896fd9a319262f"
+        },
+        {
+          "name": "houtu-studio-1.29.2-Windows-x64-Setup.exe",
+          "bytes": 186323290,
+          "digest": "sha256:60d8db5539748f47b390ff8ce5cd424fbbe0df5d6b47ab0e1e082d5ff02beab6"
+        },
+        {
+          "name": "houtu-studio-1.29.2-Windows-x64.zip",
+          "bytes": 267973069,
+          "digest": "sha256:fef241a62c7b747a0912e334d5586082e8587729a8c942955910c51e21a9267e"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": {
+        "runId": 45697966031,
+        "latestAttempt": 1,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45697966031"
+      }
+    },
+    {
+      "tag": "v1.29.1",
+      "status": "stopped",
+      "label": "发布失败·已中止",
+      "draft": true,
+      "publishedAt": null,
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.29.1",
+      "assetCount": 0,
+      "assets": [],
+      "checksum": "not-published",
+      "replacement": "v1.29.2",
+      "note": "WebView重连异常、画面渲染等待与队列时序失败；后续版本修复交付。",
+      "workflow": {
+        "runId": 45693770781,
+        "latestAttempt": 3,
+        "latestConclusion": "cancelled",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45693770781"
+      }
+    },
+    {
+      "tag": "v1.29.0",
+      "status": "stopped",
+      "label": "发布失败·已中止",
+      "draft": true,
+      "publishedAt": null,
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.29.0",
+      "assetCount": 0,
+      "assets": [],
+      "checksum": "not-published",
+      "replacement": "v1.29.2",
+      "note": "Android沙箱拒绝硬链接，素材复用改用独占复制。",
+      "workflow": {
+        "runId": 45689881021,
+        "latestAttempt": 1,
+        "latestConclusion": "failure",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45689881021"
+      }
+    },
+    {
+      "tag": "v1.28.0",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-25T17:25:15Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.28.0",
+      "assetCount": 5,
+      "assets": [
+        {
+          "name": "houtu-studio-1.28.0-Android-arm64-v8a.apk",
+          "bytes": 205165599,
+          "digest": "sha256:71b2dc288a66ad9cb9485bd875b2a2b31277347910836397fe0e1918cb1da4d4"
+        },
+        {
+          "name": "houtu-studio-1.28.0-Android-x86_64.apk",
+          "bytes": 212780051,
+          "digest": "sha256:12e7aadc58ec4d9def4fde67bcb64f0c063dac1dbdc4e9a702a5936810679fd5"
+        },
+        {
+          "name": "houtu-studio-1.28.0-SHA256.txt",
+          "bytes": 423,
+          "digest": "sha256:ef341afbb010331bb2534f12f93c02c81f1d5fe03104e7f526b12845f21790e6"
+        },
+        {
+          "name": "houtu-studio-1.28.0-Windows-x64-Setup.exe",
+          "bytes": 186150411,
+          "digest": "sha256:5610ef670b93d859315a4bd25a1fe111cdd7fc1bc8af7d1f0a12c1724bad176b"
+        },
+        {
+          "name": "houtu-studio-1.28.0-Windows-x64.zip",
+          "bytes": 267652242,
+          "digest": "sha256:54fbaed5231f59a4f0e580d2587e1fb0bc0bf55973ec76b795a18963d0646e0c"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": {
+        "runId": 45661346769,
+        "latestAttempt": 1,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45661346769"
+      }
+    },
+    {
+      "tag": "v1.27.0",
+      "status": "recovered",
+      "label": "发布已恢复",
+      "draft": false,
+      "publishedAt": "2026-11-25T16:24:13Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.27.0",
+      "assetCount": 5,
+      "assets": [
+        {
+          "name": "houtu-studio-1.27.0-Android-arm64-v8a.apk",
+          "bytes": 205157407,
+          "digest": "sha256:bfce130938911ba495a0502145a592b8788653241213e414c1ef9d04bfb877f1"
+        },
+        {
+          "name": "houtu-studio-1.27.0-Android-x86_64.apk",
+          "bytes": 212767763,
+          "digest": "sha256:c8a384330b95e19b54977d1fa40775e8125f1920cf2401a01f76e394e770f78b"
+        },
+        {
+          "name": "houtu-studio-1.27.0-SHA256.txt",
+          "bytes": 423,
+          "digest": "sha256:381fc4248852adb5e7e9f27659152a98e54d6232ebacbab46599f52335829fba"
+        },
+        {
+          "name": "houtu-studio-1.27.0-Windows-x64-Setup.exe",
+          "bytes": 186015363,
+          "digest": "sha256:73e76b6a553f4bfd0e7b345684e86d1d76f1300f63bc4b3dcb86df2086b3d0cf"
+        },
+        {
+          "name": "houtu-studio-1.27.0-Windows-x64.zip",
+          "bytes": 267636512,
+          "digest": "sha256:ffd6a9da958cf39d8dbff26b2fbd1a53c63797a1459d7f64575149d91d335cff"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "replacement": "v1.27.0",
+      "note": "GitHub创建Release返回HTTP500，随后同提交本机恢复发布并验证。",
+      "workflow": {
+        "runId": 45645379331,
+        "latestAttempt": 2,
+        "latestConclusion": "cancelled",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45645379331"
+      }
+    },
+    {
+      "tag": "v1.26.1",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-25T14:17:12Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.26.1",
+      "assetCount": 5,
+      "assets": [
+        {
+          "name": "houtu-studio-1.26.1-Android-arm64-v8a.apk",
+          "bytes": 205141023,
+          "digest": "sha256:517c3b4e097460c1cbe42d3046d6d955d4a49c4dddb44de75c49602a8e8e87fc"
+        },
+        {
+          "name": "houtu-studio-1.26.1-Android-x86_64.apk",
+          "bytes": 212751379,
+          "digest": "sha256:7f98cd70c8f09135a133694b6e146081441a49d0be8b4155eb038bdb0d5bc6a0"
+        },
+        {
+          "name": "houtu-studio-1.26.1-SHA256.txt",
+          "bytes": 423,
+          "digest": "sha256:59f563261bcc5d574070681fdf1deb24ec23ae5e56ecd0b5d3f6eefc342263d6"
+        },
+        {
+          "name": "houtu-studio-1.26.1-Windows-x64-Setup.exe",
+          "bytes": 186006426,
+          "digest": "sha256:4b4cc1a8590cc10025482820b76c4a1ad3cacadee662ed88dfdfee9333fa6761"
+        },
+        {
+          "name": "houtu-studio-1.26.1-Windows-x64.zip",
+          "bytes": 267619325,
+          "digest": "sha256:10e96fe26adb5e5f35852636eb73cc4219be9ee913e4d71741b545cccd67fde9"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": {
+        "runId": 45629135942,
+        "latestAttempt": 1,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45629135942"
+      }
+    },
+    {
+      "tag": "v1.26.0",
+      "status": "recovered",
+      "label": "中断后已恢复",
+      "draft": false,
+      "publishedAt": "2026-11-25T13:28:22Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.26.0",
+      "assetCount": 5,
+      "assets": [
+        {
+          "name": "houtu-studio-1.26.0-Android-arm64-v8a.apk",
+          "bytes": 205136927,
+          "digest": "sha256:7bfab99ea398f442f8bab18a7de12fb513673b25fdc504abfcef171f1faa284b"
+        },
+        {
+          "name": "houtu-studio-1.26.0-Android-x86_64.apk",
+          "bytes": 212747283,
+          "digest": "sha256:76f4fd6eb7a3a79b0388e8d93b86aa538653c7854340f2ffe17afbec1c1d60b9"
+        },
+        {
+          "name": "houtu-studio-1.26.0-SHA256.txt",
+          "bytes": 423,
+          "digest": "sha256:99e84506c9c28f0a4a012e315c23bbb036dfd83793780f09d2217fb3b414e443"
+        },
+        {
+          "name": "houtu-studio-1.26.0-Windows-x64-Setup.exe",
+          "bytes": 186006543,
+          "digest": "sha256:c7852396e240bb19ff40ae2622e73a935d28416a75fd30ca28b928ab55b878f1"
+        },
+        {
+          "name": "houtu-studio-1.26.0-Windows-x64.zip",
+          "bytes": 267616896,
+          "digest": "sha256:71c034d30cb5b83c095a6d929f3f557ab08a1a692a16863c4de9fa481d807893"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "replacement": "v1.26.0",
+      "note": "首次取消，第二次成功；现有附件和校验清单完整。",
+      "workflow": {
+        "runId": 45618762939,
+        "latestAttempt": 2,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45618762939"
+      }
+    },
+    {
+      "tag": "v1.25.0",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-25T12:21:50Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.25.0",
+      "assetCount": 5,
+      "assets": [
+        {
+          "name": "houtu-studio-1.25.0-Android-arm64-v8a.apk",
+          "bytes": 205132831,
+          "digest": "sha256:c745426a6186227e75d3563c33a2d7ebba56f1d5766acb6706620ef590723f55"
+        },
+        {
+          "name": "houtu-studio-1.25.0-Android-x86_64.apk",
+          "bytes": 212743187,
+          "digest": "sha256:c44e144e0a71c66bfb20d5002b73c76143e32193ddfaf9f590e548d99476d4ab"
+        },
+        {
+          "name": "houtu-studio-1.25.0-SHA256.txt",
+          "bytes": 423,
+          "digest": "sha256:7247247d215a05cb6c1b50ef8bc1a83d55b8b099eceddd9687873e90d1cfb2a2"
+        },
+        {
+          "name": "houtu-studio-1.25.0-Windows-x64-Setup.exe",
+          "bytes": 186003577,
+          "digest": "sha256:c36e1f5444c8ffbf539bcc8dcf0f84a892657069c8b7e304a10764a0a28200ec"
+        },
+        {
+          "name": "houtu-studio-1.25.0-Windows-x64.zip",
+          "bytes": 267608179,
+          "digest": "sha256:44e8306bd25cbfa48aab05c0f5272078848ec96a918341e98174c26faf1f7c8a"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": {
+        "runId": 45610443479,
+        "latestAttempt": 1,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45610443479"
+      }
+    },
+    {
+      "tag": "v1.24.1",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-25T11:36:34Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.24.1",
+      "assetCount": 5,
+      "assets": [
+        {
+          "name": "houtu-studio-1.24.1-Android-arm64-v8a.apk",
+          "bytes": 205128735,
+          "digest": "sha256:332f85bdc9c62170fdfe9d392c33f27484e21e9880c6e5de236ba45a7df79c97"
+        },
+        {
+          "name": "houtu-studio-1.24.1-Android-x86_64.apk",
+          "bytes": 212739091,
+          "digest": "sha256:393fbd6213f363aea3b1b8c837ffed7e56bf81433a358d03619905ed0a450b21"
+        },
+        {
+          "name": "houtu-studio-1.24.1-SHA256.txt",
+          "bytes": 423,
+          "digest": "sha256:b19758f644d6e4d4f21b7ecef2f02428caffdc1174732e84638b08e03ae98f5f"
+        },
+        {
+          "name": "houtu-studio-1.24.1-Windows-x64-Setup.exe",
+          "bytes": 185989106,
+          "digest": "sha256:cbcbb56cb71820dbd17cfc4fba16a916ef3f57cce34ef057ee9e5acfcbec9e80"
+        },
+        {
+          "name": "houtu-studio-1.24.1-Windows-x64.zip",
+          "bytes": 267601784,
+          "digest": "sha256:eb3b6c8e1d4135a44361eb790858e0e23f2f94dd6338f863fe7f0fd7883a127f"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": {
+        "runId": 45603253367,
+        "latestAttempt": 1,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45603253367"
+      }
+    },
+    {
+      "tag": "v1.24.0",
+      "status": "known-issue",
+      "label": "已知问题·后续已修复",
+      "draft": false,
+      "publishedAt": "2026-11-25T11:17:57Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.24.0",
+      "assetCount": 5,
+      "assets": [
+        {
+          "name": "houtu-studio-1.24.0-Android-arm64-v8a.apk",
+          "bytes": 205128735,
+          "digest": "sha256:b6c24328bcb8d420b47f47bdcc98db32ce895bd076c743d7abb884c743340a9a"
+        },
+        {
+          "name": "houtu-studio-1.24.0-Android-x86_64.apk",
+          "bytes": 212739091,
+          "digest": "sha256:3f891a53aaf2de1f4a38d06d575bfc379cc72944abe0318301fff7e7cb2edd6e"
+        },
+        {
+          "name": "houtu-studio-1.24.0-SHA256.txt",
+          "bytes": 423,
+          "digest": "sha256:bf893bcb5f384daee03e349ce9893a266c802f3ad991693b97e9acc815fa1afa"
+        },
+        {
+          "name": "houtu-studio-1.24.0-Windows-x64-Setup.exe",
+          "bytes": 186007212,
+          "digest": "sha256:e30dcc8150b4495f921acdd0d0b4740683d540f753c0210e772e1722946a191a"
+        },
+        {
+          "name": "houtu-studio-1.24.0-Windows-x64.zip",
+          "bytes": 267601528,
+          "digest": "sha256:44760676f2f57420f4a0333416646c643779eb409be88258740f7e4c3a667a33"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "replacement": "v1.24.1",
+      "note": "自动检查更新可能多等一轮，1.24.1修复缓存到期调度。",
+      "workflow": {
+        "runId": 45600624881,
+        "latestAttempt": 1,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45600624881"
+      }
+    },
+    {
+      "tag": "v1.23.2",
+      "status": "known-issue",
+      "label": "已知问题·建议升级",
+      "draft": false,
+      "publishedAt": "2026-11-25T09:20:54Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.23.2",
+      "assetCount": 5,
+      "assets": [
+        {
+          "name": "houtu-studio-1.23.2-Android-arm64-v8a.apk",
+          "bytes": 205104159,
+          "digest": "sha256:ff629941be3b68e071c8ca8e5924c158575e9fe032eabd160469371d1e4483ac"
+        },
+        {
+          "name": "houtu-studio-1.23.2-Android-x86_64.apk",
+          "bytes": 212718611,
+          "digest": "sha256:cf1fa7d2b9ee1e623b822eeaa07867094800041b43025100de3045060a495d5a"
+        },
+        {
+          "name": "houtu-studio-1.23.2-SHA256.txt",
+          "bytes": 423,
+          "digest": "sha256:8c14f3227795d0ca90988493d750c4f730fc2fc690c4f30e8d3df711349f401e"
+        },
+        {
+          "name": "houtu-studio-1.23.2-Windows-x64-Setup.exe",
+          "bytes": 168030008,
+          "digest": "sha256:6adf0e52b32f795e78e18d8399c369bdb4e1f3363919998fc8aba2d22a077a0a"
+        },
+        {
+          "name": "houtu-studio-1.23.2-Windows-x64.zip",
+          "bytes": 236923847,
+          "digest": "sha256:866b178aedee42f3f9f63c5e29eac08805aaf6db1cdea26b172e4226a07147cf"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "replacement": "v1.24.0",
+      "note": "部分Windows精简包缺绘图组件，1.24起补齐。",
+      "workflow": {
+        "runId": 45581959351,
+        "latestAttempt": 1,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45581959351"
+      }
+    },
+    {
+      "tag": "v1.23.1",
+      "status": "stopped",
+      "label": "发布中止·原因待核实",
+      "draft": true,
+      "publishedAt": null,
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.23.1",
+      "assetCount": 0,
+      "assets": [],
+      "checksum": "not-published",
+      "replacement": "v1.23.2",
+      "note": "运行被取消，直接取消原因未证实，后续已有交付。",
+      "workflow": {
+        "runId": 45580415228,
+        "latestAttempt": 1,
+        "latestConclusion": "cancelled",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45580415228"
+      }
+    },
+    {
+      "tag": "v1.23.0",
+      "status": "stopped",
+      "label": "发布中止·原因待核实",
+      "draft": true,
+      "publishedAt": null,
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.23.0",
+      "assetCount": 0,
+      "assets": [],
+      "checksum": "not-published",
+      "replacement": "v1.23.2",
+      "note": "运行被取消，直接取消原因未证实，后续已有交付。",
+      "workflow": {
+        "runId": 45580076544,
+        "latestAttempt": 1,
+        "latestConclusion": "cancelled",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45580076544"
+      }
+    },
+    {
+      "tag": "v1.22.1",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-25T06:20:52Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.22.1",
+      "assetCount": 5,
+      "assets": [
+        {
+          "name": "houtu-studio-1.22.1-Android-arm64-v8a.apk",
+          "bytes": 197096479,
+          "digest": "sha256:b1818117d482ec8fcae158d21271ca45286bb2f1ebb6bfddff22fe44c695b2cf"
+        },
+        {
+          "name": "houtu-studio-1.22.1-Android-x86_64.apk",
+          "bytes": 204706835,
+          "digest": "sha256:9bc34b19e9630b294decb43c7f3945ebaf3de4f408742438e9a9807556d74263"
+        },
+        {
+          "name": "houtu-studio-1.22.1-SHA256.txt",
+          "bytes": 423,
+          "digest": "sha256:e56e63076da0e39b2a703a9b666a11a9d938e1bad962543521d35043e981eb7d"
+        },
+        {
+          "name": "houtu-studio-1.22.1-Windows-x64-Setup.exe",
+          "bytes": 160164065,
+          "digest": "sha256:f23e194ca6550de3a11e2002eb520f3e9ef187da0b73422886cbedbfaa405af1"
+        },
+        {
+          "name": "houtu-studio-1.22.1-Windows-x64.zip",
+          "bytes": 228766073,
+          "digest": "sha256:5f784f5896e62a6096b5993e4d011091dcb5f49f5e088c384014a5c76fcff0a0"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": {
+        "runId": 45558260907,
+        "latestAttempt": 1,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45558260907"
+      }
+    },
+    {
+      "tag": "v1.22.0",
+      "status": "stopped",
+      "label": "发布失败·已中止",
+      "draft": true,
+      "publishedAt": null,
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.22.0",
+      "assetCount": 0,
+      "assets": [],
+      "checksum": "not-published",
+      "replacement": "v1.22.1",
+      "note": "Windows PowerShell安全模块路径导致打包失败，后续修复。",
+      "workflow": {
+        "runId": 45556228988,
+        "latestAttempt": 1,
+        "latestConclusion": "failure",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45556228988"
+      }
+    },
+    {
+      "tag": "v1.21.0",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-25T04:55:28Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.21.0",
+      "assetCount": 4,
+      "assets": [
+        {
+          "name": "houtu-studio-1.21.0-Android-arm64-v8a.apk",
+          "bytes": 197092383,
+          "digest": "sha256:57973e801478ecead6eaf45f9228e6973299149de7a6f901f51bc7864ed6f84c"
+        },
+        {
+          "name": "houtu-studio-1.21.0-Android-x86_64.apk",
+          "bytes": 204702739,
+          "digest": "sha256:4e3be4a41c07c5f61a6a579dcb7d06565b173bbcaccef3cdb44f1e1b7a8c78b1"
+        },
+        {
+          "name": "houtu-studio-1.21.0-SHA256.txt",
+          "bytes": 315,
+          "digest": "sha256:d7b60ae3a0a3ddc603f93252463dd2907103e66d6c84ff4e88b3c40d842a9236"
+        },
+        {
+          "name": "houtu-studio-1.21.0-Windows-x64.zip",
+          "bytes": 309488047,
+          "digest": "sha256:275ccc481d21885fb395249cd8c7c76cf691e4ee195d77c9765fc63e76b2733b"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": {
+        "runId": 45548978662,
+        "latestAttempt": 1,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45548978662"
+      }
+    },
+    {
+      "tag": "v1.20.0",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-25T00:31:03Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.20.0",
+      "assetCount": 2,
+      "assets": [
+        {
+          "name": "houtu-studio-1.20.0-SHA256.txt",
+          "bytes": 102,
+          "digest": "sha256:069a18b796b52d37d01ccd974b075df27741593c298478417d267676060ff89b"
+        },
+        {
+          "name": "houtu-studio-1.20.0-Windows-x64.zip",
+          "bytes": 309121389,
+          "digest": "sha256:d048e64ef9cd9523445c0431d23521e4dedc8ed38b56bf085c2a30ceae8ba53b"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": {
+        "runId": 45518287236,
+        "latestAttempt": 1,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45518287236"
+      }
+    },
+    {
+      "tag": "v1.19.0",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-24T22:57:45Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.19.0",
+      "assetCount": 2,
+      "assets": [
+        {
+          "name": "houtu-studio-1.19.0-SHA256.txt",
+          "bytes": 102,
+          "digest": "sha256:f3a6717a1c9d860da3ec5ad0ec7755a945c83300abbf66fa8653281283c38c02"
+        },
+        {
+          "name": "houtu-studio-1.19.0-Windows-x64.zip",
+          "bytes": 309112184,
+          "digest": "sha256:3d4aa10de9a29244fe2cb27a3a6243a6c2e3de4f6cff1840163f41fc1dac8515"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": {
+        "runId": 45505349087,
+        "latestAttempt": 1,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45505349087"
+      }
+    },
+    {
+      "tag": "v1.18.0",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-24T21:39:20Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.18.0",
+      "assetCount": 2,
+      "assets": [
+        {
+          "name": "houtu-studio-1.18.0-SHA256.txt",
+          "bytes": 102,
+          "digest": "sha256:5008d513db49e57249a78734fb793d156e3dc5da1d00603dc894fc4aa9abff08"
+        },
+        {
+          "name": "houtu-studio-1.18.0-Windows-x64.zip",
+          "bytes": 272675629,
+          "digest": "sha256:c18fd9f8377fe4d72427cc0ed3abd8ee7fdac2bde701345faf67b97e3777e8a6"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": {
+        "runId": 45492921028,
+        "latestAttempt": 1,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45492921028"
+      }
+    },
+    {
+      "tag": "v1.17.0",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-24T21:04:40Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.17.0",
+      "assetCount": 2,
+      "assets": [
+        {
+          "name": "houtu-studio-1.17.0-SHA256.txt",
+          "bytes": 102,
+          "digest": "sha256:5a464427adfbcad27a2d17479c25675973187f38c98667a484e884f3e4560e2f"
+        },
+        {
+          "name": "houtu-studio-1.17.0-Windows-x64.zip",
+          "bytes": 272664335,
+          "digest": "sha256:e7d9da1c586117a9a799bda371d2e84e9b2fd1f5ab1c8184403385f3c68d2416"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": {
+        "runId": 45487041575,
+        "latestAttempt": 1,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45487041575"
+      }
+    },
+    {
+      "tag": "v1.16.0",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-24T20:22:02Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.16.0",
+      "assetCount": 2,
+      "assets": [
+        {
+          "name": "houtu-studio-1.16.0-SHA256.txt",
+          "bytes": 103,
+          "digest": "sha256:cf6ce65473d4afdb8103184939f0736576a15202c6f25741c8a08e66bd41ab87"
+        },
+        {
+          "name": "houtu-studio-1.16.0-Windows-x64.zip",
+          "bytes": 272618951,
+          "digest": "sha256:172ff745e54dd8bafac75a734314d810e355735422e90c797d6607698a6b16d1"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": null
+    },
+    {
+      "tag": "v1.15.0",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-24T19:14:04Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.15.0",
+      "assetCount": 2,
+      "assets": [
+        {
+          "name": "houtu-studio-1.15.0-SHA256.txt",
+          "bytes": 103,
+          "digest": "sha256:b22b5af16f0f3b83fa97a03069f2ef624aecafc50bfd8e1a35b22e0738ab1500"
+        },
+        {
+          "name": "houtu-studio-1.15.0-Windows-x64.zip",
+          "bytes": 272609842,
+          "digest": "sha256:4b8710cdf659966ba1b9da30c0220e893ea73781d63ecc28b4c210b52fa293e9"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": null
+    },
+    {
+      "tag": "v1.14.0",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-24T17:53:58Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.14.0",
+      "assetCount": 2,
+      "assets": [
+        {
+          "name": "houtu-studio-1.14.0-SHA256.txt",
+          "bytes": 103,
+          "digest": "sha256:7bc0d932291c7eea1a07b6d7e807dfc80f6b2c13e11b76111947bcf0be172157"
+        },
+        {
+          "name": "houtu-studio-1.14.0-Windows-x64.zip",
+          "bytes": 272594391,
+          "digest": "sha256:d7141f7a67b421c962d92e5b4267446d7d3718493c286abb0902bac26ca0ef3a"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": null
+    },
+    {
+      "tag": "v1.13.1",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-24T14:05:20Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.13.1",
+      "assetCount": 1,
+      "assets": [
+        {
+          "name": "houtu-studio-1.13.1-Windows-x64.zip",
+          "bytes": 263345814,
+          "digest": "sha256:63a3fa5c30da2ac0a82217993889ac77129ac9f6d0313c6f45b92ac004f4b50d"
+        }
+      ],
+      "checksum": "legacy-not-provided",
+      "workflow": null
+    },
+    {
+      "tag": "v1.13.0",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-24T13:29:31Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.13.0",
+      "assetCount": 1,
+      "assets": [
+        {
+          "name": "houtu-studio-1.13.0-Windows-x64.zip",
+          "bytes": 263338534,
+          "digest": "sha256:f91a3e6f467874ed3287914c1f8906313b60d3864b5f015e45f2b261a9e417ff"
+        }
+      ],
+      "checksum": "legacy-not-provided",
+      "workflow": null
+    }
+  ],
+  "historicalSourceTags": [
+    "v1.10.0",
+    "v1.11.0",
+    "v1.12.0",
+    "v1.7.0",
+    "v1.8.0",
+    "v1.9.0"
+  ],
+  "dependency": {
+    "tag": "android-runtime-v0.172.0-r1",
+    "classification": "build-dependency",
+    "payloadChecksumsMatch": true,
+    "metadataDigestVerified": true,
+    "metadataInShaList": false,
+    "note": "SHA256SUMS covers the two runtime payload archives; manifest.json is separate metadata and its own GitHub digest was verified. App builds pin archive hashes in android/runtime-lock.json."
+  }
+}
