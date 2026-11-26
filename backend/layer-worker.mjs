@@ -1,2 +1,3 @@
-import fs from 'node:fs/promises';import {parentPort,workerData} from 'node:worker_threads';import {renderLayers} from './layer-render.mjs';
-try{const output=await renderLayers(workerData.document,async id=>{const file=workerData.assets[id];if(!file)throw Error('工程图片缺失。');return fs.readFile(file);},workerData.options);parentPort.postMessage({bytes:output.bytes,width:output.width,height:output.height,engine:output.engine});}catch(error){parentPort.postMessage({error:error.message});}
+import fs from 'node:fs/promises';import {parentPort,workerData} from 'node:worker_threads';import sharp from 'sharp';import {renderLayers} from './layer-render.mjs';
+if(process.platform==='android'){sharp.concurrency(1);sharp.cache({memory:16,files:0,items:8});}
+try{const output=await renderLayers(workerData.document,async id=>{const file=workerData.assets[id];if(!file)throw Error('工程图片缺失。');return fs.readFile(file);},workerData.options),bytes=Uint8Array.from(output.bytes);parentPort.postMessage({bytes,width:output.width,height:output.height,engine:output.engine},[bytes.buffer]);}catch(error){parentPort.postMessage({error:error.message});}finally{parentPort.close();}
