@@ -1,9 +1,10 @@
 // Panasonic V-Log/V-Gamut Reference Manual, Rev. 1.0, sections 3 and 4.
 export const MAX_CUBE_BYTES = 16 * 1024 * 1024;
+// Inverse of Panasonic's V-Gamut to linear BT.709 RGB matrix (section 4.2).
 const linear709ToVGamut = [
- [0.624492, 0.304033, 0.071475],
- [0.090049, 0.772302, 0.137649],
- [0.020813, 0.080388, 0.898799]
+ [0.585196050, 0.322641504, 0.092162446],
+ [0.078588423, 0.819627145, 0.101784432],
+ [0.022794304, 0.114216866, 0.862988829]
 ];
 const unit = value => Math.min(1, Math.max(0, value));
 

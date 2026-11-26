@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs/promises';import path from 'node:path';import os from 'node:os';import sharp from 'sharp';import {WorkflowStore} from '../backend/workflows.mjs';import {ImageImports} from '../backend/image-imports.mjs';import {rawFixture} from './helpers/raw-fixture.mjs';
 import {bmpPixels} from '../backend/bmp-image.mjs';
-import {encodeVLog,parseCube,sampleCube} from '../backend/raw-vlog.mjs';
+import {encodeVLog,parseCube,sampleCube,renderVLog} from '../backend/raw-vlog.mjs';
 import {workflowImage} from '../lib/workflow-image.mjs';
 import {originalImageSignature} from '../public/image-formats.js';
 
@@ -13,6 +13,16 @@ test('bitmap import retains TIFF high-bit input and invalid RAW parameters fail 
 const identityCube = 'TITLE "identity"\nLUT_3D_SIZE 2\n0 0 0\n1 0 0\n0 1 0\n1 1 0\n0 0 1\n1 0 1\n0 1 1\n1 1 1\n';
 test('V-Log follows Panasonic code values and interpolates valid 3D .cube tables in RGB order',()=>{
  for(const [value,code] of [[0,128],[.18,433],[.9,602]])assert.equal(Math.round(encodeVLog(value)*1023),code);
+ // Decode the V-Log primaries and reproduce the input with Panasonic's published forward matrix.
+ const fromVGamut=[[1.806576,-.695697,-.110879],[-.170090,1.305955,-.135865],[-.025206,-.154468,1.179674]];
+ const identity=[[1,0,0],[0,1,0],[0,0,1]];
+ for(const rgb of identity){
+  const data=Uint16Array.from(rgb,n=>n*65535);
+  const {master}=renderVLog({data,colors:3},identity,0);
+  const linear=Array.from(master,n=>10**((n/65535-.598206)/.241514)-.00873);
+  const restored=fromVGamut.map(row=>row.reduce((sum,n,i)=>sum+n*linear[i],0));
+  restored.forEach((value,i)=>assert.ok(Math.abs(value-rgb[i])<.0002));
+ }
  const lut=parseCube(identityCube.replace('LUT_3D_SIZE 2','LUT_3D_SIZE 2\nLUT_3D_INPUT_RANGE 0.1 0.9'));
  const out=new Float64Array(3);
  for(const rgb of [[.13,.52,.85],[.13,.85,.52],[.52,.13,.85],[.52,.85,.13],[.85,.13,.52],[.85,.52,.13],[.9,.1,.9]]){

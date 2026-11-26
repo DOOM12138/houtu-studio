@@ -566,7 +566,7 @@ function rawProfileSection(photo){
     const profile=state.rawProfile||'standard',busy=Boolean(photo.rawDeveloping);
     const labels={standard:'标准 sRGB',vlog:'V-Log 灰片','vlog-lut':'V-Log LUT'};
     const info=element('p',labels[profile]+(state.lutName?' · '+state.lutName:''),'hint');
-    info.id='rawWorkingProfile';info.setAttribute('role','status');box.append(info);
+    info.id='rawWorkingProfile';info.style.overflowWrap='anywhere';info.setAttribute('role','status');box.append(info);
     const lut=document.createElement('input');
     lut.type='file';lut.id='rawLutFile';lut.accept='.cube';lut.hidden=true;
     lut.onchange=()=>{const file=lut.files[0];lut.value='';if(file)void applyRawProfile(photo,'vlog-lut',file);};
