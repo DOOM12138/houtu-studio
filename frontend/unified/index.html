@@ -10,6 +10,7 @@
  <span class="rule"></span><button id="open" class="with-icon outline"><i data-icon="import"></i>导入</button><button id="export" class="with-icon primary"><i data-icon="export"></i>导出</button>
  <input type="file" id="file" accept="image/*,.dng,.nef,.cr2,.cr3,.arw,.raf,.orf,.rw2" multiple hidden>
 </header>
+<div id="workbench-update-slot"></div>
 <nav id="rail" aria-label="修图工具分类">
  <button class="rail-tool" data-section="color"><i data-icon="sliders"></i>调色</button><button class="rail-tool" data-section="portrait"><i data-icon="brush"></i>人物</button><button class="rail-tool" data-section="layers"><i data-icon="layers"></i>图层</button><button class="rail-tool" data-section="ai"><i data-icon="spark"></i>AI 修图</button>
  <button class="rail-tool rail-tail" data-section="steps"><i data-icon="steps"></i>步骤</button><button class="rail-tool help" id="about"><i data-icon="info"></i>说明</button>
@@ -23,7 +24,7 @@
   <span class="rule"></span><button id="compare" class="with-icon" aria-pressed="false"><i data-icon="compare"></i>对比</button><button id="original" aria-pressed="false" title="按住反斜杠临时查看原图">原图</button>
   <span class="push"></span><button id="toggleFilm" class="with-icon" aria-label="展开或收起照片条"><i data-icon="film"></i><span id="filmCount">照片</span></button>
  </div>
- <section id="film" aria-label="当前项目的照片"><div id="filmHead"><span id="filmLabel">照片</span><span class="muted" id="filmSummary"></span><button class="push" id="batch">多选</button><button class="soft" id="sync" hidden>同步调色</button></div><div id="filmPhotos"></div></section>
+ <section id="film" aria-label="当前项目的照片"><div id="filmHead"><span id="filmLabel">照片</span><span class="muted" id="filmSummary"></span><button class="push" id="batch">多选</button><button class="soft" id="sync" hidden>同步调色</button><button id="remove-photos" hidden>移除</button></div><div id="filmPhotos"></div></section>
 </main>
 <aside id="inspector" aria-label="当前工具参数"><div id="panelHead"><h1 id="panelTitle">调色</h1><span class="push" id="sectionKind"></span><button id="mobilePanel" class="mobile-only push">收起参数</button></div><div id="parameterScroll"></div><div id="unified-ai" hidden></div></aside>
 </div>

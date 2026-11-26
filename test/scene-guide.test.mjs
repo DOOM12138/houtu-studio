@@ -97,3 +97,37 @@ test('recovering a reference checkpoint retries failed public reads without dupl
  fail=false;const second=await sceneReferenceStep(service,w,node,'token2',{},'input',p);assert.equal(lookups,2);assert.equal(second.references.length,1);assert.equal(second.references[0].guideRole,'design');assert.equal(requests.filter(q=>q==='cosplay convention').length,1);assert.ok(saves>1);
  w.config={...config,autoSearch:false};node.output=null;service.searchGuide=()=>assert.fail('external search');service.characterLookup=()=>assert.fail('external catalogue');const off=await sceneReferenceStep(service,w,node,'off',{},'input',p);assert.equal(off.queries.length,0);
 });
+
+test('platform-only references search the supplied alias and series, preserve provenance, and avoid Commons even when restricted',async ()=>{
+ const calls=[],captured=[];
+ const source=await sharp({create:{width:40,height:50,channels:3,background:'pink'}}).png().toBuffer();
+ const config=agentOptions({sceneGuide:{character:'影宝',work:'原神'},referenceProvider:'douyin',allowPublicFallback:false,referenceCount:1,tasks:['portrait','color']});
+ const profile=resolveSceneProfile(null,config.sceneGuide,true);
+ const w={id:'w',config,steps:[{output:{references:[]}}]},node={id:'references',output:null};
+ const service={guard(){},async partial(id,step,token,state){node.output=structuredClone(state);},
+  characterLookup:()=>assert.fail('external character catalogue'),searchGuide:()=>assert.fail('Commons fallback'),
+  fetchGuideAsset:()=>assert.fail('Commons image request'),
+  platform:{
+   async search(query,provider){calls.push({query,provider});return {results:[{url:'https://www.douyin.com/video/123',title:'造型参考'}]};},
+   async capture(url,provider){captured.push({url,provider});return {bytes:source,source:url,title:'造型参考'};}
+  },workflows:{async putAsset(){return {id:'test-photo'};}}
+ };
+ const result=await sceneReferenceStep(service,w,node,'token',{},'input',profile);
+ assert.equal(result.references[0].origin,'douyin');
+ assert.equal(result.references[0].usage,'reference-only');
+ assert.equal(result.references[0].guideRole,'design');
+ assert.equal(result.catalog.status,'platform-only');
+ assert.equal(catalogBoundProfile(profile,result.catalog).catalogVerified,false);
+ assert.deepEqual(calls,[{query:'影宝 原神 COS 人设',provider:'douyin'}]);
+ assert.deepEqual(captured,[{url:'https://www.douyin.com/video/123',provider:'douyin'}]);
+ node.output=null;
+ service.platform.search=async()=>{throw Object.assign(Error('请完成平台验证'),{code:'PLATFORM_LOGIN'});};
+ await assert.rejects(sceneReferenceStep(service,w,node,'blocked',{},'input',profile),{code:'INPUT_REQUIRED'});
+ assert.equal(node.output.references.length,0);
+ assert.ok(node.output.queries.every(query=>query.provider==='douyin'));
+ node.output=null;
+ service.platform.search=async()=>{throw Object.assign(Error('系统浏览器'),{code:'PLATFORM_UNAVAILABLE'});};
+ const offline=await sceneReferenceStep(service,w,node,'offline',{},'input',profile);
+ assert.equal(offline.references.length,0);
+ assert.ok(offline.warnings.some(text=>text.includes('系统浏览器')));
+});

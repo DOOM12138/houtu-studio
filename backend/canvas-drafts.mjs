@@ -43,15 +43,25 @@ export class CanvasDrafts{
  file(id){if(!uuid.test(id))throw error('草稿编号无效。');return path.join(this.folder,id+'.json');}
  async load(){await fs.mkdir(this.folder,{recursive:true});for(const file of await fs.readdir(this.folder)){const id=file.slice(0,-5);if(file.endsWith('.json')&&uuid.test(id)){const d=await this.get(id);this.summaries.set(id,this.summary(d));}}}
  async get(id){try{return JSON.parse(await fs.readFile(this.file(id),'utf8'));}catch(e){if(e.code==='ENOENT')throw error('没有找到这张照片的草稿。',404);throw e;}}
- summary(d){return {id:d.id,name:d.name,origin:d.origin,runs:d.runs||{},thumbnail:d.thumbnail,created:d.created,updated:d.updated,revision:d.revision,metadataOnly:true};}
- list(){return [...this.summaries.values()].sort((a,b)=>a.created-b.created);}
- async save(id,input){
+ summary(d){return {id:d.id,name:d.name,origin:d.origin,runs:d.runs||{},thumbnail:d.thumbnail,created:d.created,updated:d.updated,revision:d.revision,removedAt:d.removedAt||null,metadataOnly:true};}
+ list(removed=false){return [...this.summaries.values()].filter(d=>Boolean(d.removedAt)===removed).sort((a,b)=>removed?b.removedAt-a.removedAt:a.created-b.created);}
+ async setRemoved(id,input){
+  return this.run(id,async()=>{
+   const doc=await this.get(id);
+   if(typeof input.removed!=='boolean'||doc.revision!==input.revision)throw error('照片列表已在其他窗口更新，请刷新后重试。',409);
+   const next={...doc,revision:doc.revision+1,updated:Date.now(),removedAt:input.removed?Date.now():null};
+   return this.persist(next);
+  });
+ }
+ save(id,input){return this.run(id,()=>this.write(id,input));}
+ async run(id,work){
   this.file(id);
-  const task=(this.queue.get(id)||Promise.resolve()).catch(()=>{}).then(()=>this.write(id,input));
+  const task=(this.queue.get(id)||Promise.resolve()).catch(()=>{}).then(work);
   this.queue.set(id,task);try{return await task;}finally{if(this.queue.get(id)===task)this.queue.delete(id);}
  }
  async write(id,input){
   const current=this.summaries.has(id)?await this.get(id):null;
+  if(current?.removedAt)throw error('这张照片已移除，请先恢复。',409);
   if(!Number.isInteger(input.revision)||input.revision!==(current?.revision||0))throw error('草稿已在另一个窗口更新，请先导出当前成片。',409);
   const origin=ref(input.origin);
   if(current&&JSON.stringify(current.origin)!==JSON.stringify(origin))throw error('同一草稿不可替换原图。',409);
@@ -70,6 +80,10 @@ export class CanvasDrafts{
   const thumbnail=typeof input.thumbnail==='string'&&input.thumbnail.length<160000&&/^data:image\/png;base64,[a-z0-9+/=]+$/i.test(input.thumbnail)?input.thumbnail:null;
   const runs={};for(const mode of ['auto','semi'])if(uuid.test(input.runs?.[mode]||''))runs[mode]=input.runs[mode];
   const doc={id,revision:input.revision+1,created:current?.created||Date.now(),updated:Date.now(),origin,name:String(input.name||'照片').slice(0,120),nodes:history,pins,redo,cursor:input.cursor,viewport,thumbnail,runs};
-  const target=this.file(id),tmp=target+'.'+randomUUID()+'.tmp';await fs.writeFile(tmp,JSON.stringify(doc));await replaceFile(tmp,target);this.summaries.set(id,this.summary(doc));return {revision:doc.revision};
+  return {revision:(await this.persist(doc)).revision};
+ }
+ async persist(doc){
+  const target=this.file(doc.id),tmp=target+'.'+randomUUID()+'.tmp';await fs.writeFile(tmp,JSON.stringify(doc));await replaceFile(tmp,target);
+  const summary=this.summary(doc);this.summaries.set(doc.id,summary);return summary;
  }
 }

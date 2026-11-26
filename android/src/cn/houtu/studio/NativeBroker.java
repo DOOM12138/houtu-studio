@@ -143,10 +143,11 @@ final class NativeBroker {
       JSONObject result;
       if (path.equals("/vision")) result = vision(input);
       else if (path.equals("/platform/open")) {
+        final String site = "douyin".equals(input.optString("provider")) ? "https://www.douyin.com/" : "https://www.xiaohongshu.com/";
         RuntimeHost.main.post(
             () -> {
               if (RuntimeHost.activity != null)
-                RuntimeHost.activity.openExternal("https://www.xiaohongshu.com/");
+                RuntimeHost.activity.openExternal(site);
             });
         result = new JSONObject().put("opened", true).put("mode", "system-browser");
       } else if (path.equals("/platform/status"))

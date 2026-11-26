@@ -20,8 +20,10 @@ export function deskRecipe(input){
  if(input.mode==='auto'){
   const a=input.auto||{};
   if(a.paint===true&&a.paintLevel!==undefined&&(!Number.isInteger(a.paintLevel)||a.paintLevel<1||a.paintLevel>10))throw error('厚涂程度需要 1–10 的整数。');
+  const provider=a.referenceProvider??'xiaohongshu';
+  if(!['xiaohongshu','douyin','commons','none'].includes(provider))throw error('请选择有效的参考图来源。');
   const tasks=['portrait','color',...(a.paint===true?['paint']:[]),...(a.effects===true?['effects']:[])];
-  const opts=agentOptions({mode:'auto',provider:'auto',hardwarePolicy:'auto',sceneGuide:{},tasks,style:a.paint===true?'cos':'natural',paintLevel:a.paintLevel??2,effect:a.effect||'sparkles',autoSearch:true,quality:true,autoRepair:false,maxImageSteps:6,planningModel:input.model,generationModel:input.model});
+  const opts=agentOptions({mode:'auto',provider:'auto',hardwarePolicy:'auto',sceneGuide:{character:a.character,work:a.work},tasks,style:a.paint===true?'cos':'natural',paintLevel:a.paintLevel??2,effect:a.effect||'sparkles',autoSearch:provider!=='none',referenceProvider:provider==='none'?'xiaohongshu':provider,allowPublicFallback:false,quality:true,autoRepair:false,maxImageSteps:6,planningModel:input.model,generationModel:input.model});
   return recipeValue({name:'全自动 · 场景精修',model:input.model,stages:[{type:'agent',name:'分析场景并自动精修',options:opts},finish]});
  }
  if(input.mode!=='semi')throw error('请选择全自动或半自动。');
@@ -71,7 +73,12 @@ export class AiDeskRuns{
   let agent=null;
   if(project.aiDesk.mode==='auto'){
    const child=steps.find(s=>s.type==='agent')?.child;
-   if(child){const v=await this.agents.view(child);agent={id:child,current:v.current,steps:v.steps.map(s=>({id:s.id,name:s.name,status:s.status,message:s.message,picture:s.imageOrigin})),submitted:v.budget.submitted};}
+   if(child){const v=await this.agents.view(child);agent={id:child,current:v.current,referenceProvider:v.config.referenceProvider,sceneGuide:v.config.sceneGuide,
+     steps:v.steps.map(s=>({id:s.id,name:s.name,status:s.status,message:s.message,picture:s.imageOrigin,
+      ...(s.id==='references'?{referenceSearch:{count:s.output?.references?.length||0,
+       queries:(s.output?.queries||[]).slice(-16).map(({query,provider,status})=>({query,provider,status})),
+       warnings:(s.output?.warnings||[]).slice(-4)}}:{})})),
+     submitted:v.budget.submitted};}
   }
   const source=stepPicture(w,'source'),recordedOrigin=w.sourceOrigin||project.aiDesk.origin;
   return {id,mode:project.aiDesk.mode,source,origin:w.restoredBackup?source:recordedOrigin,recordedOrigin,name:photo.name,photoId:photo.id,workflowId:w.id,revision:w.revision,steps,agent,queue:project.queue.state,message:project.queue.message,busy,current:photo.workflowId===w.id,done:!pending,next:pending?.id||null,result:completed?.picture||null,previousReview:pending?w.deskReviews?.[pending.id]?.options||null:null};

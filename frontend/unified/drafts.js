@@ -5,9 +5,13 @@ async function request(url,input){
  const r=await fetch(url,input?{method:'POST',headers:{'Content-Type':'application/json','X-Paint-CSRF':token},body:JSON.stringify(input)}:{});
  const v=await r.json();if(!r.ok)throw Error(v.error||'草稿暂未写入本机。');return v;
 }
-export async function loadDrafts(){return (await request('/api/studio/canvas-drafts')).photos;}
+export async function loadDrafts(removed=false){return (await request('/api/studio/canvas-drafts'+(removed?'?removed=1':''))).photos;}
 export const loadDraft=id=>request('/api/studio/canvas-drafts/'+id);
 const queues=new Map();
+export async function archiveDraft(photo,removed){
+ const pending=queues.get(photo.id);if(pending)await pending.task;
+ return request('/api/studio/canvas-drafts/'+photo.id+'/archive',{removed,revision:photo.diskRevision??photo.revision});
+}
 export function saveDraft(photo){
  const snapshot=structuredClone({id:photo.id,name:photo.name,origin:photo.origin,nodes:photo.nodes,cursor:photo.cursor,
   redo:photo.redo,viewport:photo.viewport,thumbnail:photo.thumbnail,pins:photo.pins||{},runs:photo.runs||{}});

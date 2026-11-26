@@ -33,7 +33,7 @@ export class DeskBridge extends EventEmitter{
 export async function deskFixture(){
  const directory=await fs.mkdtemp(path.join(tmpdir(),'houtu-mode-test-')),bridge=new DeskBridge();let app,origin,csrf;
  async function start(){
-  app=await createApp({directory,bridge,automaticUpdateChecks:false,platform:{async close(){}},agentSearch:async()=>[],agentCharacterLookup:async()=>({status:'no-match'}),agentHardware:{snapshot:async()=>({platform:'linux',arch:'x64',gpus:[],ramBytes:3e9,freeRamBytes:1e9})},
+  app=await createApp({directory,bridge,automaticUpdateChecks:false,platform:{async close(){},async search(){return {results:[]};}},agentSearch:async()=>[],agentCharacterLookup:async()=>({status:'no-match'}),agentHardware:{snapshot:async()=>({platform:'linux',arch:'x64',gpus:[],ramBytes:3e9,freeRamBytes:1e9})},
     agentMask:async bytes=>{bridge.subjects++;const m=await sharp(bytes).metadata(),mask=await sharp({create:{width:m.width,height:m.height,channels:3,background:'black'}}).composite([{input:await sharp({create:{width:Math.floor(m.width/2),height:Math.floor(m.height/2),channels:3,background:'white'}}).png().toBuffer(),gravity:'center'}]).png().toBuffer();return {mask,found:true,requiresReview:false};}});
   await new Promise(r=>app.server.listen(0,'127.0.0.1',r));origin='http://127.0.0.1:'+app.server.address().port;csrf=(await(await fetch(origin+'/api/health')).json()).csrf;
  }

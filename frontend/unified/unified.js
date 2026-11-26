@@ -7,7 +7,7 @@ import {WorkflowClient} from '/color/workflow-client.js';
 import {stepPicture} from '/workflow-pictures.js';
 import {IMAGE_ACCEPT,RAW_EXTENSIONS,needsImageImport,extension} from '/image-formats.js';
 import {MAX_IMAGE_UPLOAD_BYTES,IMAGE_UPLOAD_MESSAGE,DESKTOP_PHOTO_PIXELS,MOBILE_PHOTO_PIXELS} from '/upload-limits.js';
-import {saveDraft,loadDrafts,loadDraft} from './drafts.js';
+import {saveDraft,loadDrafts,loadDraft,archiveDraft} from './drafts.js';
 const aiDirectory=PRESETS.map(tool=>({...tool,aliases:{'remove-equipment':'去灯架 去器材','remove-people':'去路人','clear-background':'净场'}[tool.id]||''}));
 'use strict';
 const $ = id => document.getElementById(id);
@@ -187,7 +187,7 @@ async function importPhotos(files){
   for(const file of files){
     let provisional=null;
     try{
-      const count=photos.length,origin=await readSource(file),photo=makeFromRef(origin,file.name);if(photos.length>count)provisional=photo;
+      const count=photos.length,origin=await readSource(file),photo=makeFromRef(origin,file.name,true);if(photos.length>count)provisional=photo;
       const data=await obtainMedia(photo);
       const thumb=document.createElement('canvas');thumb.width=64;thumb.height=64;
       const side=Math.min(data.img.naturalWidth,data.img.naturalHeight);
@@ -203,7 +203,8 @@ async function importPhotos(files){
   if(rejected.length)announce(rejected.slice(0,2).join('；'));
 }
 function renderFilm(){
-  const wrap=clear($('filmPhotos'));const current=currentPhoto();
+  const strip=$('filmPhotos'),left=strip.scrollLeft;
+ const wrap=clear(strip);const current=currentPhoto();
   photos.forEach((photo,index)=>{
     const b=action('',()=>selectPhoto(photo.id),'tile'+(current===photo?' current':''));
     b.setAttribute('aria-label',photo.name);b.title=photo.name;
@@ -212,12 +213,77 @@ function renderFilm(){
     const img=document.createElement('img');img.src=photo.thumbnail||photo.source;img.alt='';
     const desc=element('span');desc.append(element('b',photo.name),element('small',ui.batch?(checked.has(photo.id)?'已选为目标':'可选目标'):(photo.cursor?'已调整':'原始照片')));
     if(ui.batch&&photo===current){b.disabled=true;desc.lastChild.textContent='同步来源';}
-    b.append(img,desc);wrap.append(b);
+    b.append(img,desc);
+    if(ui.batch)wrap.append(b);
+    else{
+     const holder=element('div',undefined,'film-tile'),remove=action('×',()=>confirmRemove([photo]),'tile-remove');
+     remove.title='从工作台移除';remove.setAttribute('aria-label','移除照片 '+photo.name);
+     holder.append(b,remove);wrap.append(holder);
+    }
   });
-  const add=action('',()=>$('file').click(),'add-photo');add.setAttribute('aria-label','导入更多照片');add.append(icon('plus'));wrap.append(add);
+  const add=action('',()=>$('file').click(),'add-photo');add.setAttribute('aria-label','导入更多照片');add.append(icon('plus'));wrap.append(add);strip.scrollLeft=left;
   $('filmCount').textContent='照片 '+photos.length;$('filmSummary').textContent=ui.batch?'选择接收调色的照片':(current?String(photos.indexOf(current)+1).padStart(2,'0')+' / '+String(photos.length).padStart(2,'0'):'');
+  $('remove-photos').hidden=!ui.batch;
+  $('remove-photos').disabled=!checked.size;
   $('batch').textContent=ui.batch?'结束多选':'多选';$('sync').hidden=!ui.batch;$('sync').disabled=!checked.size;$('sync').textContent='同步调色（'+checked.size+'）';
 }
+async function changeRemoved(items){
+ if(!items.length)return;
+ $('dialog').close();
+ settleCanvasInput();finishPendingEdit();
+ let count=0;
+ for(const photo of items){
+  if(photo.removing||!photos.includes(photo))continue;
+  photo.removing=true;
+  try{
+   if(!photo.metadataOnly&&!photo.diskRevision)await saveDraft(photo);
+   const receipt=await archiveDraft(photo,true);
+   photo.removedAt=receipt.removedAt;
+   photos.splice(photos.indexOf(photo),1);
+   checked.delete(photo.id);media.delete(photo.id);count++;
+  }catch(e){announce(e.message);}
+  finally{photo.removing=false;}
+ }
+ if(!currentPhoto()){
+  resetWorkspaceImage();
+  if(photos.length){ui.batch=false;checked.clear();await selectPhoto(photos[0].id);}
+  else{
+   ++switchTicket;++renderSerial;++desiredBase;
+   ui.active=null;ui.previewId=null;activeMedia=null;rootMedia=null;boundBase='';queuedRender=null;gestureReset();
+   saveActiveId(null);desk?.sourceChanged(null,null);status('');updateChrome();renderPanel();paintCanvas();
+  }
+ }
+ renderFilm();
+ if(count)announce('已从工作台移除 '+count+' 张。可在「工作台菜单 → 最近移除」恢复。');
+}
+function confirmRemove(items){
+ if(!items.length)return;
+ openDialog(items.length===1?'移除照片':'移除 '+items.length+' 张照片',body=>{
+  body.append(element('p',items.length===1?items[0].name:'已选中的照片将从底部照片条移除。'));
+  body.append(hint('原片、编辑历史和工作流保留，可从「最近移除」恢复。'));
+  body.append(action('移除',()=>void changeRemoved(items),'primary wide','confirm-photo-removal'));
+ });
+}
+async function showRemoved(){
+ try{
+  const items=await loadDrafts(true);
+  openDialog('最近移除',body=>{
+   if(!items.length)body.append(hint('这里还没有移除的照片。'));
+   for(const item of items){
+    const row=element('div',undefined,'panel-actions'),button=action('恢复',async()=>{
+     button.disabled=true;
+     try{
+      const restored=await archiveDraft(item,false);
+      if(!photos.some(p=>p.id===restored.id))photos.push(fromSaved(restored));
+      $('dialog').close();ui.batch=false;checked.clear();await selectPhoto(restored.id);announce('照片已恢复');
+     }catch(e){button.disabled=false;announce(e.message);}
+    },'outline');
+    button.setAttribute('aria-label','恢复 '+item.name);row.append(element('span',item.name),button);body.append(row);
+   }
+  });
+ }catch(e){announce(e.message);}
+}
+$('remove-photos').onclick=()=>confirmRemove(photos.filter(p=>checked.has(p.id)));
 function toggleChecked(id){if(id===ui.active)return;checked.has(id)?checked.delete(id):checked.add(id);renderFilm();}
 $('batch').onclick=()=>{ui.batch=!ui.batch;checked.clear();renderFilm();};
 $('sync').onclick=()=>{
@@ -761,7 +827,7 @@ $('find').onclick=toolSearch;
 function about(){
   openDialog('工作台说明',body=>{body.append(element('p','用同一张画布调色、修人物或添加文字。AI 修图右栏顶部切换全自动与半自动。'),hint('导入的原图与 AI 工作流保存在本机服务器。手动笔触、调色、文字和历史草稿保存在当前服务的项目目录；导出成片或提交 AI 时，按原尺寸重算。'),hint('Ctrl/⌘ + K 查找工具，Ctrl/⌘ + Z 撤销，按住空格拖动画布。'));});
 }
-$('project-menu').onclick=()=>openDialog('工作台菜单',body=>{const links=[['照片项目与批量同步','/studio/'],['完整调色与曲线','/color/'],['完整人物修整','/portrait/'],['多图创作与合成','/creative/'],['本机图层工程','/layers/'],['单项 AI 精修','/ai/?tool=portrait-polish'],['本机超分 4K','/upscale/'],['工作流记录','/workflows/'],['账号与版本更新','/server/']];for(const [name,url]of links){const a=element('a',name,'match');a.href=url;body.append(a);}});
+$('project-menu').onclick=()=>openDialog('工作台菜单',body=>{body.append(action('最近移除',()=>{$('dialog').close();void showRemoved();},'match','recently-removed'));const links=[['照片项目与批量同步','/studio/'],['完整调色与曲线','/color/'],['完整人物修整','/portrait/'],['多图创作与合成','/creative/'],['本机图层工程','/layers/'],['单项 AI 精修','/ai/?tool=portrait-polish'],['本机超分 4K','/upscale/'],['工作流记录','/workflows/'],['账号与版本更新','/server/']];for(const [name,url]of links){const a=element('a',name,'match');a.href=url;body.append(a);}});
 $('about').onclick=about;
 $('sessionInfo').onclick=about;
 document.addEventListener('keydown',e=>{
@@ -803,9 +869,10 @@ function stable(ref){
 function refKey(ref){const s=stable(ref);return s?JSON.stringify(s):'';}
 function assetPath(ref){if(!stable(ref))throw Error('图片引用无效。');return '/api/workflows/'+ref.workflowId+'/assets/'+ref.assetId;}
 function safeDraft(p){
+ if(p.removing||p.removedAt||p.metadataOnly)return;
  saveDraft(p).catch(error=>{p.saveError=error.message;status('草稿未保存',true);announce(error.message);});
 }
-function cacheOrigin(photo,version,ref){photo.pins||={};photo.pins[version]=stable(ref);safeDraft(photo);}
+function cacheOrigin(photo,version,ref){photo.pins||={};photo.pins[version]=stable(ref);}
 function indexFor(photo,ref){
  const key=refKey(ref);
  if(!key)return -1;
@@ -819,7 +886,7 @@ function mediaFor(photo,state){
  const key=refKey(state.base);
  return obtainMedia({id:key,name:photo.name,source:assetPath(state.base)});
 }
-function saveActiveId(id){try{sessionStorage.setItem('houtu-canvas-active',id);}catch{}const u=new URL(location.href);u.searchParams.set('canvasPhoto',id);if(u.href!==location.href)history.replaceState(null,'',u);}
+function saveActiveId(id){try{if(id)sessionStorage.setItem('houtu-canvas-active',id);else sessionStorage.removeItem('houtu-canvas-active');}catch{}const u=new URL(location.href);if(id)u.searchParams.set('canvasPhoto',id);else u.searchParams.delete('canvasPhoto');if(u.href!==location.href)history.replaceState(null,'',u);}
 let desiredBase=0;
 async function loadEffective(photo,edits){
  const token=++desiredBase,baseKey=refKey(edits.base||photo.origin);
@@ -856,11 +923,17 @@ async function pinVisible(){
  settleCanvasInput();finishPendingEdit();
  const p=currentPhoto();if(!p)throw Error('请先打开照片。');const index=ui.previewId??p.cursor,key=p.id+':'+index;
  let task=pinsInFlight.get(key);if(!task){task=settleSource(p,index);pinsInFlight.set(key,task);}
- try{const ref=await task;if(currentPhoto()!==p||(ui.previewId??p.cursor)!==index)throw Error('照片或历史位置已经变化，请再次开始。');return ref;}
+ try{
+  const ref=await task;
+  if(currentPhoto()!==p||(ui.previewId??p.cursor)!==index)throw Error('照片或历史位置已经变化，请再次开始。');
+  await saveDraft(p);
+  if(p.removing||currentPhoto()!==p||(ui.previewId??p.cursor)!==index)throw Error('照片或历史位置已经变化，请再次开始。');
+  return ref;
+ }
  finally{if(pinsInFlight.get(key)===task)pinsInFlight.delete(key);}
 }
 function receivePicture(origin,run,explicit){
- const p=currentPhoto(),ref=stable(origin);if(!p||!ref||!run)return;
+ const p=currentPhoto(),ref=stable(origin);if(!p||p.removing||!ref||!run)return;
  let anchor=indexFor(p,run.origin);if(anchor<0)return;
  if(origin.stepId==='source'){
   if(explicit){ui.previewId=anchor;refreshEdits();}
@@ -886,9 +959,9 @@ function receivePicture(origin,run,explicit){
  }
  if(changed){updateChrome();requestPixels();}
 }
-function makeFromRef(origin,name){
+function makeFromRef(origin,name,importing=false){
  const ref=stable(origin);if(!ref)throw Error('输入照片没有可恢复的素材记录。');
- const found=photos.find(p=>refKey(p.origin)===refKey(ref)||indexFor(p,ref)>=0);
+ const found=photos.find(p=>refKey(p.origin)===refKey(ref)||indexFor(p,ref)>=0||(importing&&p.origin.stepId===ref.stepId&&p.origin.assetId===ref.assetId&&p.name===name));
  if(found)return found;
  const photo=makePhoto(crypto.randomUUID(),name,assetPath(ref));photo.origin=ref;photo.pins={0:ref};photo.created=Date.now();photos.push(photo);return photo;
 }
@@ -907,11 +980,30 @@ async function loginState(){
  try{const v=await api('/api/state');signedIn=!!v.account;imageRuntimeReady=v.imageRuntime?.ready!==false;}catch{signedIn=false;}
  desk?.sync();
 }
+function fromSaved(saved){
+ const photo=makePhoto(saved.id,saved.name,assetPath(saved.origin));
+ return Object.assign(photo,saved,{diskRevision:saved.revision});
+}
+async function unproject(photo){
+ if(!photo?.metadataOnly)return;
+ const saved=await loadDraft(photo.id);
+ Object.assign(photo,saved,{metadataOnly:false,diskRevision:saved.revision});
+}
+async function runOwner(run,stored){
+ const known=photos.find(p=>Object.values(p.runs||{}).includes(run.id));
+ if(known){await unproject(known);return known;}
+ for(const p of new Set([stored,...photos])){
+  if(!p)continue;
+  await unproject(p);
+  if(indexFor(p,run.origin)>=0)return p;
+ }
+ return null;
+}
 async function boot(){
  try{
   for(const saved of (await loadDrafts()).sort((a,b)=>a.created-b.created)){
     if(!stable(saved.origin))continue;
-    const photo=makePhoto(saved.id,saved.name,assetPath(saved.origin));Object.assign(photo,saved,{diskRevision:saved.revision});photos.push(photo);
+    photos.push(fromSaved(saved));
   }
  }catch{announce('本机草稿记录暂不可用，仍可导入和导出照片。');}
  const params=new URLSearchParams(location.search),id=params.get('deskRun');
@@ -920,16 +1012,24 @@ async function boot(){
   const stored=photos.find(p=>p.id===params.get('canvasPhoto'))||photos.find(p=>p.id===sessionStorage.getItem('houtu-canvas-active'));
   let selected=stored||photos[0];
   if(run){
-    selected=photos.find(p=>Object.values(p.runs||{}).includes(run.id))||stored;
-    if(selected?.metadataOnly){const saved=await loadDraft(selected.id);Object.assign(selected,saved,{metadataOnly:false,diskRevision:saved.revision});}
-    if(!selected||indexFor(selected,run.origin)<0)selected=makeFromRef(run.origin,run.name);
+    const owner=await runOwner(run,stored);
+    if(owner)selected=owner;
+    else if(params.has('canvasPhoto')||(await loadDrafts(true)).some(p=>Object.values(p.runs||{}).includes(run.id))){
+      run=null;announce('这张照片的 AI 结果保存在工作流中。');
+    }else selected=makeFromRef(run.origin,run.name);
   }
  if(selected)await selectPhoto(selected.id);else{updateChrome();renderPanel();renderFilm();paintCanvas();}
- if(run){showSection('ai');desk.restoreRun(run,currentPhoto()?.id);}
+ if(run){showSection('ai');desk.restoreRun(run,currentPhoto()?.id);if(currentPhoto())safeDraft(currentPhoto());}
  await registerWorkspaceEditor({tool:'workbench',prepare:()=>currentPhoto()?pinVisible():false,open:async(v,{isCurrent=()=>true}={})=>{
    if(!isCurrent()||run)return;
    if(photos.length&&!params.has('handoff')&&!params.has('imageAsset'))return;
-   ui.batch=false;const p=makeFromRef(v.origin,v.name),i=indexFor(p,v.origin);if(i>=0)p.cursor=i;
+   let match=null;
+   for(const photo of photos){
+    await unproject(photo);
+    if(indexFor(photo,v.origin)>=0){match=photo;break;}
+   }
+   if(!isCurrent())return;
+   ui.batch=false;const p=match||makeFromRef(v.origin,v.name),i=indexFor(p,v.origin);if(i>=0)p.cursor=i;
    await selectPhoto(p.id);if(isCurrent()&&p===currentPhoto()&&p.origin){const pinned=indexFor(p,v.origin);if(pinned>=0&&p.cursor!==pinned){p.cursor=pinned;ui.previewId=null;refreshEdits();}safeDraft(p);}
  }});
  await loginState();document.addEventListener('visibilitychange',()=>{if(!document.hidden)void loginState();});

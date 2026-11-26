@@ -7,7 +7,7 @@ function remove(){notice?.remove();notice=null;}
 function panel(version,kind,text){
  if(notice?.dataset.version===version&&notice.dataset.kind===kind)return null;
  remove();notice=document.createElement('aside');notice.className='update-notice';notice.dataset.version=version;notice.dataset.kind=kind;notice.setAttribute('aria-label','软件更新');notice.setAttribute('aria-live','polite');
- const message=document.createElement('span');message.textContent=text;notice.append(message);document.querySelector('header')?.after(notice);return notice;
+ const message=document.createElement('span');message.textContent=text;notice.append(message);const slot=document.getElementById('workbench-update-slot');if(slot)slot.replaceChildren(notice);else document.querySelector('header')?.after(notice);return notice;
 }
 function render(s,native=false){
  if(!s||typeof s.currentVersion!=='string')return;

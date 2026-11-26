@@ -11,7 +11,7 @@ export function sceneGuideControls({label,row,select,onChange}){
  const character=el('input'),work=el('input');character.id='agent-character-hint';work.id='agent-work-hint';
  character.maxLength=work.maxLength=64;character.placeholder='例如：雷电将军';work.placeholder='例如：原神';
  const extra=detail('场景和角色校正（选填）');
- extra.append(label('拍摄场景',scene),label('虚构角色名',character),label('作品或系列',work),paragraph('留空时根据图中服装、道具和背景分析。没有充分依据时按可见造型修图。'));
+ extra.append(label('拍摄场景',scene),label('角色名或外号',character),label('作品或系列',work),paragraph('留空时根据图中服装、道具和背景分析。没有充分依据时按可见造型修图。'));
  const root=el('div');root.className='agent-option-group';root.append(row('识别场景与 COS 角色',enabled),extra);
  function update(){extra.hidden=!enabled.checked;}
  enabled.onchange=()=>{update();onChange();};update();

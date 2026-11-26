@@ -2,6 +2,10 @@ import {deskDefaults,deskGroups,deskTools,listOperation,moveOperation,stageOptio
 import {sceneOptions} from './scene-options.js';
 import {TARGET_POLICIES} from './target-policy.js';
 import {MAX_IMAGE_UPLOAD_BYTES} from './upload-limits.js';
+import {sceneGuideOptions} from './scene-guide.js';
+import {socialReferenceProvider} from './retouch-agent-options.js';
+
+const referenceSources={xiaohongshu:'小红书',douyin:'抖音',commons:'公开图库（Wikimedia Commons）',none:'不自动找图'};
 
 const names={auto:'全自动',semi:'半自动'};
 const statuses={pending:'待执行',done:'已完成',running:'执行中',stale:'待重新执行',error:'需处理',interrupted:'已暂停'};
@@ -143,7 +147,14 @@ export function createAiDesk(host){
  }
  function currentStep(){return chosen()?.steps.find(s=>s.id===chosen().next);}
  function inputProblem(){
-  if(mode==='auto'&&!chosen()&&draft.auto.paint&&(!Number.isInteger(draft.auto.paintLevel)||draft.auto.paintLevel<1||draft.auto.paintLevel>10))return '厚涂程度需要 1–10 的整数。';
+  if(mode==='auto'&&!chosen()){
+   const p=draft.auto;
+   if(p.paint&&(!Number.isInteger(p.paintLevel)||p.paintLevel<1||p.paintLevel>10))return '厚涂程度需要 1–10 的整数。';
+   if(p.referenceProvider!=='none'){
+    try{sceneGuideOptions({character:p.character?.trim(),work:p.work?.trim()});}
+    catch(error){return error.message;}
+   }
+  }
   const op=currentStep()?.operation||(!chosen()&&mode==='semi'?draft.operations[0]:null);
   if(!op)return '';const p=stateAt(op);
   if(p.reading||p.maskReading)return '正在准备本步输入…';
@@ -179,9 +190,58 @@ export function createAiDesk(host){
   b.onkeydown=e=>{let next;if(e.key==='Home')next='auto';else if(e.key==='End')next='semi';else if(e.key==='ArrowRight'||e.key==='ArrowLeft')next=m==='auto'?'semi':'auto';if(next){e.preventDefault();changeMode(next);modeButtons[next].focus();}};
   modeButtons[m]=b;tabs.append(b);
  }
+ function referenceSettings(parent,p){
+  const group=details('参考图来源与角色',parent);
+  group.open=p.referenceSettingsOpen??true;
+  group.ontoggle=()=>{p.referenceSettingsOpen=group.open;persist();};
+  const provider=select('参考图来源',Object.entries(referenceSources),p.referenceProvider||'xiaohongshu',value=>{
+   p.referenceProvider=value;persist();update();sync();
+  },group);
+  provider.id='desk-reference-provider';
+  const hints=el('div'),labels=[['character','角色名或外号','如 影宝'],['work','作品名（消歧）','如 原神']];
+  for(const [key,label,placeholder] of labels){
+   const field=el('label',label,'desk-field'),input=el('input');
+   input.type='text';input.id='desk-reference-'+key;input.maxLength=64;input.value=p[key]||'';
+   input.placeholder=placeholder;input.oninput=()=>{p[key]=input.value;persist();sync();};
+   field.append(input);hints.append(field);
+  }
+  group.append(hints);
+  const note=el('p');
+  const open=button('打开独立浏览器',()=>openPlatform(provider.value,open),'','desk-reference-open');
+  group.append(open,note);
+  function update(){
+   const social=socialReferenceProvider(provider.value);
+   open.hidden=!social;hints.hidden=provider.value==='none';
+   note.textContent=social?'使用 '+referenceSources[provider.value]+' 的站内搜索。若要求登录，请在独立窗口完成。':
+    provider.value==='none'?'按本图的造型、光线和场景进行修整。':'搜索 Wikimedia Commons，保留图片出处与许可。';
+  }
+  update();
+ }
+ async function openPlatform(provider,control){
+  if(!socialReferenceProvider(provider))return;
+  const started=epoch;control.disabled=true;
+  try{
+   await host.api('/api/platform/open',{provider});
+   if(started===epoch)tell('已打开 '+referenceSources[provider]+'，请在该窗口处理登录或验证提示。');
+  }catch(error){if(started===epoch)tell(error.message||'参考平台暂时无法打开。');}
+  finally{control.disabled=false;}
+ }
+ function showReferenceSearch(run,parent){
+  const step=run.agent?.steps.find(step=>step.id==='references');
+  const search=step?.referenceSearch,provider=run.agent?.referenceProvider;
+  if(!search?.queries.length)return;
+  const group=details('参考图记录 · '+search.count+' 张候选',parent);
+  group.open=!!draft.expandedReferences||step.status==='error';
+  group.ontoggle=()=>{draft.expandedReferences=group.open;persist();};
+  for(const warning of search.warnings)group.append(el('p',warning));
+  for(const query of search.queries)group.append(el('p',(referenceSources[query.provider]||query.provider)+' · '+query.query));
+  if(!run.busy&&socialReferenceProvider(provider)&&['error','interrupted'].includes(step.status))
+   group.append(button('打开 '+referenceSources[provider],event=>openPlatform(provider,event.currentTarget)));
+ }
  function automatic(){
   dataArea.append(el('h3','按场景自动精修'),el('p','分析场景、寻找参考、修人物、调色并检查成片。'));
   const p=draft.auto;
+  referenceSettings(dataArea,p);
   check('加入厚涂',p.paint,v=>{p.paint=v;persist();render();},dataArea).id='desk-auto-paint';
   if(p.paint)numberField(dataArea,'厚涂程度 1–10',1,10,p.paintLevel,v=>{p.paintLevel=v;persist();sync();});
   check('加入小特效',p.effects,v=>{p.effects=v;persist();render();},dataArea).id='desk-auto-effects';
@@ -241,6 +301,7 @@ export function createAiDesk(host){
    const edits=run.steps.filter(s=>s.type==='retouch');
    if(edits.length){const done=edits.filter(s=>s.status==='done').length;progress.append(el('p','已完成 '+done+' / '+edits.length+' 项修图'));}
    if(steps.length>5){const more=details('查看全部 '+steps.length+' 个步骤',progress);more.open=!!draft.expandedProgress;more.ontoggle=()=>{draft.expandedProgress=more.open;};more.append(list);}else progress.append(list);
+   showReferenceSearch(run,progress);
    if(next?.operation&&!run.busy){
     const configBox=el('div');progress.append(configBox);configBox.append(el('h3','下一步 · '+next.name));
     if(next.inputsFrozen)configBox.append(el('p','已有提交记录。继续会核对原请求，修改参数请另开一轮。'));
@@ -274,7 +335,7 @@ export function createAiDesk(host){
    const source=host.pinDisplayed?await host.pinDisplayed():adopted||await host.pin();
    if(!guard())return;
    if(!boundKey)boundKey=keyFor(source);
-   const intent={mode,source,name:host.state().name,model:host.state().model||models.image,operations:[...draft.operations],auto:{...draft.auto}};
+   const intent={mode,source,name:host.state().name,model:host.state().model||models.image,operations:[...draft.operations],auto:{paint:draft.auto.paint,effects:draft.auto.effects,paintLevel:draft.auto.paintLevel,effect:draft.auto.effect,referenceProvider:draft.auto.referenceProvider,character:draft.auto.referenceProvider==='none'?'':draft.auto.character?.trim(),work:draft.auto.referenceProvider==='none'?'':draft.auto.work?.trim()}};
    const signature=JSON.stringify(intent);
    const previous=pendingPreparations[mode];
    if(previous&&previous.signature!==signature)throw Error('上次准备回执未知，请先恢复原设置或打开工作流。');
@@ -297,7 +358,7 @@ export function createAiDesk(host){
  }
  function sourceChanged(ref,documentKey){
   ++epoch;locked=false;stopTimer();runs={auto:null,semi:null};pendingPreparations={auto:null,semi:null};inspected={auto:null,semi:null};readyToRecover=null;draft=deskDefaults();boundKey=documentKey||keyFor(ref)||'';adopted=null;paintedKey='';notice='';shownState='';
-  try{const raw=boundKey&&JSON.parse(sessionStorage.getItem('houtu-desk:'+boundKey));if(raw){draft=raw.draft||draft;mode=names[raw.mode]?raw.mode:mode;readyToRecover=raw.ids;pendingPreparations=raw.pending||pendingPreparations;}}catch{}
+  try{const raw=boundKey&&JSON.parse(sessionStorage.getItem('houtu-desk:'+boundKey));if(raw){if(raw.draft)draft={...draft,...raw.draft,auto:{...draft.auto,...raw.draft.auto}};mode=names[raw.mode]?raw.mode:mode;readyToRecover=raw.ids;pendingPreparations=raw.pending||pendingPreparations;}}catch{}
   const saved=host.savedRuns?.();if(saved)readyToRecover={...readyToRecover,...saved};
   render();if(active&&boundKey)void loadSaved(mode);
  }

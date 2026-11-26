@@ -89,3 +89,16 @@ test('canvas drafts survive backend restart and reject stale writes and invalid 
  await f.restart();const saved=await f.ok(u);assert.equal(saved.cursor,1);assert.equal(saved.nodes[1].action.values.exposure,.15);assert.equal(saved.revision,1);assert.equal(saved.viewport.zoom,1.5);
  const index=await f.ok('/api/studio/canvas-drafts');assert.equal(index.photos.length,1);assert.equal(index.photos[0].metadataOnly,true);assert.equal(index.photos[0].nodes,undefined);
 });
+
+test('auto desk forwards an explicit search source and alias to the scene recipe',()=>{
+ const auto=deskRecipe({mode:'auto',auto:{character:' 影宝 ',work:'原神'}}).stages[0].options;
+ assert.equal(auto.referenceProvider,'xiaohongshu');
+ assert.equal(auto.allowPublicFallback,false);
+ assert.equal(auto.sceneGuide.character,'影宝');
+ assert.equal(auto.sceneGuide.work,'原神');
+ assert.equal(deskRecipe({mode:'auto',auto:{referenceProvider:'douyin'}}).stages[0].options.referenceProvider,'douyin');
+ assert.equal(deskRecipe({mode:'auto',auto:{referenceProvider:'commons'}}).stages[0].options.referenceProvider,'commons');
+ assert.equal(deskRecipe({mode:'auto',auto:{referenceProvider:'none'}}).stages[0].options.autoSearch,false);
+ assert.throws(()=>deskRecipe({mode:'auto',auto:{referenceProvider:'other'}}),/来源/);
+ assert.throws(()=>deskRecipe({mode:'auto',auto:{character:'https://example.test'}}),/角色/);
+});

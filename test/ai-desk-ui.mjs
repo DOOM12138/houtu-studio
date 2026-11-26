@@ -19,7 +19,10 @@ await ctx.addInitScript(()=>{
  const native=window.fetch;window.fetch=(url,init)=>{if(init?.method==='POST'&&String(url).includes('/ai-runs'))counts.posts++;return native(url,init);};
 });
 const page=await ctx.newPage();page.setDefaultTimeout(15000);page.on('pageerror',e=>errors.push(e.message));
-const png=await sharp({create:{width:320,height:240,channels:3,background:'#8b8491'}}).png().toBuffer(),file={name:'演练图.png',mimeType:'image/png',buffer:png};
+const privateSample=process.env.HOUTU_PRIVATE_EXPORT_FIXTURE==='1';
+const png=privateSample?await sharp('data/private-regression/cos-export.jpg').png().toBuffer():
+ await sharp({create:{width:320,height:240,channels:3,background:'#8b8491'}}).png().toBuffer();
+const file={name:'演练图.png',mimeType:'image/png',buffer:png};
 const ready=()=>page.waitForFunction(()=>document.querySelector('#docName')?.textContent==='演练图.png'&&!document.querySelector('#export').disabled);
 async function selectTool(id,label){
  const q=page.locator('#desk-search');await q.fill(label);await page.locator('[data-operation-choice="'+id+'"]').check();
@@ -62,9 +65,38 @@ try{
  const actual=await sharp(await fs.readFile(await(await download).path())).raw().toBuffer();
  const expected=await sharp(Buffer.from(await(await fetch(f.origin+'/api/workflows/'+v.result.workflowId+'/assets/'+v.result.assetId)).arrayBuffer())).ensureAlpha().raw().toBuffer();
  assert.deepEqual([...actual.subarray(0,3)],[...expected.subarray(0,3)]);
- await page.locator('[data-section=ai]').click();await page.locator('#desk-mode-auto').click();await page.locator('#desk-start').click();
+ await page.locator('[data-section=ai]').click();await page.locator('#desk-mode-auto').click();
+ assert.equal(await page.locator('#desk-reference-provider').inputValue(),'xiaohongshu');
+ await page.locator('#desk-reference-provider').selectOption('douyin');
+ await page.locator('#desk-reference-character').fill('影宝');
+ await page.locator('#desk-reference-work').fill('原神');
+ await page.locator('#desk-start').click();
  await page.waitForFunction(()=>document.querySelector('[data-desk-step=deliver]')?.textContent.includes('已完成'),null,{timeout:30000});
- const ai=await read('/api/studio/ai-runs/'+new URL(page.url()).searchParams.get('deskRun'));assert.equal(ai.mode,'auto');assert.equal(ai.origin.assetId,v.result.assetId);assert.ok(ai.done);assert.equal(f.bridge.images.length,4);
+ const ai=await read('/api/studio/ai-runs/'+new URL(page.url()).searchParams.get('deskRun'));assert.equal(ai.mode,'auto');assert.equal(ai.agent.referenceProvider,'douyin');assert.equal(ai.agent.sceneGuide.character,'影宝');assert.equal(ai.agent.sceneGuide.work,'原神');assert.equal(ai.origin.assetId,v.result.assetId);assert.ok(ai.done);assert.equal(f.bridge.images.length,4);
+ // The update notice must not add a grid row or resize the photo.
+ const box=await page.locator('#mat').boundingBox(),currentVersion=(await read('/api/health')).version;
+ await page.route('**/api/updates/status',route=>route.fulfill({json:{currentVersion,available:true,latest:{version:'9.9.1'}}}));
+ await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+ await page.locator('#workbench-update-slot .update-notice').waitFor();
+ assert.deepEqual(await page.locator('#mat').boundingBox(),box);
+ const dismiss=page.locator('#workbench-update-slot button').last();
+ await dismiss.click();await page.unroute('**/api/updates/status');
+ for(let attempt=0;attempt<2;attempt++){
+  await page.reload();await waitPic('deliver');
+  assert.equal(await page.locator('#filmPhotos .tile').count(),1);
+ }
+ const runUrl=page.url();
+ await page.getByRole('button',{name:'移除照片 演练图.png',exact:true}).click();
+ await page.locator('#confirm-photo-removal').click();
+ await page.waitForFunction(()=>document.querySelectorAll('#filmPhotos .tile').length===0);
+ assert.equal((await read('/api/studio/canvas-drafts?removed=1')).photos.length,1);
+ await page.goto(runUrl);
+ await page.waitForFunction(()=>document.querySelector('#toast')?.textContent.includes('保存在工作流'));
+ assert.equal(await page.locator('#filmPhotos .tile').count(),0);
+ await page.locator('#project-menu').click();await page.locator('#recently-removed').click();
+ await page.getByRole('button',{name:'恢复 演练图.png',exact:true}).click();await ready();await waitPic('deliver');
+ assert.equal(await page.locator('#filmPhotos .tile').count(),1);
+ assert.equal((await read('/api/studio/canvas-drafts?removed=1')).photos.length,0);
  for(const width of [390,320]){
   await page.setViewportSize({width,height:820});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
   await page.locator('#desk-mode-semi').click();await page.locator('#desk-mode-auto').click();await page.screenshot({path:path.join(out,'phone-'+width+'.png')});

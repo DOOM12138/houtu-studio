@@ -42,3 +42,13 @@ button{white-space:nowrap}
 #unified-ai{overflow:hidden;display:flex;flex-direction:column;padding:8px 14px 0}#unified-ai .ai-mode-desk{flex:1;min-height:0}#unified-ai .ai-mode-body{display:flex;flex-direction:column;min-height:0}#unified-ai .desk-scroll{flex:1;overflow:auto;min-height:0;scrollbar-width:thin;overscroll-behavior:contain}#unified-ai .desk-foot{border-top:1px solid var(--line);background:var(--panel);padding:7px 0 9px}.desk-foot:has(.desk-start[hidden]):not(:has(.desk-notice:not(:empty))):not(:has(#desk-login:not([hidden]))){display:none}#project-menu{background:transparent;padding:0 3px;font-weight:700}#app #desk-start{line-height:1.3;height:auto;white-space:normal}.desk-unified-link{display:block;padding:9px 0;color:var(--accent)}@media(max-width:700px){#unified-ai{padding:2px 10px 0}#unified-ai .desk-foot{padding:3px 0}#unified-ai .desk-start{min-height:36px}#unified-ai .ai-mode-tabs button{min-height:32px}#unified-ai .desk-notice{margin:2px 0}#unified-ai .ai-mode-tabs{margin-bottom:2px}}
 
 @media(max-width:700px){#app:has(#inspector.ai-section):not(.focus-view){grid-template-rows:48px minmax(120px,1fr) clamp(208px,47dvh,410px) 52px}#unified-ai .desk-list{max-height:none;overflow:visible}#unified-ai .ai-mode-body p{margin:4px 0 7px}}
+
+#workbench-update-slot{position:fixed;top:62px;left:84px;z-index:9;max-width:min(460px,calc(100vw - 100px));pointer-events:none}
+#workbench-update-slot:empty{display:none}
+#workbench-update-slot .update-notice{justify-content:flex-start;gap:4px 12px;padding:8px 12px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 16px #25252024;pointer-events:auto}
+#workbench-update-slot .update-notice button{background:var(--paper)}
+#filmPhotos .film-tile{position:relative;flex:none;display:inline-flex;align-items:center}
+#filmPhotos .film-tile .tile{padding-right:29px}
+#filmPhotos .tile-remove{position:absolute;right:2px;top:4px;min-height:32px;width:27px;padding:0;color:var(--sub)}
+#filmPhotos .tile-remove:hover{color:var(--accent)}
+@media(max-width:700px){#workbench-update-slot{top:51px;left:8px;max-width:calc(100vw - 16px)}#filmPhotos .tile-remove{top:0}}

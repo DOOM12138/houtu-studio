@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 import {composite} from './compositor.mjs';
 import {gradeProcess} from './local-image.mjs';
 import {cloudSubject,cloudUpscale} from './agent-cloud.mjs';
-import {agentActions,imageAction} from '../public/retouch-agent-options.js';
+import {agentActions,imageAction,socialReferenceProvider,strictSocialReferences} from '../public/retouch-agent-options.js';
 import {inspectionPrompt,validateInspection,planPrompt,validateAgentPlan,localAgentPlan,checkPrompt,validateAgentCheck,licensedMaterial} from './agent-planning.mjs';
 import {sceneReferenceStep} from './scene-reference-search.mjs';
 import {resolveSceneProfile,catalogBoundProfile} from './scene-direction.mjs';
@@ -35,13 +35,13 @@ export async function executeAgentStep(service,w,node,token,run,inputAsset){
     service.guard(run);if(references.length>=config.referenceCount)break;
     if(!attempted.some(p=>p.query===q.query&&p.purpose===q.purpose))attempted.push(q);await save();
     let pool=[],provider=config.referenceProvider;
-    try{if(provider==='xiaohongshu'&&q.purpose==='style'){
-      if(typeof service.platform.open!=='function')throw Error('此设备未配置独立平台浏览器。');await service.platform.open();const found=await service.platform.search(q.query);pool=(found.results||[]).slice(0,8);
-     }else{provider='commons';pool=await service.search(q.query);}
-    }catch(error){warnings.push(error.message);if(provider==='xiaohongshu'&&config.allowPublicFallback){provider='commons';try{pool=await service.search(q.query);}catch(e){warnings.push(e.message);}}else if(provider==='xiaohongshu')throw inputRequired('平台需要登录或验证，请完成后继续，或允许公开图库备用。');}
+    try{if(socialReferenceProvider(provider)&&q.purpose==='style'){
+      if(typeof service.platform.open!=='function')throw Error('此设备未配置独立平台浏览器。');await service.platform.open(provider);const found=await service.platform.search(q.query,provider);pool=(found.results||[]).slice(0,8);
+     }else if(!strictSocialReferences(config)){provider='commons';pool=await service.search(q.query);}
+    }catch(error){warnings.push(error.message);if(socialReferenceProvider(provider)&&config.allowPublicFallback){provider='commons';try{pool=await service.search(q.query);}catch(e){warnings.push(e.message);}}else if(socialReferenceProvider(provider)&&error?.code!=='PLATFORM_UNAVAILABLE')throw inputRequired('平台需要登录或验证，请完成后继续，或允许公开图库备用。');}
     for(const entry of pool.slice(0,8)){
      service.guard(run);if(references.length>=config.referenceCount)break;const url=entry.url;if(references.some(r=>r.url===url))continue;
-     try{let raw,title,license,usage='reference-only';if(provider==='xiaohongshu'){const captured=await service.platform.capture(url);raw=captured.bytes;title=captured.title;license='平台例图，仅作参考，保留水印';}
+     try{let raw,title,license,usage='reference-only';if(socialReferenceProvider(provider)){const captured=await service.platform.capture(url,provider);raw=captured.bytes;title=captured.title;license='平台例图，仅作参考，保留水印';}
       else{const fetched=await service.fetchAsset(entry.image);raw=fetched.bytes;title=entry.title;license=entry.license;if(q.purpose==='material'&&licensedMaterial({...entry,usage:'material'}))usage='material';}
       const normalized=await sharp(raw,{limitInputPixels:24000000}).rotate().flatten({background:'white'}).resize({width:1200,height:1200,fit:'inside',withoutEnlargement:true}).jpeg({quality:88}).toBuffer(),asset=await service.workflows.putAsset(id,normalized,'image/jpeg');
       if(references.some(r=>r.assetId===asset.id))continue;references.push({assetId:asset.id,title:String(title||'自动参考').slice(0,180),url,license:String(license||'许可未明确，仅作参考').slice(0,180),creator:String(entry.creator||'').slice(0,180),usage,origin:provider});await save();
@@ -57,7 +57,7 @@ export async function executeAgentStep(service,w,node,token,run,inputAsset){
   const references=refs(),inspection=w.steps.find(s=>s.id==='inspect').output,catalog=w.steps.find(s=>s.id==='references')?.output?.catalog,observation=config.sceneGuide?{...inspection,sceneProfile:catalogBoundProfile(inspection.sceneProfile||resolveSceneProfile(null,config.sceneGuide,inspection.subjectPresent),catalog),catalog}:inspection;let plan,analysis;
   if(source.provider==='chatgpt'||config.hardwarePolicy){const result=await service.analyzeChecked(w,node,token,run,[source.previewAsset,...references.map(r=>r.assetId)],planPrompt(config,observation,references),value=>validateAgentPlan(value,config,references,observation));plan=result.checked;analysis=result.receipt;}
   else{plan=localAgentPlan(config,observation,references);analysis={provider:'local',engine:'task-rules',model:'mediapipe-selfie-segmentation'};}
-  if(config.sceneGuide&&plan.roleHypothesis&&config.autoSearch&&!config.sceneGuide.character&&!plan.sceneProfile.catalogVerified){
+  if(config.sceneGuide&&plan.roleHypothesis&&config.autoSearch&&!strictSocialReferences(config)&&!config.sceneGuide.character&&!plan.sceneProfile.catalogVerified){
    const proposed=plan.roleHypothesis,record=await service.characterLookup(proposed);service.guard(run);plan.roleCatalogue=record;
    if(['matched-record','matched-name'].includes(record.status)){
     plan.sceneProfile={...plan.sceneProfile,catalogVerified:true,character:{...plan.sceneProfile.character,status:'reference-candidate',name:proposed.name,work:record.status==='matched-record'?proposed.work:'',confidence:proposed.confidence,canSearchName:true}};

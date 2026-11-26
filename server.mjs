@@ -372,8 +372,10 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       const logDownload=/^\/api\/logs\/exports\/([a-f0-9-]{36})$/.exec(route);if(logDownload&&req.method==='GET'){const receipt=await diagnostics.asset(logDownload[1]);res.writeHead(200,{'Content-Type':'application/zip','Content-Length':receipt.bytes,'Cache-Control':'no-store','X-Houtu-Content-SHA256':receipt.sha256,'Content-Disposition':"attachment; filename*=UTF-8''"+encodeURIComponent(receipt.name)});await pipeline(createReadStream(receipt.file),res);return;}
       if(route==='/api/retouch-agent-capabilities'&&req.method==='GET')return json(res,200,await agents.capabilities({refresh:url.searchParams.get('refresh')==='1',model:url.searchParams.get('model')||'auto'}));
       if(route==='/api/studio/projects'&&req.method==='GET')return json(res,200,{projects:studio.list(),active:studio.active?{projectId:studio.active.projectId,currentPhoto:studio.active.currentPhoto,currentStep:studio.active.currentStep}:null});
-      if(route==='/api/studio/canvas-drafts'&&req.method==='GET')return json(res,200,{photos:canvasDrafts.list()});
+      if(route==='/api/studio/canvas-drafts'&&req.method==='GET')return json(res,200,{photos:canvasDrafts.list(url.searchParams.get('removed')==='1')});
       const canvasDraft=/^\/api\/studio\/canvas-drafts\/([a-f0-9-]{36})$/.exec(route);
+      const archiveCanvas=/^\/api\/studio\/canvas-drafts\/([a-f0-9-]{36})\/archive$/.exec(route);
+      if(archiveCanvas&&req.method==='POST')return json(res,200,await canvasDrafts.setRemoved(archiveCanvas[1],await body(req,4096)));
       if(canvasDraft&&req.method==='GET')return json(res,200,await canvasDrafts.get(canvasDraft[1]));
       if(canvasDraft&&req.method==='POST')return json(res,200,await canvasDrafts.save(canvasDraft[1],await body(req,3*1024*1024)));
       if(route==='/api/studio/ai-runs'&&req.method==='POST')return json(res,201,await deskRuns.prepare(await body(req,100000)));
@@ -435,9 +437,9 @@ export async function createApp({ directory = path.join(ROOT, 'data'), bridge: s
       if(route==='/api/platform/status'&&req.method==='GET')return json(res,200,await platform.status());
       if(route.startsWith('/api/platform/')&&req.method==='POST'){
         const input=await body(req,4096);
-        if(route==='/api/platform/open')return json(res,200,await platform.open());
-        if(route==='/api/platform/search')return json(res,200,await platform.search(input.query));
-        if(route==='/api/platform/capture'){const result=await platform.capture(input.url);return json(res,200,{...result,bytes:undefined,image:'data:image/png;base64,'+result.bytes.toString('base64')});}
+        if(route==='/api/platform/open')return json(res,200,await platform.open(input.provider));
+        if(route==='/api/platform/search')return json(res,200,await platform.search(input.query,input.provider));
+        if(route==='/api/platform/capture'){const result=await platform.capture(input.url,input.provider);return json(res,200,{...result,bytes:undefined,image:'data:image/png;base64,'+result.bytes.toString('base64')});}
         if(route==='/api/platform/close'){await platform.close();return json(res,200,{ok:true});}
       }
       if(route==='/api/creative'&&req.method==='POST'){const input=await body(req,64*1024),w=await creative.create(input);if(input.sourceOrigin)await workspace.bindOrigin(w.id,input.sourceOrigin);return json(res,201,await workflows.get(w.id));}
