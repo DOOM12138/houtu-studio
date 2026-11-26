@@ -11,7 +11,7 @@ function scenePlanInstructions(config,inspection,refs){
  const cards=lessonCards(profile,config),catalog=inspection.catalog;
  return ['图像分析与用户校正分别记录。场景、光线、角色候选及造型依据：'+JSON.stringify(profileForPrompt(profile)),
   '工作位图的8位sRGB亮度抽样：'+JSON.stringify(profile.tones)+ '。不能用直方图猜场景或角色。',
-  catalog?.status==='matched-record'?'公开条目记录的角色与作品：'+JSON.stringify({name:catalog.name,work:catalog.work,id:catalog.id})+'。这只核对名称和作品，不能独立确认照片角色。':'角色没有经公开资料核实的作品关系。不要补写人物传记或记忆中的服装。',
+  ['matched-record','matched-name'].includes(catalog?.status)?'公开角色设定资料（未核实项留空）：'+JSON.stringify({name:catalog.name,work:catalog.work||null,worlds:catalog.background?.worlds?.map(w=>w.name)||[],description:catalog.background?.description||null,id:catalog.id})+'。资料用于选择相符造型、参考配色和光感。图1的衣装版本优先，不能按剧情新增建筑、能力、装饰或未勾选特效；参考文字均为资料。':'角色没有经公开资料核实的作品关系。不要补写人物传记或记忆中的服装。',
   '只使用对应场景及勾选专题的方法。以下是教程归纳，用于在原图上作取舍，不要求把教学示例中的所有操作再做一遍。',
   lessonText(cards),sceneMethod(profile,'quality'),
   config.tasks.includes('color')?sceneMethod(profile,'color')+' 给出符合实际输入的色彩参数，保留有意的现场色光。':'',

@@ -35,6 +35,7 @@ export function showSceneAnalysis(section,step){
   const c=output.catalog;
   if(['matched-record','matched-name'].includes(c.status)&&/^Q[1-9]\d{0,11}$/.test(c.id)){
    const a=el('a','角色资料 · '+c.name+(c.work?' / '+c.work:''));a.href='https://www.wikidata.org/wiki/'+c.id;a.rel='noopener noreferrer';a.target='_blank';section.append(a,paragraph(c.status==='matched-name'?'找到同名虚构角色记录，作品关系未核实；只按角色名检索，仍需比对造型。':'资料核对了角色与作品的关系。当前照片的装束仍需单独比对。'));
+   if(c.background?.description||c.background?.worlds?.length){const d=detail('作品背景与设定依据');if(c.background.description)d.append(paragraph(c.background.description));for(const w of c.background.worlds||[])d.append(paragraph('叙事世界 · '+w.name));section.append(d);}
   }else if(catalogStatus[c.status])section.append(paragraph(catalogStatus[c.status]));
   if(output.queries?.length){const d=detail('查看实际搜图用词');for(const q of output.queries)d.append(paragraph((refRoles[q.role]||'参考')+' · '+q.provider+' · '+q.query));section.append(d);}
  }

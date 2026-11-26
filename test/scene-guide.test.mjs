@@ -40,10 +40,12 @@ test('different scene anchors, competing late cues and uncertain costume evidenc
 test('only a matching fictional catalogue record and work enable named public image queries',async()=>{
  const claim=id=>({mainsnak:{datavalue:{value:{id}}}}),entity=(id,name,kind,work)=>({id,labels:{en:{value:name}},claims:{P31:[claim(kind)],P1441:work?[claim(work)]:[]}});
  const char=entity('Q11','Example','Q1569167','Q40'),person=entity('Q12','Example','Q5'),same=entity('Q14','Example','Q95074','Q41');
- const datasets={'Q11':char,'Q12':person,'Q14':same,'Q40':entity('Q40','Source Work','Q0'),'Q41':entity('Q41','Other Work','Q0')};
+ char.descriptions={en:{value:'A fictional test adventurer'}};char.claims.P1080=[claim('Q55')];
+ const datasets={'Q11':char,'Q12':person,'Q14':same,'Q40':entity('Q40','Source Work series','Q0'),'Q41':entity('Q41','Other Work','Q0'),'Q55':entity('Q55','Fictional world','Q0')};
  const read=async params=>params.action==='wbsearchentities'?{search:[{id:'Q12'},{id:'Q14'},{id:'Q11'}]}:{entities:Object.fromEntries(params.ids.split('|').map(k=>[k,datasets[k]]))};
  const candidate={name:'Example',work:'Source Work',canSearchName:true};
  const match=await lookupFictionalCharacter(candidate,{read});assert.equal(match.id,'Q11');assert.equal(match.status,'matched-record');
+ assert.deepEqual(match.background,{description:'A fictional test adventurer',worlds:[{id:'Q55',name:'Fictional world'}]});
  const ambiguous=await lookupFictionalCharacter({...candidate,work:'Unknown Media'},{read});assert.equal(ambiguous.status,'ambiguous');
  const one=await lookupFictionalCharacter({...candidate,work:'Unverified subtitle'},{read:params=>params.action==='wbsearchentities'?{search:[{id:'Q11'}]}:read(params)});
  assert.equal(one.status,'matched-name');assert.equal(one.work,undefined);assert.equal(catalogBoundProfile(profile(),one).character.work,'');
