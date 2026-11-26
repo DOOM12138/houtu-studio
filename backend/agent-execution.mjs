@@ -5,16 +5,28 @@ import {gradeProcess} from './local-image.mjs';
 import {cloudSubject,cloudUpscale} from './agent-cloud.mjs';
 import {agentActions,imageAction} from '../public/retouch-agent-options.js';
 import {inspectionPrompt,validateInspection,planPrompt,validateAgentPlan,localAgentPlan,checkPrompt,validateAgentCheck,licensedMaterial} from './agent-planning.mjs';
+import {sceneReferenceStep} from './scene-reference-search.mjs';
+import {resolveSceneProfile,catalogBoundProfile} from './scene-direction.mjs';
+import {frameTones,finalSceneGrade} from './scene-tones.mjs';
 const inputRequired=message=>Object.assign(Error(message),{code:'INPUT_REQUIRED'});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 export async function executeAgentStep(service,w,node,token,run,inputAsset){
  if(w.config.hardwarePolicy)w=await service.ensureCompute(w,node,run);
  const config=w.config,source=w.steps[0].output,id=w.id,base={imageAsset:inputAsset},bytes=()=>service.bytes(id,inputAsset),refs=()=>w.steps.find(s=>s.id==='references')?.output?.references||source.references||[];
  if(node.id==='inspect'){
+  if(config.sceneGuide){
+   const inputs=[source.previewAsset,...(w.manualReferences||source.references||[]).slice(0,5).map(r=>r.assetId)];
+   const semantic=source.provider==='chatgpt'||config.hardwarePolicy;
+   const result=semantic?await service.analyzeChecked(w,node,token,run,inputs,inspectionPrompt(config),v=>validateInspection(v,config)):null;
+   const observed=result?.checked||{summary:'当前规则路线没有视觉语言模型。',subjectPresent:null,observations:[],queries:[],waistBox:null,sceneProfile:resolveSceneProfile(null,config.sceneGuide,null)};
+   observed.sceneProfile.tones=await frameTones(await bytes());
+   return {...base,...observed,analysis:result?.receipt||{provider:'local',engine:'image-statistics',semanticVerified:false}};
+  }
   if(source.provider==='chatgpt'||config.hardwarePolicy){const result=await service.analyzeChecked(w,node,token,run,[source.previewAsset],inspectionPrompt(config),value=>validateInspection(value,config));return {...base,...result.checked,analysis:result.receipt};}
   const image=await sharp(await bytes()).stats();return {...base,subjectPresent:null,summary:'本机图像指标与视觉分割辅助，不包含语言模型的复杂审美判断。',observations:[],queries:[{purpose:'style',query:config.goal.slice(0,120)||'cosplay portrait light color'},{purpose:'material',query:'transparent fantasy light particles PNG'}],luminance:image.channels.slice(0,3).map(c=>c.mean),analysis:{provider:'local',engine:'image-statistics+headless-segmentation'}};
  }
  if(node.id==='references'){
+  if(config.sceneGuide){const profile=w.steps.find(s=>s.id==='inspect').output?.sceneProfile||resolveSceneProfile(null,config.sceneGuide,null);return sceneReferenceStep(service,w,node,token,run,inputAsset,profile);}
   const prior=node.output?.references||[],references=[...(w.manualReferences||source.references||[]),...prior].filter((r,i,a)=>a.findIndex(p=>p.assetId===r.assetId)===i).slice(0,5),warnings=[...(node.output?.warnings||[])],attempted=[...(node.output?.queries||[])];
   const save=()=>service.partial(id,node.id,token,{...base,references,warnings,queries:attempted});await save();
   if(config.autoSearch){
@@ -42,9 +54,24 @@ export async function executeAgentStep(service,w,node,token,run,inputAsset){
   return {...base,references,warnings,queries:attempted,materialMode:references.some(licensedMaterial)?'licensed-material':'original-generation-if-needed'};
  }
  if(node.id==='plan'){
-  const references=refs(),observation=w.steps.find(s=>s.id==='inspect').output;let plan,analysis;
-  if(source.provider==='chatgpt'||config.hardwarePolicy){const result=await service.analyzeChecked(w,node,token,run,[source.previewAsset,...references.map(r=>r.assetId)],planPrompt(config,observation,references),value=>validateAgentPlan(value,config,references));plan=result.checked;analysis=result.receipt;}
+  const references=refs(),inspection=w.steps.find(s=>s.id==='inspect').output,catalog=w.steps.find(s=>s.id==='references')?.output?.catalog,observation=config.sceneGuide?{...inspection,sceneProfile:catalogBoundProfile(inspection.sceneProfile||resolveSceneProfile(null,config.sceneGuide,inspection.subjectPresent),catalog),catalog}:inspection;let plan,analysis;
+  if(source.provider==='chatgpt'||config.hardwarePolicy){const result=await service.analyzeChecked(w,node,token,run,[source.previewAsset,...references.map(r=>r.assetId)],planPrompt(config,observation,references),value=>validateAgentPlan(value,config,references,observation));plan=result.checked;analysis=result.receipt;}
   else{plan=localAgentPlan(config,observation,references);analysis={provider:'local',engine:'task-rules',model:'mediapipe-selfie-segmentation'};}
+  if(config.sceneGuide&&plan.roleHypothesis&&config.autoSearch&&!config.sceneGuide.character&&!plan.sceneProfile.catalogVerified){
+   const proposed=plan.roleHypothesis,record=await service.characterLookup(proposed);service.guard(run);plan.roleCatalogue=record;
+   if(record.status==='matched-record'){
+    plan.sceneProfile={...plan.sceneProfile,catalogVerified:true,character:{...plan.sceneProfile.character,status:'reference-candidate',name:proposed.name,work:proposed.work,confidence:proposed.confidence,canSearchName:true}};
+    plan.referenceSupport='visual-agreement';
+   }
+  }
+  if(config.sceneGuide){
+   const named=plan.sceneProfile?.catalogVerified&&(plan.sceneProfile.character.status==='user-specified'||plan.referenceSupport==='visual-agreement');
+   const unsupported=[inspection.sceneProfile?.character,plan.roleHypothesis].filter(c=>c?.name&&(!named||c.name!==plan.sceneProfile.character.name));
+   // Keep the original model reply in its receipt. Only scoped instructions are
+   // eligible to reach a downstream renderer after a name failed corroboration.
+   for(const a of plan.actions)for(const c of unsupported)for(const title of [c.name,c.work].filter(Boolean))a.prompt=a.prompt.split(title).join('图中原有造型');
+  }
+  if(config.sceneGuide&&config.materialFallback==='pause'&&plan.actions.some(a=>['large','small'].includes(a.id)&&!a.skip&&!a.parameters.materialId))throw inputRequired('视觉比对后没有选中可合成的授权素材，请更换素材后重新规划。');
   if(observation.subjectPresent===false){const person=plan.actions.find(a=>a.id==='person');if(person){person.skip=true;person.reason='原图分析未见人物，不凭空增加人物修整。';}}if(observation.observations?.some(o=>o.task==='belly'&&o.visible===false)){const belly=plan.actions.find(a=>a.id==='belly');if(belly){belly.skip=true;belly.reason='腹部不可见，不虚构人体调整。';}}
   return {...base,plan,analysis};
  }
@@ -59,7 +86,7 @@ export async function executeAgentStep(service,w,node,token,run,inputAsset){
  }
  if(['check','recheck'].includes(node.id)){
   if(node.id==='recheck'&&w.steps.find(s=>s.id==='repair')?.output?.skipped){const previous=w.steps.find(s=>s.id==='check');return {...previous.output,...base,pass:previous.output.pass||w.acceptedChecks?.includes(previous.attempts.at(-1).id)||false,skipped:true,reason:'本轮未再次细化，沿用已有检查／用户确认。',semanticVerified:false};}
-  if((source.provider==='chatgpt'||config.hardwarePolicy)&&agentActions(config).some(id=>id!=='upscale')){const preview=await service.preview(id,await bytes()),prompt=checkPrompt(config),result=await service.analyzeChecked(w,node,token,run,[source.previewAsset,preview],prompt,value=>validateAgentCheck(value,config));let checked=result.checked,cloudReview=null;if(result.receipt.provider==='local-agent'){const cloud=await service.analyzeCloud(await service.get(id),node,token,run,[source.previewAsset,preview],prompt);cloudReview={...validateAgentCheck(cloud.value,config),analysis:cloud.receipt};checked={...checked,pass:checked.pass&&cloudReview.pass,severity:checked.severity==='major'||cloudReview.severity==='major'?'major':'minor',checks:checked.checks.map(a=>{const b=cloudReview.checks.find(b=>b.key===a.key);return {...a,pass:a.pass&&b.pass,note:'本地：'+a.note+'；云端复核：'+b.note};}),summary:'本地Agent：'+checked.summary+'；云端复核：'+cloudReview.summary,repairable:checked.pass?cloudReview.repairable:cloudReview.pass?checked.repairable:checked.repairable&&cloudReview.repairable&&checked.repairStage===cloudReview.repairStage,repairStage:cloudReview.repairStage||checked.repairStage,repairPrompt:cloudReview.repairPrompt||checked.repairPrompt};}return {...base,...checked,analysis:result.receipt,cloudReview,semanticVerified:true};}
+  if((source.provider==='chatgpt'||config.hardwarePolicy)&&agentActions(config).some(id=>id!=='upscale')){const preview=await service.preview(id,await bytes()),prompt=checkPrompt(config,w.steps.find(s=>s.id==='plan')?.output?.plan),result=await service.analyzeChecked(w,node,token,run,[source.previewAsset,preview],prompt,value=>validateAgentCheck(value,config));let checked=result.checked,cloudReview=null;if(result.receipt.provider==='local-agent'){const cloud=await service.analyzeCloud(await service.get(id),node,token,run,[source.previewAsset,preview],prompt);cloudReview={...validateAgentCheck(cloud.value,config),analysis:cloud.receipt};checked={...checked,pass:checked.pass&&cloudReview.pass,severity:checked.severity==='major'||cloudReview.severity==='major'?'major':'minor',checks:checked.checks.map(a=>{const b=cloudReview.checks.find(b=>b.key===a.key);return {...a,pass:a.pass&&b.pass,note:'本地：'+a.note+'；云端复核：'+b.note};}),summary:'本地Agent：'+checked.summary+'；云端复核：'+cloudReview.summary,repairable:checked.pass?cloudReview.repairable:cloudReview.pass?checked.repairable:checked.repairable&&cloudReview.repairable&&checked.repairStage===cloudReview.repairStage,repairStage:cloudReview.repairStage||checked.repairStage,repairPrompt:cloudReview.repairPrompt||checked.repairPrompt};}return {...base,...checked,analysis:result.receipt,cloudReview,semanticVerified:true};}
   return {...base,pass:true,severity:'minor',summary:'本机完成尺寸、图像可读性与执行范围账本检查；没有完成语义审美判断。',checks:['scope','identity','lighting','seams','color'].map(key=>({key,pass:key==='scope'?true:null,note:key==='scope'?'执行节点均来自勾选清单。':'本机指标无法独立判断此语义项目。'})),repairable:false,engine:'local-structural-check',semanticVerified:false};
  }
  if(node.id==='deliver')return {...base,account:w.roleAccounts?.rendering||null,model:config.generationModel,resolvedModel:w.roleModels?.rendering?.resolvedModel||null,selectedTasks:config.tasks,sources:refs().map(r=>({title:r.title,url:r.url,license:r.license,creator:r.creator,usage:r.usage})),notice:'原图、各步结果与旧分支保留。'};
@@ -71,7 +98,7 @@ export async function executeAgentStep(service,w,node,token,run,inputAsset){
  if(!action||!agentActions(config).includes(action.id))throw Error('此节点不是已勾选的执行任务。');if(action.skip)return {...base,skipped:true,reason:action.reason};
  if(imageAction(action.id))return service.renderImage(w,node,token,run,inputAsset,action,{repair});
  if(action.id==='color'){
-  const tone=config.tone==='none'?null:{id:{dark:'dark-clean',bright:'bright-air',cinema:'cinema-teal'}[config.tone],amount:50},report={};const output=await gradeProcess(await bytes(),action.parameters.settings||{},{look:tone,report});return {...base,imageAsset:(await service.workflows.putAsset(id,output,'image/png')).id,engine:'local-sRGB',settings:report.settings,tone:report.tone};
+  const tone=config.tone==='none'?null:{id:{dark:'dark-clean',bright:'bright-air',cinema:'cinema-teal'}[config.tone],amount:50},report={};const output=await gradeProcess(await bytes(),action.parameters.settings||{},{look:tone,report,...(config.sceneGuide?{resolveSettings:finalSceneGrade(action.parameters.settings,w.steps.find(s=>s.id==='plan').output.plan.sceneProfile)}:{})});return {...base,imageAsset:(await service.workflows.putAsset(id,output,'image/png')).id,engine:'local-sRGB',settings:report.settings,tone:report.tone,...(action.colorGuard?{sceneProtection:action.colorGuard+(tone?' 已合并所选影调，并对最终基础参数限幅。':'')}:{})};
  }
  if(action.id==='effects'){
   const maskId=w.steps.find(s=>s.id==='subject')?.output?.maskAsset,mask=maskId?await service.bytes(id,maskId):null;

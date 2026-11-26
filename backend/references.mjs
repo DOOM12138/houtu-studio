@@ -26,10 +26,10 @@ export async function importReference(raw){
   const bytes=await sharp(result.bytes,{limitInputPixels:40000000}).rotate().toColourspace('srgb').resize({width:1400,height:1400,fit:'inside',withoutEnlargement:true}).jpeg({quality:90}).toBuffer();
   return {image:'data:image/jpeg;base64,'+bytes.toString('base64'),source};
 }
-export async function searchReferences(query){
+export async function searchReferences(query,load=publicFetch){
   const q=String(query||'portrait warm light').trim().slice(0,120);if(!q)throw new Error('请输入想参考的主题。');
   const url=new URL('https://commons.wikimedia.org/w/api.php');url.search=new URLSearchParams({action:'query',format:'json',generator:'search',gsrsearch:q+' filetype:bitmap',gsrnamespace:'6',gsrlimit:'6',prop:'imageinfo',iiprop:'url|extmetadata',iiurlwidth:'700'}).toString();
-  const response=await publicFetch(url.href),data=JSON.parse(response.bytes.toString('utf8'));
+  const response=await load(url.href),data=JSON.parse(response.bytes.toString('utf8'));
   if(data.error)throw new Error('公开图库暂时不可用，请上传参考图。');
   return Object.values(data.query?.pages||{}).sort((a,b)=>(a.index||0)-(b.index||0)).map(p=>{const i=p.imageinfo?.[0],plain=s=>String(s||'').replace(/<[^>]*>/g,'').slice(0,600);return i&&{title:p.title.replace(/^File:/,''),image:i.thumburl||i.url,url:i.descriptionurl,license:plain(i.extmetadata?.LicenseShortName?.value)||'见来源页面',creator:plain(i.extmetadata?.Artist?.value),credit:plain(i.extmetadata?.Credit?.value),licenseUrl:plain(i.extmetadata?.LicenseUrl?.value)};}).filter(x=>x&&allowed(new URL(x.image)));
 }

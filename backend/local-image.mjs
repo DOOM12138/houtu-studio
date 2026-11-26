@@ -22,8 +22,8 @@ export async function localProcess(bytes,input){
  if(options.sharpen>0)image=image.sharpen({sigma:.3+options.sharpen*.6,m1:options.sharpen,m2:options.sharpen*1.4});
  return image.png().toBuffer();
 }
-export async function gradeProcess(bytes,input,{look=null,report=null}={}){
- const image=await sharp(bytes,INPUT).rotate().toColourspace('srgb').ensureAlpha().raw().toBuffer({resolveWithObject:true}),data=new Uint8ClampedArray(image.data),choice=toneChoice(look),tone=choice?createToneState(choice,analyze(data)):null,applied=tone?toneSettings(tone):settings(input),pixels=render(data,image.info.width,image.info.height,applied);if(report)Object.assign(report,{settings:applied,tone});
+export async function gradeProcess(bytes,input,{look=null,report=null,resolveSettings=null}={}){
+ const image=await sharp(bytes,INPUT).rotate().toColourspace('srgb').ensureAlpha().raw().toBuffer({resolveWithObject:true}),data=new Uint8ClampedArray(image.data),choice=toneChoice(look),tone=choice?createToneState(choice,analyze(data)):null,base=tone?toneSettings(tone):settings(input),applied=resolveSettings?resolveSettings(base,tone):base,pixels=render(data,image.info.width,image.info.height,applied);if(report)Object.assign(report,{settings:applied,tone});
  return sharp(Buffer.from(pixels),{raw:{width:image.info.width,height:image.info.height,channels:4}}).png().toBuffer();
 }
 export async function exportProcess(bytes,input){let image=sharp(bytes,INPUT).rotate().toColourspace('srgb');const options=exportOptions(input);if(options.maxEdge>0)image=image.resize({width:options.maxEdge,height:options.maxEdge,fit:'inside',withoutEnlargement:true});if(options.format==='jpeg')image=image.flatten({background:options.background}).jpeg({quality:options.quality,mozjpeg:true});else if(options.format==='webp')image=image.webp({quality:options.quality});else image=image.png({compressionLevel:9});const data=await image.toBuffer(),metadata=await sharp(data,INPUT).metadata();return {bytes:data,type:'image/'+options.format,width:metadata.width,height:metadata.height,extension:options.format==='jpeg'?'jpg':options.format};}

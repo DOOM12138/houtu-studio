@@ -1,4 +1,5 @@
 import {normalizeModel} from './model-options.js';
+import {sceneGuideOptions} from './scene-guide.js';
 export const AGENT_VERSION='retouch-agent-v1';
 export const AGENT_TASKS=[['portrait','人物细化'],['outfit','衣料整理'],['belly','平滑瘦腹'],['clean','场照净场'],['paint','厚涂'],['color','调色'],['effects','小特效'],['small','小合成'],['large','大合成'],['figure','3D质感／手办'],['upscale','4K超分']];
 export const PERSON_TASKS=['portrait','outfit','paint'];
@@ -13,7 +14,7 @@ export function agentOptions(input={}){
  const effect=tasks.includes('effects')?input.effect||'sparkles':'none';if(!['sparkles','bokeh','snow','rain','petals','mist','rim','none'].includes(effect))throw Error('小特效选项无效。');
  const quality=input.quality!==false,repair=quality&&input.autoRepair===true;
  const hardware={};if(input.hardwarePolicy!==undefined){if(!['auto','cloud','hybrid'].includes(input.hardwarePolicy)||!['auto','qwen3-vl:4b','qwen3-vl:8b'].includes(input.localAgentModel||'auto'))throw Error('硬件路由或本地视觉Agent选择无效。');hardware.hardwarePolicy=input.hardwarePolicy;hardware.localAgentModel=input.localAgentModel||'auto';}
- return {version:AGENT_VERSION,mode,provider,...hardware,tasks,style,paintLevel,bellyLevel,tone,effect,goal:String(input.goal||'').trim().slice(0,2000),planningModel:normalizeModel(input.planningModel),generationModel:normalizeModel(input.generationModel),autoSearch:input.autoSearch!==false,referenceProvider:['commons','xiaohongshu'].includes(input.referenceProvider)?input.referenceProvider:'commons',allowPublicFallback:input.allowPublicFallback!==false,materialFallback:input.materialFallback==='pause'?'pause':'original',referenceCount:Math.max(1,Math.min(5,Math.round(Number(input.referenceCount)||5))),quality,autoRepair:repair,maxImageSteps};
+ return {version:AGENT_VERSION,mode,provider,...hardware,...(input.sceneGuide==null?{}:{sceneGuide:sceneGuideOptions(input.sceneGuide)}),tasks,style,paintLevel,bellyLevel,tone,effect,goal:String(input.goal||'').trim().slice(0,2000),planningModel:normalizeModel(input.planningModel),generationModel:normalizeModel(input.generationModel),autoSearch:input.autoSearch!==false,referenceProvider:['commons','xiaohongshu'].includes(input.referenceProvider)?input.referenceProvider:'commons',allowPublicFallback:input.allowPublicFallback!==false,materialFallback:input.materialFallback==='pause'?'pause':'original',referenceCount:Math.max(1,Math.min(5,Math.round(Number(input.referenceCount)||5))),quality,autoRepair:repair,maxImageSteps};
 }
 export function agentActions(config){
  const tasks=new Set(config.tasks),ids=[];if(tasks.has('clean'))ids.push('clean');if(PERSON_TASKS.some(id=>tasks.has(id)))ids.push('person');for(const id of ['belly','small','large','figure','color','effects','upscale'])if(tasks.has(id))ids.push(id);return ids;
