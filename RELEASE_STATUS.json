@@ -1,13 +1,13 @@
 {
   "schema": "houtu-release-status",
   "version": 1,
-  "checkedAt": "2026-11-26T06:38:45.877Z",
+  "checkedAt": "2026-11-26T07:20:15.553Z",
   "repository": "DOOM12138/houtu-studio",
-  "latestVerified": "v1.33.0",
+  "latestVerified": "v1.34.0",
   "scope": "Release publication, available workflow attempts, artifact inventory and supplied checksum lists against GitHub asset digests. Historical binaries were not all reinstalled; real AI quality and ARM physical-device coverage remain separately recorded.",
   "counts": {
-    "applications": 31,
-    "published": 24,
+    "applications": 32,
+    "published": 25,
     "failedOrStopped": 7,
     "recovered": 3,
     "knownIssues": 3,
@@ -15,6 +15,50 @@
     "dependencyReleases": 1
   },
   "applications": [
+    {
+      "tag": "v1.34.0",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-26T07:12:56Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.34.0",
+      "assetCount": 5,
+      "assets": [
+        {
+          "name": "houtu-studio-1.34.0-Android-arm64-v8a.apk",
+          "bytes": 205562911,
+          "digest": "sha256:1a6a2d3669a393b0ee5c0a740d02d2631d8b7caaf49932a8bc8ea33b15b294b0"
+        },
+        {
+          "name": "houtu-studio-1.34.0-Android-x86_64.apk",
+          "bytes": 213177363,
+          "digest": "sha256:3eaefd17a481224a0e79db936e945df53309f3428563bdd4aee1034d1358c5b7"
+        },
+        {
+          "name": "houtu-studio-1.34.0-SHA256.txt",
+          "bytes": 423,
+          "digest": "sha256:4c6733dedbefeeefd4da605fe951d736d8259b9f80fd3654cd85dafbba4bc2da"
+        },
+        {
+          "name": "houtu-studio-1.34.0-Windows-x64-Setup.exe",
+          "bytes": 186364301,
+          "digest": "sha256:86bceefbc3b14a4c552fa1115a48b77dc069815192f2f6faea5e4f4dc94eca9b"
+        },
+        {
+          "name": "houtu-studio-1.34.0-Windows-x64.zip",
+          "bytes": 268084003,
+          "digest": "sha256:7376154d1a50244575354ea327df0e176587f9592477e743bbc0b5c99c775531"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": {
+        "runId": 45771173444,
+        "latestAttempt": 1,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45771173444"
+      },
+      "note": "选片筛选、批量评分与标记、快捷键及撤销；精确步骤预览与跨板块接续，修复图层蒙版缩放。Windows实际安装及安卓独立模拟器已验证，未调用真实AI出图。"
+    },
     {
       "tag": "v1.33.0",
       "status": "known-issue",
@@ -57,8 +101,10 @@
         "latestConclusion": "success",
         "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45753504909"
       },
-      "note": "部分上传或人物图层蒙版在缩略预览／非100%缩放时可能失败或错位；修复在1.34隔离工作区验证，原附件保留。",
-      "fixStatus": "1.34.0验证中"
+      "note": "部分上传／人物图层蒙版在缩略预览、非100%缩放时可能失败或错位；已在v1.34.0验证修复，原安装附件保留。",
+      "fixStatus": "已在v1.34.0验证修复",
+      "replacement": "v1.34.0",
+      "fixedIn": "v1.34.0"
     },
     {
       "tag": "v1.32.2",
