@@ -61,7 +61,12 @@ jobs:
         with: {node-version: '25.2.1'}
       - uses: actions/download-artifact@v4
         with: {name: android-test-apk, path: release}
-      - run: npm ci
+      - name: Install emulator-host dependencies without optional CUDA downloads
+        run: npm ci
+        env:
+          # The host drives an APK whose ONNX runtime is bundled WASM.
+          # Keep native CPU packages; avoid unused Linux CUDA EP NuGet downloads.
+          ONNXRUNTIME_NODE_INSTALL: skip
       - name: Prepare native Android touch test driver
         run: node scripts/project-node.mjs node_modules/playwright-core/cli.js install android
       - name: Enable KVM for isolated Android emulator
