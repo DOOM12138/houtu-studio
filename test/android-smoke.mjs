@@ -20,7 +20,29 @@ async function waitForSavedGrade(page, exposure) {
  throw Error('Android grade did not persist exposure ' + exposure);
 }
 async function privateFile(file){return call([...target,'shell','run-as',pkg,'cat','files/houtu/'+file]);}
-async function waitFile(file,timeout=180000){const until=Date.now()+timeout;let last;while(Date.now()<until){try{return await privateFile(file);}catch(e){last=e;for(const diagnostic of ['runtime-error.txt','tmp/probe-error.txt'])try{const text=await privateFile(diagnostic);if(text.trim()){await fs.writeFile(path.join(report,diagnostic.replaceAll('/','-')),text);throw Error('Android runtime failed: '+text);}}catch(problem){if(problem.message.startsWith('Android runtime failed:'))throw problem;}await new Promise(r=>setTimeout(r,1000));}}throw Error('Missing Android runtime file '+file+': '+last?.message);}
+async function waitFile(file,timeout=180000){
+ const until=Date.now()+timeout;
+ let last;
+ while(Date.now()<until){
+  try{
+   const text=await privateFile(file);
+   // The Android process may have created the report but not finished writing JSON.
+   JSON.parse(text);
+   return text;
+  }catch(e){
+   last=e;
+   for(const diagnostic of ['runtime-error.txt','tmp/probe-error.txt'])try{
+    const text=await privateFile(diagnostic);
+    if(text.trim()){
+     await fs.writeFile(path.join(report,diagnostic.replaceAll('/','-')),text);
+     throw Error('Android runtime failed: '+text);
+    }
+   }catch(problem){if(problem.message.startsWith('Android runtime failed:'))throw problem;}
+   await new Promise(r=>setTimeout(r,1000));
+  }
+ }
+ throw Error('Missing or incomplete Android runtime file '+file+': '+last?.message);
+}
 async function mainPage(view,origin){const first=await view.page(),context=first.context();context.setDefaultTimeout(45000);context.setDefaultNavigationTimeout(45000);for(let i=0;i<150;i++){const match=context.pages().find(p=>{try{const u=new URL(p.url());return u.origin===origin&&['/','/workbench/','/ai/','/portrait/','/color/','/ai/color/','/studio/','/upscale/','/creative/','/layers/'].includes(u.pathname);}catch{return false;}});if(match){await match.waitForLoadState('domcontentloaded');return match;}await new Promise(r=>setTimeout(r,200));}const cdp=await context.browser().newBrowserCDPSession();try{await fs.writeFile(path.join(report,'webview-targets.json'),JSON.stringify(await cdp.send('Target.getTargets'),null,2));}finally{await cdp.detach();}throw Error('No Android workbench target: '+context.pages().map(p=>p.url()).join(','));}
 try{
  assert.equal((await call([...target,'shell','getprop','ro.kernel.qemu'])).trim(),'1','test requires an emulator');assert.equal((await call([...target,'shell','pm','list','packages',pkg])).trim(),'','test requires no existing Houtu app data');await call([...target,'install','-r',path.resolve(process.argv[2])],{timeout:180000});await call([...target,'shell','pm','grant',pkg,'android.permission.POST_NOTIFICATIONS']);await call([...target,'shell','am','start','-n',pkg+'/.MainActivity']);const runtime=JSON.parse(await waitFile('runtime.json'));
