@@ -1,20 +1,39 @@
 {
   "schema": "houtu-release-status",
   "version": 1,
-  "checkedAt": "2026-11-26T16:38:42.964Z",
+  "checkedAt": "2026-11-26T17:08:59.705Z",
   "repository": "DOOM12138/houtu-studio",
   "latestVerified": "v1.39.1",
   "scope": "Release publication, available workflow attempts, artifact inventory and supplied checksum lists against GitHub asset digests. Historical binaries were not all reinstalled; real AI quality and ARM physical-device coverage remain separately recorded.",
   "counts": {
-    "applications": 40,
+    "applications": 41,
     "published": 32,
-    "failedOrStopped": 8,
+    "failedOrStopped": 9,
     "recovered": 4,
     "knownIssues": 4,
     "historicalSourceTags": 6,
     "dependencyReleases": 1
   },
   "applications": [
+    {
+      "tag": "v1.40.0",
+      "status": "stopped",
+      "label": "发布中止·已被替代",
+      "draft": true,
+      "publishedAt": null,
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.40.0",
+      "assetCount": 0,
+      "assets": [],
+      "checksum": "not-published",
+      "replacement": "v1.40.1",
+      "note": "新版首页使用可见导入按钮和隐藏文件输入，旧安卓验收等待文件输入可见而超时。已修正验收入口。",
+      "workflow": {
+        "runId": 45863945620,
+        "latestAttempt": 1,
+        "latestConclusion": "failure",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45863945620"
+      }
+    },
     {
       "tag": "v1.39.1",
       "status": "published",

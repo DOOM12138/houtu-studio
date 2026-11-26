@@ -2,12 +2,13 @@
 
 核查日期：2026-11-26。最新完整验证版：[v1.39.1](https://github.com/DOOM12138/houtu-studio/releases/tag/v1.39.1)。
 
-现有40条应用Release中，32条已公开、8条发布失败／中止；已公开版本中另标4条恢复交付、4条已知运行问题。另有6个历史源码标签和1条安卓构建依赖。具体原因和后续跟进规则见 [RELEASE_RECOVERY.md](RELEASE_RECOVERY.md)，机器可读目录见 [RELEASE_STATUS.json](RELEASE_STATUS.json)。
+现有41条应用Release中，32条已公开、9条发布失败／中止；已公开版本中另标4条恢复交付、4条已知运行问题。另有6个历史源码标签和1条安卓构建依赖。具体原因和后续跟进规则见 [RELEASE_RECOVERY.md](RELEASE_RECOVERY.md)，机器可读目录见 [RELEASE_STATUS.json](RELEASE_STATUS.json)。
 
 核查覆盖发布状态、现存工作流尝试、附件清单，以及已提供的SHA清单与GitHub附件摘要；仅最新版本另核对实际Windows安装、安卓模拟器及本机更新回执。旧版并未逐个重新安装或重做AI画质验收。草稿仅维护者可见，失败版本原有Git标签和运行记录保留。
 
 ## 发布失败／已中止
 
+- **v1.40.0 · 发布中止·已被替代**：旧安卓验收在新版首页等待隐藏文件输入可见。已修正验收并由1.40.1交付。[运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45863945620)。
 - **v1.39.0 · 发布中止·已被替代**：传统照片项目验收卡在参考平台初始化，已停止发布。[运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45854982639)。修复包含在 1.39.1。
 - **v1.32.1 · 发布中止·已被替代**：功能测试已PASS，常驻测试驱动收尾未退出，后续修复。 [运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45735671520)；[替代／恢复版 v1.32.2](https://github.com/DOOM12138/houtu-studio/releases/tag/v1.32.2)。
 - **v1.32.0 · 发布失败·已中止**：模拟器宿主缺少Playwright安卓触控驱动，已补齐。 [运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45734215845)；[替代／恢复版 v1.32.2](https://github.com/DOOM12138/houtu-studio/releases/tag/v1.32.2)。
