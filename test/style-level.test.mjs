@@ -42,4 +42,4 @@ test('template export and legacy import retain valid style levels without privat
   assert.equal(old.options.style,'natural');
 });
 
-test('legacy high strengths use the deeper sixth level and retain clean edges',()=>{for(const style of ['cos','anime']){const top=paintingPrompt({style,paintLevel:6});assert.equal(paintingPrompt({style,paintLevel:10}),top);assert.match(top,/厚涂程度6\/10/);assert.match(top,/禁止涂鸦、乱线、粗糙刷痕/);}});
+test('legacy high strengths use the deeper sixth level and retain clean edges',()=>{for(const style of ['cos','anime']){const top=paintingPrompt({style,paintLevel:6});assert.equal(paintingPrompt({style,paintLevel:10}),top);assert.match(top,/厚涂程度6\/10/);assert.match(top,/禁止涂鸦、乱线、粗糙刷痕/);assert.match(top,/看不清的虹膜、睫毛、纹样与饰品保留/);}});

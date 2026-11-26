@@ -29,6 +29,10 @@ test('new Agent prompts are scoped to the node and legacy recipes retain their i
  assert.doesNotMatch(current,/移除|衣料仅整理|3D质感/);
  assert.match(current,/保留原妆/);
  assert.match(inspectionPrompt(fresh),/看不清时说明不确定/);
+ assert.match(current,/全身远景按原片可见细节/);
+ const previousRevision=agentOptions({...fresh,promptRevision:'agent-prompts-2026-11-27-r2'});
+ assert.equal(previousRevision.promptRevision,'agent-prompts-2026-11-27-r2');
+ assert.doesNotMatch(compileAgentPrompt(previousRevision,action,[]),/全身远景按原片可见细节/);
  assert.doesNotMatch(inspectionPrompt(old),/看不清时说明不确定/);
  const clothes=compileAgentPrompt(agentOptions({tasks:['outfit']}),{id:'person',prompt:'只整理裙摆右侧乱褶。'},[]);
  assert.match(clothes,/保留结构褶、纹样、接缝和覆盖范围/);
