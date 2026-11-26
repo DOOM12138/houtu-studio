@@ -5,7 +5,8 @@ import {PRESETS} from '/catalog.js';
 import {registerWorkspaceEditor,saveWorkspaceImage,resetWorkspaceImage,trackWorkspaceInput} from '/workspace-continuation.js';
 import {WorkflowClient} from '/color/workflow-client.js';
 import {stepPicture} from '/workflow-pictures.js';
-import {IMAGE_ACCEPT,RAW_EXTENSIONS,extension} from '/image-formats.js';
+import {IMAGE_ACCEPT,RAW_EXTENSIONS,needsImageImport,extension} from '/image-formats.js';
+import {MAX_IMAGE_UPLOAD_BYTES,IMAGE_UPLOAD_MESSAGE,DESKTOP_PHOTO_PIXELS,MOBILE_PHOTO_PIXELS} from '/upload-limits.js';
 import {saveDraft,loadDrafts,loadDraft} from './drafts.js';
 const aiDirectory=PRESETS.map(tool=>({...tool,aliases:{'remove-equipment':'去灯架 去器材','remove-people':'去路人','clear-background':'净场'}[tool.id]||''}));
 'use strict';
@@ -142,7 +143,7 @@ async function obtainMedia(photo) {
   if(media.has(photo.id))return media.get(photo.id);
   const promise=(async()=>{
     const img=new Image();if(/^https:/.test(photo.source)){img.crossOrigin='anonymous';img.referrerPolicy='no-referrer';}img.src=photo.source;await img.decode();
-    if(img.naturalWidth*img.naturalHeight>(isAndroid?12000000:24000000))throw Error('手动工作台支持电脑2400万／手机1200万像素以内的位图。');
+    if(img.naturalWidth*img.naturalHeight>(isAndroid?MOBILE_PHOTO_PIXELS:DESKTOP_PHOTO_PIXELS))throw Error('此照片超过'+(isAndroid?'1200 万':'6400 万')+'像素的编辑上限。');
     photo.width=img.naturalWidth;photo.height=img.naturalHeight;
     const ratio=Math.min(1,960/Math.max(photo.width,photo.height));
     const proxy=document.createElement('canvas');proxy.width=Math.max(1,Math.round(photo.width*ratio));proxy.height=Math.max(1,Math.round(photo.height*ratio));
@@ -153,7 +154,8 @@ async function obtainMedia(photo) {
   media.set(photo.id,promise);
   try{
     const data=await promise;
-    for(const k of media.keys()){if(media.size<=4)break;if(k!==photo.id&&k!==ui.active&&k!==boundBase)media.delete(k);}
+    const keep=photo.width*photo.height>24_000_000?2:4;
+    for(const k of media.keys()){if(media.size<=keep)break;if(k!==photo.id&&k!==ui.active&&k!==boundBase)media.delete(k);}
     return data;
   }catch(error){media.delete(photo.id);throw error;}
 }
@@ -576,7 +578,12 @@ function rawProfileSection(photo){
       control.setAttribute('aria-pressed',String(profile===mode));control.disabled=busy||profile===mode;actions.append(control);
     }
     const load=action('导入 .cube LUT',()=>lut.click(),undefined,'raw-import-lut');
-    load.disabled=busy;actions.append(load);box.append(actions,lut);
+    load.disabled=busy;actions.append(load);
+    if(!isAndroid){
+      const full=action('按原尺寸显影',()=>applyRawProfile(photo,profile,null,true),undefined,'raw-full-size');
+      full.disabled=busy;actions.append(full);
+    }
+    box.append(actions,lut);
     box.append(hint(photo.rawError||(busy?'正在从 RAW 重新显影…':'选择 V-Log/V-Gamut → Rec.709 的 LUT。')));
     const original=element('a','下载原始 RAW','small');
     original.href='/api/image-imports/'+photo.origin.workflowId+'/original';
@@ -585,7 +592,7 @@ function rawProfileSection(photo){
     links.append(original,history);box.append(links);
   });
 }
-async function applyRawProfile(photo,profile,file){
+async function applyRawProfile(photo,profile,file,fullSize=false){
   if(currentPhoto()!==photo||photo.rawDeveloping||ui.previewId!==null)return;
   settleCanvasInput();finishPendingEdit();
   const index=photo.cursor,source=editsAt(photo,index).base||photo.origin;
@@ -601,20 +608,28 @@ async function applyRawProfile(photo,profile,file){
       const response=await fetch(route+'/vlog-lut?'+query,{method:'POST',headers:{'X-Paint-CSRF':csrf,'Content-Type':'application/octet-stream'},body:file});
       result=await response.json();
       if(!response.ok)throw Error(result.error||'LUT 应用失败。');
+    }else if(fullSize){
+      result=await api(route+'/develop',{profile:'same',fullSize:true,fromAttempt:source.attemptId});
     }else if(profile==='standard'){
-      // The canvas already pins the first standard rendition.
-      result={source:photo.origin};
+      // Reuse the most recent standard rendition in this branch, including restored full-resolution versions.
+      const standard=chain(photo,index).map(i=>photo.nodes[i].action).findLast(a=>a?.type==='raw-develop'&&a.profile==='standard');
+      if(standard){
+        result={source:standard.origin};
+      }else{
+        result=await api(route+'/develop',{profile:'standard',fromAttempt:source.attemptId});
+      }
     }else result=await api(route+'/develop',{profile,fromAttempt:source.attemptId});
     const origin=stable(result.source);
     if(!origin||origin.workflowId!==photo.origin.workflowId||origin.stepId!=='develop')throw Error('本次显影未返回可用的照片版本。');
     if(photo.cursor!==index){
       throw Error('当前编辑步骤已变化。显影结果已保存在工作流中，可回到原步骤后再应用。');
     }
-    append(photo,profile==='standard'?'RAW · 标准 sRGB':profile==='vlog'?'RAW · V-Log 灰片':'RAW LUT · '+result.options.lutName,
+    const label=profile==='standard'?'RAW · 标准 sRGB':profile==='vlog'?'RAW · V-Log 灰片':'RAW LUT · '+result.options.lutName;
+    append(photo,fullSize?label+' · 原尺寸':label,
       {type:'raw-develop',origin,profile,...(profile==='vlog-lut'?{lutName:result.options.lutName}:{})});
     if(currentPhoto()===photo){
       refreshEdits();
-      announce(profile==='standard'?'已恢复标准显影，调色参数保留。':'已应用 RAW 显影，调色参数保留。');
+      announce(fullSize?'已按 '+result.width+' × '+result.height+' 显影，调色参数保留。':profile==='standard'?'已恢复标准显影，调色参数保留。':'已应用 RAW 显影，调色参数保留。');
     }
   }catch(e){
     photo.rawError=e.message;
@@ -878,8 +893,8 @@ function makeFromRef(origin,name){
  const photo=makePhoto(crypto.randomUUID(),name,assetPath(ref));photo.origin=ref;photo.pins={0:ref};photo.created=Date.now();photos.push(photo);return photo;
 }
 async function readSource(file){
- if(file.size>100*1024*1024)throw Error('单图最高100 MB。');
- if(!RAW_EXTENSIONS.includes(extension(file.name))&&['image/jpeg','image/png','image/webp'].includes(file.type)){
+ if(file.size>MAX_IMAGE_UPLOAD_BYTES)throw Error(IMAGE_UPLOAD_MESSAGE);
+ if(!needsImageImport(file)){
   const saved=await saveWorkspaceImage(file,file.name),w=await api('/api/workflows/'+saved.workflowId);
   return stepPicture(w,'source');
  }

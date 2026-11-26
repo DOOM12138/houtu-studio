@@ -1,6 +1,17 @@
 // Short-lived local worker. Camera files never go to an AI provider.
 import {workerData,parentPort} from 'node:worker_threads';import fs from 'node:fs/promises';import {fileURLToPath} from 'node:url';import sharp from 'sharp';import createLibRaw from 'libraw-wasm/dist/libraw.js';import {bmpPixels} from './bmp-image.mjs';
 import {renderVLog} from './raw-vlog.mjs';
+// RAW metadata defines the camera crop in sensor coordinates. LibRaw's cropbox
+// is relative to the decoder's active area, before orientation is applied.
+function cameraCrop(meta){
+ const crop=meta.raw_inset_crops?.[0];
+ if(!crop)return null;
+ const {cleft,ctop,cwidth,cheight}=crop;
+ const x=cleft-meta.left_margin,y=ctop-meta.top_margin;
+ if(![x,y,cwidth,cheight].every(Number.isSafeInteger)||x<0||y<0||cwidth<1||cheight<1||x+cwidth>meta.width||y+cheight>meta.height)return null;
+ if(!x&&!y&&cwidth===meta.width&&cheight===meta.height)return null;
+ return [x,y,cwidth,cheight];
+}
 let stage='读取原片';
 try{
  const {file,raw,options,maxPixels,lut}=workerData,bytes=await fs.readFile(file);let metadata={},master,rendered,width,height,halfSize=false;
@@ -18,13 +29,16 @@ try{
     ...(log ? {gamm: [1, 1], outputColor: 0, expCorrec: false, highlight: 1} : {})
    };
    decoder.open(new Uint8Array(bytes), settings);
-   const meta = decoder.metadata(false), pixels = Number(meta.width) * Number(meta.height);
+   const meta = decoder.metadata(true), pixels = Number(meta.width) * Number(meta.height);
    if (!Number.isSafeInteger(pixels) || pixels < 1 || pixels > 160000000) throw Error('RAW尺寸超出本机解码上限。');
+   const crop = cameraCrop(meta), effective = crop ? crop[2] * crop[3] : pixels;
    halfSize = settings.halfSize;
-   if (pixels > maxPixels && !halfSize) {
-    if (options.halfSize === false) throw Error('此RAW像素较大，请开启半尺寸显影。');
+   if (effective > maxPixels && !halfSize) {
+    if (options.halfSize === false) throw Error('此 RAW 超过本机原尺寸显影上限，请使用半尺寸显影。');
     halfSize = true;
-    decoder.open(new Uint8Array(bytes), {...settings, halfSize: true});
+   }
+   if (crop || halfSize !== settings.halfSize) {
+    decoder.open(new Uint8Array(bytes), {...settings, halfSize, ...(crop ? {cropbox:crop} : {})});
    }
    const image = decoder.imageData();
    const channels = log ? [1, 3, 4] : [1, 3], length = image.width * image.height * image.colors;

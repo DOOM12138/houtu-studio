@@ -61,4 +61,10 @@ test('RAW V-Log and LUT use retained sensor data, retain 16-bit precision and pi
  await assert.rejects(importer.applyVLogLut(before.workflowId,Buffer.from('LUT_3D_SIZE 2'),'invalid.cube',gray.source.attemptId),/3D/);
  await assert.rejects(importer.develop(before.workflowId,{profile:'vlog',fromAttempt:'absent'}),/显影版本不可用/);
  assert.equal((await importer.view(before.workflowId)).source.attemptId,lut.source.attemptId);
+ const half=await importer.create(original,'half.dng',{halfSize:true});
+ assert.equal(half.halfSize,true);
+ const full=await importer.develop(half.workflowId,{profile:'same',fullSize:true,fromAttempt:half.source.attemptId});
+ assert.deepEqual([full.width,full.height,full.halfSize],[before.width,before.height,false]);
+ assert.notEqual(half.imageAsset,full.imageAsset);
+ assert.equal((await workflowImage(workflows,half.source)).origin.attemptId,half.source.attemptId);
 });

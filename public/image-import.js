@@ -1,6 +1,9 @@
 import {trackWorkspaceInput,resetWorkspaceImage} from './workspace-continuation.js';
 import {MAX_IMAGE_UPLOAD_BYTES,IMAGE_UPLOAD_MESSAGE} from './upload-limits.js';
-import {IMAGE_ACCEPT,needsImageImport} from './image-formats.js';
+import {IMAGE_ACCEPT,needsImageImport,extension} from './image-formats.js';
+const bitmapMimes={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp'};
+function missingBitmapMime(file){return (!file.type||file.type==='application/octet-stream')&&Object.hasOwn(bitmapMimes,extension(file.name));}
+function normalizedBitmap(file){return missingBitmapMime(file)?new File([file],file.name,{type:bitmapMimes[extension(file.name)],lastModified:file.lastModified}):file;}
 const origins=new WeakMap(),selections=new WeakMap();let installed=false,csrf='',queue=Promise.resolve(),current=null,panel=null;
 export const imageOrigin=file=>origins.get(file)||null;
 async function request(url,input,raw){if(!csrf)csrf=(await(await fetch('/api/health')).json()).csrf;const r=await fetch(url,{method:'POST',headers:{'X-Paint-CSRF':csrf,'Content-Type':raw?'application/octet-stream':'application/json'},body:raw?input:JSON.stringify(input)}),value=await r.json();if(!r.ok)throw Object.assign(Error(value.error||'本机图片导入失败。'),{workflowId:value.workflowId});return value;}
@@ -31,9 +34,20 @@ export function installImageImports(){
  document.addEventListener('change',event=>{
   const input=event.target;if(!(input instanceof HTMLInputElement)||input.type!=='file'||!input.files?.length)return;const files=[...input.files];
   if(/image\//i.test(input.accept)&&files.some(file=>!imageOrigin(file)&&file.size>MAX_IMAGE_UPLOAD_BYTES)){event.stopImmediatePropagation();const p=elements();p.root.hidden=false;p.status.textContent=IMAGE_UPLOAD_MESSAGE;p.links.hidden=true;p.details.hidden=true;input.value='';return;}
-  if(!files.some(needsImageImport)){if(current?.input===input&&!files.some(imageOrigin)){panel.root.hidden=true;current=null;}return;}
+  if(!files.some(needsImageImport)){
+   if(/image\//i.test(input.accept)&&files.some(missingBitmapMime)){
+    event.stopImmediatePropagation();
+    const transfer=new DataTransfer();
+    for(const file of files)transfer.items.add(normalizedBitmap(file));
+    input.files=transfer.files;
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    return;
+   }
+   if(current?.input===input&&!files.some(imageOrigin)){panel.root.hidden=true;current=null;}
+   return;
+  }
   event.stopImmediatePropagation();if(['file','creative-source','sr-file','studio-files'].includes(input.id))resetWorkspaceImage();queue=queue.catch(()=>{}).then(async()=>{const p=elements();p.root.hidden=false;p.links.hidden=true;p.details.hidden=true;input.disabled=true;
-   try{const prepared=[];for(const file of files){if(!needsImageImport(file)){prepared.push({file});continue;}if(file.size>MAX_IMAGE_UPLOAD_BYTES)throw Error('原始图片最大支持100 MB。');p.status.textContent='正在本机导入 '+file.name+'，不发送到AI服务…';const imported=await request('/api/image-imports?name='+encodeURIComponent(file.name),file,true);prepared.push({imported});}await replaceInput(input,prepared);}
+   try{const prepared=[];for(const file of files){if(!needsImageImport(file)){prepared.push({file:normalizedBitmap(file)});continue;}if(file.size>MAX_IMAGE_UPLOAD_BYTES)throw Error('原始图片最大支持100 MB。');p.status.textContent='正在本机导入 '+file.name+'，不发送到AI服务…';const imported=await request('/api/image-imports?name='+encodeURIComponent(file.name),file,true);prepared.push({imported});}await replaceInput(input,prepared);}
    catch(e){p.status.textContent=e.message;if(e.workflowId){try{await loadImport(e.workflowId,input);}catch{p.links.hidden=false;p.history.href='/workflows/?id='+e.workflowId;p.history.textContent='查看保留的原始文件与错误';p.original.hidden=true;p.master.hidden=true;}}}
    finally{input.disabled=false;}
   });trackWorkspaceInput(queue);

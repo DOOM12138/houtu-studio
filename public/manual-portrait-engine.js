@@ -1,3 +1,4 @@
+import {DESKTOP_PHOTO_PIXELS} from './upload-limits.js';
 // Local pixel editing. No model, network, account or generated replacement pixels.
 import {FREQUENCY_TOOLS,applyFrequencyStroke,frequencyView} from './manual-frequency.js';
 import {NEUTRAL_TOOLS,paintNeutral,compositeNeutral} from './manual-neutral.js';
@@ -17,7 +18,7 @@ function sample(source,width,height,x,y){
  const a=values[3];return a?[values[0]/a,values[1]/a,values[2]/a,a*255]:[0,0,0,0];
 }
 export function renderManualPortrait(input,width,height,operations,settings={}){
- if(!(input instanceof Uint8ClampedArray)||!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1||width*height>24000000||input.length!==width*height*4)throw Error('人物图片尺寸无效，最多2400万像素。');
+ if(!(input instanceof Uint8ClampedArray)||!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1||width*height>DESKTOP_PHOTO_PIXELS||input.length!==width*height*4)throw Error('人物图片尺寸无效，最多6400万像素。');
  if(!settings||typeof settings!=='object'||!['composite','low','high','gray'].includes(settings.view||'composite'))throw Error('人物检查视图无效。');
  const all=manualOperations(operations),ops=all.slice(all.findLastIndex(o=>o.tool==='reset')+1),protection=new Uint8Array(width*height),short=Math.min(width,height);let pixels=input.slice(),neutral=null;
  for(const op of ops.filter(o=>['protect','unprotect','clear-protection'].includes(o.tool))){if(op.tool==='clear-protection'){protection.fill(0);continue;}const radius=Math.max(2,op.r*short),box=region(width,height,op.points,radius);for(let y=box.top;y<=box.bottom;y++)for(let x=box.left;x<=box.right;x++){let w=0;for(const p of op.points)w=Math.max(w,maskWeight((x-p[0]*width)**2+(y-p[1]*height)**2,radius));const i=y*width+x;protection[i]=op.tool==='protect'?Math.max(protection[i],Math.round(255*w*op.strength)):Math.max(0,protection[i]-Math.round(255*w*op.strength));}}

@@ -104,8 +104,31 @@ try{
  assert.match(await page.locator('#rawWorkingProfile').textContent(),/test\.cube/);
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
  await page.locator('#raw-standard').click();
- assert.equal(await page.locator('#rawWorkingProfile').textContent(),'标准 sRGB');
+ await page.waitForFunction(()=>document.querySelector('#rawWorkingProfile')?.textContent==='标准 sRGB');
  assert.equal(f.bridge.images.length,4);
+ // Standard photos must load independently of the host-supplied MIME.
+ await page.setViewportSize({width:1400,height:850});
+ for(const [format,name,type,width,height] of [
+  ['png','通用类型.PNG','application/octet-stream',150,100],
+  ['webp','空类型.WEBP','',160,100],
+  ['jpeg','实拍尺寸.JPG','application/octet-stream',8256,5504],
+  ['tiff','显影尺寸.TIFF','application/octet-stream',8256,5504]
+ ]){
+  const image=await sharp({create:{width,height,channels:3,background:'#90704b'}}).toFormat(format).toBuffer();
+  await page.locator('#file').setInputFiles({name,mimeType:type,buffer:image});
+  await page.waitForFunction(({name,size})=>document.querySelector('#docName')?.textContent===name&&document.querySelector('#docSize')?.textContent===size&&!document.querySelector('#export').disabled,
+   {name,size:width+' × '+height},{timeout:45000});
+ }
+ // The original 8256×5504 geometry is also used by the full-resolution render/export.
+ if(!await page.locator('#exposure').count())await page.locator('#group-light summary').click();
+ await page.locator('#exposure').evaluate(e=>{
+  e.value='.2';e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));
+ });
+ await page.locator('#export').click();
+ await page.locator('#exportFormat').selectOption('image/jpeg');
+ const exported=page.waitForEvent('download',{timeout:90000});await page.locator('#doExport').click();
+ const geometry=await sharp(await (await exported).path()).metadata();
+ assert.deepEqual([geometry.width,geometry.height],[8256,5504]);
  assert.deepEqual(errors,[]);console.log(JSON.stringify({pass:true,realGenerations:0,semiSingleStep:true,restoredNoResubmit:true,exactChainedSource:true,fullAuto:true,modeSwitchNoImageIO:true,sameCanvas:true,editAfterAi:true,display320:true,legacySingleTool:true}));
 }catch(e){console.error('URL',page.url(),'pageerrors',errors,'notice',await page.locator('.desk-notice').allTextContents(),'status',await page.locator('#ioState').allTextContents());await page.screenshot({path:path.join(out,'failure.png')});throw e;}
 finally{await ctx.close();await browser.close();await f.close();}
