@@ -38,7 +38,7 @@ try{
  await page.locator('#model-picker button').click();await page.waitForFunction(()=>document.querySelector('#model-picker').textContent.includes('暂时无法读取'));assert.equal(await select().inputValue(),A);await page.unroute('**/api/models?refresh=1');
  bridge.available=catalog;await page.locator('#model-picker button').click();await page.waitForFunction(()=>document.querySelectorAll('#model-picker-select option').length===3);
  const request=page.waitForResponse(r=>r.url().endsWith('/api/jobs')&&r.request().method()==='POST');await page.locator('#generate').click();const response=await request;assert.equal(response.status(),202);const job=await response.json();assert.equal(job.model,A);
- await page.waitForSelector('#reuse-result:not([hidden])');assert.equal(bridge.images,1);await page.goto(origin+'/?job='+job.id);await page.waitForFunction(()=>document.querySelector('#model-picker-select').value==='test-vision-a');
+ await page.waitForSelector('#reuse-result:not([hidden])');assert.equal(bridge.images,1);await page.goto(origin+'/ai/?job='+job.id);await page.waitForFunction(()=>document.querySelector('#model-picker-select').value==='test-vision-a');
  for(const [width,theme] of [[1440,'light'],[320,'dark']]){await page.setViewportSize({width,height:1000});await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.locator('.settings').screenshot({path:path.join(out,'retouch-'+width+'-'+theme+'.png')});}
  let expected=A;
  for(const [route,id] of [['/creative/','creative-model-picker'],['/ai/color/','color-model-picker']]){

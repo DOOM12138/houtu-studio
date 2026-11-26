@@ -13,6 +13,10 @@ test('all existing operations remain selectable and the queue preserves order wi
  assert.deepEqual(moveOperation(['skin','face'],'face',-1),['face','skin']);
  assert.deepEqual(listOperation(['skin','face'],'skin',false),['face']);
  assert.throws(()=>deskRecipe({mode:'semi',operations:[]}));assert.throws(()=>deskRecipe({mode:'semi',operations:['custom','custom']}));
+ const selected=deskRecipe({mode:'auto',auto:{paint:true,paintStyle:'anime',paintLevel:4}});
+ assert.equal(selected.stages[0].options.style,'anime');
+ assert.equal(selected.stages[0].options.paintLevel,4);
+ assert.throws(()=>deskRecipe({mode:'auto',auto:{paint:true,paintStyle:'photo'}}));
  const auto=deskRecipe({mode:'auto',auto:{paint:false,effects:false}});assert.deepEqual(auto.stages[0].options.tasks,['portrait','color']);
  assert.deepEqual(deskRecipe({mode:'auto',auto:{paint:true,effects:true}}).stages[0].options.tasks,['portrait','color','paint','effects']);
 });

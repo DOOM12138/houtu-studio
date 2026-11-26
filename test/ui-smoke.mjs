@@ -58,6 +58,7 @@ try {
     await page.locator('[name="area"][value="hands"]').check();
     if (width <= 1100) await page.locator('#tools-panel>summary').click();
     await page.locator('#select-region').click();
+    await page.locator('#selection-canvas').scrollIntoViewIfNeeded();
     const canvas = await page.locator('#selection-canvas').boundingBox();
     assert.ok(canvas && canvas.width > 0);
     await page.mouse.move(canvas.x + canvas.width * .2, canvas.y + canvas.height * .2);
