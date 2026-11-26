@@ -1,0 +1,1190 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light"><title>厚涂小站 · 单画布交互预览</title>
+<style>
+:root{color-scheme:light;--paper:#f8f6f2;--panel:#fffefa;--ink:#282824;--sub:#615e57;--line:#dcd8ce;--accent:#94432c;--accent-wash:#f4e6dc;--mat:#282a2c;--mat-ink:#f2f1ee;--mat-sub:#c0bfba;--focus:#ab5335;font-family:"Segoe UI","Microsoft YaHei","PingFang SC",system-ui,sans-serif;font-size:14px;color:var(--ink);background:var(--paper)}
+*{box-sizing:border-box}body{margin:0}button,input,select,textarea{font:inherit;color:inherit}button,select{cursor:pointer}button{border:1px solid transparent;border-radius:7px;background:transparent;padding:0 10px;min-height:36px;touch-action:manipulation}button:hover{background:#eae7df}button:disabled{opacity:.38;cursor:default}button:focus-visible,a:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--focus);outline-offset:3px}button[aria-pressed=true],.selected{background:var(--accent-wash);color:var(--accent)}[hidden]{display:none!important}::selection{background:#e6c5b5;color:#34251f}input,textarea{caret-color:var(--accent)}input[type=range]{accent-color:var(--accent);cursor:pointer}svg{display:block}.icon{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round;flex:none}.with-icon{display:inline-flex;align-items:center;justify-content:center;gap:7px}.icon-only{width:36px;display:inline-grid;place-items:center;padding:0}.primary{background:var(--accent);color:white;border-color:var(--accent);font-weight:600}.primary:hover{background:#78341f}.outline{border-color:var(--line);background:var(--panel)}.soft{background:var(--accent-wash);color:var(--accent)}.muted,.hint{color:var(--sub)}.hint{font-size:12px;line-height:1.6;margin:8px 0}.rule{width:1px;height:20px;background:var(--line);flex:none}.push{margin-left:auto}.number{font-variant-numeric:tabular-nums}.small{font-size:12px}.visually-hidden{position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden;white-space:nowrap}
+#app{height:100vh;height:100dvh;min-height:400px;display:grid;grid-template:54px minmax(0,1fr) / 72px minmax(0,1fr) clamp(284px,23vw,352px);overflow:hidden}
+#topbar{grid-column:1/-1;display:flex;align-items:center;gap:12px;padding:0 17px;border-bottom:1px solid var(--line);background:var(--panel);min-width:0}
+.brand{display:flex;gap:9px;align-items:center;font-weight:700;font-size:18px;letter-spacing:-.02em;white-space:nowrap}.brand img{width:29px;height:29px}.preview-label{font-size:12px;color:var(--sub);white-space:nowrap}.project-name{font-size:13px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.search-trigger{border:1px solid var(--line);background:var(--paper);color:var(--sub);min-width:132px;justify-content:space-between}.search-trigger kbd{font:11px "Segoe UI",sans-serif;padding:1px 4px;border:1px solid var(--line);border-radius:4px}.toolbar-group{display:flex;gap:4px;align-items:center}
+#rail{grid-column:1;grid-row:2;display:flex;flex-direction:column;align-items:stretch;padding:14px 7px 10px;gap:5px;border-right:1px solid var(--line);background:var(--paper);z-index:2}
+.rail-tool{display:flex;flex-direction:column;gap:5px;align-items:center;justify-content:center;min-height:58px;font-size:12px;font-weight:550;padding:4px}.rail-tool .icon{width:22px;height:22px}.rail-tool[aria-pressed=true]{background:var(--accent-wash);box-shadow:inset 0 0 0 1px #e1beac}.rail-tail{margin-top:auto}
+#desk{grid-column:2;grid-row:2;display:grid;grid-template-rows:42px minmax(0,1fr) 43px 100px;min-width:0;min-height:0;background:var(--mat)}#desk.film-closed{grid-template-rows:42px minmax(0,1fr) 43px 0}
+#documentbar,#viewbar{display:flex;align-items:center;gap:10px;min-width:0;padding:0 15px}#documentbar{background:#323436;color:var(--mat-ink);border-bottom:1px solid #414345}#documentbar .icon{color:#cfcdc6;width:16px;height:16px}#docName{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#docSize{color:var(--mat-sub);font-size:12px;white-space:nowrap}#ioState{font-size:12px;color:var(--mat-sub);white-space:nowrap;max-width:45%;overflow:hidden;text-overflow:ellipsis}#ioState[data-error=true]{color:#ffd4ad}
+#mat{position:relative;min-height:0;overflow:hidden;background:var(--mat);isolation:isolate}#stage{display:block;width:100%;height:100%;touch-action:none;cursor:grab}#stage.brush{cursor:crosshair}#stage:active{cursor:grabbing}#stage.brush:active{cursor:crosshair}
+#viewMode{position:absolute;top:12px;left:12px;background:#17191bef;color:white;max-width:calc(100% - 24px);padding:5px 10px;border-radius:5px;font-size:12px;pointer-events:none}#dividerWrap{position:absolute;inset:auto 20px 12px;display:flex;align-items:center;gap:8px;background:#1d1e20e8;border-radius:6px;color:white;padding:4px 10px;font-size:12px}#dividerWrap input{flex:1;min-width:0}#viewbar{background:#323436;color:var(--mat-ink);border-top:1px solid #454748;gap:3px}#viewbar button{min-height:34px;color:inherit;font-size:12px}#viewbar button:hover,#viewbar button[aria-pressed=true]{background:#4b4d4f;color:white}#viewbar .rule{background:#565758;margin:0 7px}#zoomLabel{min-width:40px;text-align:center;font-size:12px}#originalTip{font-size:12px;color:var(--mat-sub);white-space:nowrap}
+#film{display:flex;flex-direction:column;background:var(--paper);border-top:1px solid var(--line);min-height:0;overflow:hidden}#filmHead{display:flex;align-items:center;height:31px;gap:8px;padding:0 15px;font-size:12px}#filmHead button{min-height:26px;font-size:12px}#filmLabel{font-weight:650}#filmPhotos{display:flex;align-items:center;gap:8px;overflow:auto;padding:0 14px 7px;min-height:0}.tile{display:flex;align-items:center;gap:8px;flex:none;padding:3px 8px 3px 3px;border:1px solid var(--line);border-radius:6px;background:var(--panel);max-width:176px;min-height:50px}.tile img{display:block;width:44px;height:44px;object-fit:cover;border-radius:3px}.tile span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;font-size:12px}.tile b{display:block;font-size:12px;font-weight:600;margin-bottom:2px}.tile small{display:block;font-size:11px;color:var(--sub)}.tile.current{border:2px solid var(--accent);padding:2px 7px 2px 2px}.tile[aria-checked=true]{background:var(--accent-wash)}#filmPhotos .add-photo{height:50px;min-width:44px;border:1px dashed #b1aa9e;padding:0 10px;border-radius:6px;background:transparent}
+#inspector{grid-column:3;grid-row:2;display:grid;grid-template-rows:auto minmax(0,1fr) auto;border-left:1px solid var(--line);min-width:0;min-height:0;background:var(--panel)}
+#panelHead{display:flex;align-items:center;padding:18px 19px 13px;gap:10px;border-bottom:1px solid var(--line)}#panelTitle{margin:0;font-size:21px;line-height:1.4;letter-spacing:-.025em}#sectionKind{font-size:12px;color:var(--sub)}#parameterScroll{padding:0 18px 10px;overflow:auto;min-height:0;scrollbar-width:thin;scrollbar-color:#c8c2b6 transparent;overscroll-behavior:contain}
+.panel-group{border-bottom:1px solid var(--line)}.panel-group>summary{display:flex;align-items:center;justify-content:space-between;gap:6px;cursor:pointer;list-style:none;min-height:45px;font-weight:600;font-size:14px}.panel-group>summary::-webkit-details-marker{display:none}.panel-group>summary:after{content:"";width:6px;height:6px;margin-right:3px;border:solid var(--sub);border-width:0 1.5px 1.5px 0;transform:rotate(45deg)}.panel-group[open]>summary:after{transform:rotate(225deg)}.group-content{padding:1px 1px 14px}.range-row{margin:0 0 13px}.range-row:last-child{margin-bottom:2px}.range-line{display:flex;justify-content:space-between;align-items:center;gap:6px;line-height:1.5;font-size:13px}.range-line output{display:inline-block;font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums;min-width:42px;text-align:right}.range-row input{width:100%;height:19px;margin:3px 0 0;display:block}.panel-actions{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 2px}.panel-actions button{border:1px solid var(--line);min-height:36px;font-size:13px}.panel-actions button[aria-pressed=true]{border-color:#cb9a83}.panel-field{display:grid;gap:5px;margin:8px 0 12px;font-size:13px}.panel-field input,.panel-field select,.panel-field textarea,dialog input[type=search]{width:100%;min-width:0;border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:8px 9px}.panel-field textarea{min-height:60px;resize:vertical}.wide{width:100%}#panelFoot{display:flex;align-items:center;justify-content:space-between;background:var(--paper);border-top:1px solid var(--line);padding:6px 12px;}#panelFoot button{font-size:13px}.step-row{display:flex;align-items:center;width:100%;gap:9px;text-align:left;min-height:40px;font-size:13px}.step-row time{margin-left:auto;color:var(--sub);font-size:11px}.step-dot{width:8px;height:8px;flex:none;border-radius:50%;background:#ada99e}.step-row.current .step-dot{background:var(--accent)}.step-row.current{background:var(--accent-wash);color:var(--accent)}.step-row.previewed{outline:1px solid var(--accent)}.history-meta{margin:12px 0;font-size:13px;color:var(--sub)}.step-summary{margin:8px 0;border:1px solid var(--line);border-radius:8px;padding:10px 12px}.step-summary h3{font-size:14px;margin:0 0 4px}.step-summary p{margin:4px 0;font-size:12px;color:var(--sub);line-height:1.6}.swatch{width:12px;height:12px;border-radius:50%;border:1px solid #ffffff44}
+#toast{position:fixed;z-index:9;bottom:15px;left:50%;transform:translateX(-50%);max-width:min(90vw,640px);background:#35342f;color:#fffefa;border:1px solid #5d574e;padding:8px 15px;border-radius:7px;font-size:13px;line-height:1.55;pointer-events:none}
+dialog{width:min(425px,calc(100vw - 28px));max-height:min(78dvh,650px);overflow:auto;margin:auto;padding:18px 20px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:12px}dialog::backdrop{background:rgba(24,23,21,.43)}.dialog-head{display:flex;align-items:center;gap:12px;margin-bottom:10px}.dialog-head h2{margin:0;font-size:20px;letter-spacing:-.02em}.dialog-head button{margin-left:auto}.dialog-foot{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}.match{display:block;width:100%;padding:8px 7px;text-align:left;min-height:40px}.match small{display:block;color:var(--sub);font-size:12px}.dialog-content p{line-height:1.65}a{color:var(--accent)}.mobile-only{display:none}
+@media(max-width:900px) and (min-width:701px){#app{grid-template-columns:58px minmax(0,1fr) 253px}.search-trigger{min-width:75px}.search-trigger kbd,.project-name,#originalTip{display:none}#topbar{gap:6px}.rail-tool{font-size:12px}}
+@media(max-width:700px){#app{grid-template:48px minmax(135px,1fr) minmax(126px,31dvh) 52px / minmax(0,1fr);min-height:405px}#topbar{grid-row:1;gap:4px;padding:0 8px}.brand{font-size:15px;gap:6px}.brand img{width:25px;height:25px}.preview-label{font-size:11px}.project-name,#topbar>.rule,.desktop-only,.search-trigger kbd,.search-trigger span,#originalTip,#sectionKind{display:none}.search-trigger{min-width:34px;width:34px;justify-content:center;padding:0;border:0}.toolbar-group{gap:0}.toolbar-group .icon-only{width:32px}.mobile-only{display:inline-flex}.mobile-hidden{display:none!important}#topbar .outline,#topbar .primary{padding:0 7px;font-size:13px}#topbar .with-icon .icon{width:16px}.rail-tool .icon{width:19px;height:19px}
+ #rail{grid-column:1;grid-row:4;flex-direction:row;align-items:center;justify-content:space-evenly;padding:0 4px;border:0;border-top:1px solid var(--line);gap:0}.rail-tool{flex:1;min-width:0;min-height:44px;gap:1px;padding:2px;font-size:12px}.rail-tail{margin:0}#rail .help{display:none}
+ #desk,#desk.film-closed{grid-column:1;grid-row:2;grid-template-rows:30px minmax(0,1fr) 38px 0}#desk.mobile-film{grid-template-rows:30px minmax(0,1fr) 38px 61px}#documentbar{font-size:12px;padding:0 10px;gap:6px}#docName{font-size:12px}#docSize{font-size:11px}#ioState{font-size:11px}#viewbar{padding:0 5px;gap:0}#viewbar .rule{margin:0 3px}#viewbar button{min-height:32px;padding:0 6px}#viewbar .icon-only{width:28px}#viewbar .icon{width:16px}#zoomLabel{min-width:32px;font-size:11px}#filmHead{height:23px;font-size:11px;padding:0 9px}#filmHead button{min-height:22px}#filmPhotos{padding:0 8px 2px}.tile,.tile.current,.add-photo{min-height:32px!important;height:32px!important}.tile img{width:25px;height:25px}.tile small{display:none}.tile b{font-size:11px;margin:0}
+ #inspector{grid-column:1;grid-row:3;border:0;border-top:1px solid var(--line);grid-template-rows:32px minmax(0,1fr) 0}#panelHead{padding:0 12px}#panelTitle{font-size:15px}#parameterScroll{padding:0 12px 8px}.panel-group>summary{min-height:35px}.range-row{margin-bottom:8px}.range-row input{height:18px}.range-line{font-size:12px}#panelFoot{display:none}#toast{bottom:56px}#desk.mobile-film #film{visibility:visible}#desk:not(.mobile-film) #film{visibility:hidden}#app.focus-view{grid-template-rows:48px minmax(135px,1fr) 0 52px}#app.focus-view #inspector{visibility:hidden}#panelHead .mobile-only{min-height:28px;font-size:12px}
+}
+@media(max-width:380px){.preview-label,#topbar .outline .icon,#topbar .primary .icon{display:none}#topbar{gap:3px}.brand{font-size:14px}#viewbar .rule{display:none}#ioState{max-width:38%}}
+@media(prefers-reduced-motion:no-preference){button{transition:background .12s ease,color .12s ease}}
+button{white-space:nowrap}
+#sessionInfo{color:var(--mat-sub);padding:0 3px;font-size:12px;min-height:26px}#sessionInfo:hover{background:#454748}
+#scopeControl{margin-left:auto;border:1px solid var(--line);border-radius:5px;background:var(--panel);padding:2px 4px;font-size:12px;min-height:28px}
+#introTip{padding:9px 0;margin:0;border-bottom:1px solid var(--line);font-size:12px;line-height:1.6;color:var(--sub)}
+.range-row input[type=range]{appearance:none;background:transparent;outline-offset:1px;height:22px}
+.range-row input::-webkit-slider-runnable-track{height:3px;background:var(--line);border-radius:2px}
+.range-row input::-webkit-slider-thumb{appearance:none;width:13px;height:13px;border:2px solid var(--accent);border-radius:50%;background:var(--panel);margin-top:-5px}
+.range-row input::-moz-range-track{height:3px;background:var(--line)}
+.range-row input::-moz-range-thumb{width:10px;height:10px;border:2px solid var(--accent);border-radius:50%;background:var(--panel)}
+@media(prefers-color-scheme:dark){:root{color-scheme:dark;--paper:#262622;--panel:#2e2e2a;--ink:#f0ece4;--sub:#c3bdb2;--line:#54524a;--accent:#e2a183;--accent-wash:#4a372e;--focus:#f5ad89}.primary{background:#a25135;border-color:#a25135}.primary:hover{background:#91472f}button:hover{background:#424039}.rail-tool[aria-pressed=true]{box-shadow:inset 0 0 0 1px #95745f}.tile.current{border-color:var(--accent)}}
+@media(max-width:700px){#viewbar{gap:1px;padding:0 5px}#viewbar button{flex:0 0 auto;line-height:1.2}#viewbar .icon-only{width:29px}#viewbar #compare{gap:3px}#documentbar #sessionInfo{font-size:11px}#ioState{max-width:none}#introTip{padding:5px 0}#mobilePanel{flex-shrink:0}#scopeControl{max-width:90px}}
+@media(max-width:460px){#topbar .preview-label{display:none}#topbar .outline,#topbar .primary{flex-shrink:0}#viewbar #compare .icon{display:none}}
+@media(max-width:350px){#viewbar{gap:0}#viewbar button:not(.icon-only){padding:0 4px}#viewbar .icon-only{width:27px}#topbar .outline,#topbar .primary{padding:0 6px}}
+</style></head>
+<body><div id="app">
+<header id="topbar">
+ <div class="brand"><img alt="" id="logo"><span>厚涂小站</span></div><span class="preview-label">交互预览</span><span class="rule"></span><span class="project-name">照片工作台</span>
+ <button id="find" class="with-icon search-trigger push" title="查找工具 (Ctrl / ⌘ + K)" aria-label="查找工具"><i data-icon="search"></i><span>找工具</span><kbd>⌘/Ctrl K</kbd></button>
+ <div class="toolbar-group"><button id="undo" class="icon-only" title="撤销 (Ctrl / ⌘ + Z)" aria-label="撤销"><i data-icon="undo"></i></button><button id="redo" class="icon-only" title="重做 (Ctrl / ⌘ + Shift + Z)" aria-label="重做"><i data-icon="redo"></i></button></div>
+ <span class="rule"></span><button id="open" class="with-icon outline"><i data-icon="import"></i>导入</button><button id="export" class="with-icon primary"><i data-icon="export"></i>导出</button>
+ <input type="file" id="files" accept="image/jpeg,image/png,image/webp" multiple hidden>
+</header>
+<nav id="rail" aria-label="修图工具分类">
+ <button class="rail-tool" data-section="color"><i data-icon="sliders"></i>调色</button><button class="rail-tool" data-section="portrait"><i data-icon="brush"></i>人物</button><button class="rail-tool" data-section="layers"><i data-icon="layers"></i>图层</button><button class="rail-tool" data-section="ai"><i data-icon="spark"></i>AI 修图</button>
+ <button class="rail-tool rail-tail" data-section="steps"><i data-icon="steps"></i>步骤</button><button class="rail-tool help" id="about"><i data-icon="info"></i>说明</button>
+</nav>
+<main id="desk">
+ <div id="documentbar"><i data-icon="image"></i><strong id="docName">打开照片</strong><span id="docSize"></span><button class="push" id="sessionInfo" title="查看试用说明与会话保存范围"><span id="ioState" role="status"></span></button></div>
+ <div id="mat"><canvas id="stage" aria-label="修图画布，滚轮缩放，拖动平移；选择画笔后可在图上修整" tabindex="0"></canvas><span id="viewMode" hidden></span><label id="dividerWrap" hidden>原图<input type="range" min="1" max="99" value="50" id="splitPosition" aria-label="移动对比分界线">成片</label></div>
+ <div id="viewbar">
+  <button id="pan" class="icon-only" aria-label="平移画布" title="平移画布，按空格临时平移"><i data-icon="hand"></i></button>
+  <button id="smaller" class="icon-only" aria-label="缩小"><i data-icon="minus"></i></button><output id="zoomLabel" title="相对于适应画面的缩放倍数">1.0×</output><button id="larger" class="icon-only" aria-label="放大"><i data-icon="plus"></i></button><button id="fit">适应</button>
+  <span class="rule"></span><button id="compare" class="with-icon" aria-pressed="false"><i data-icon="compare"></i>对比</button><button id="original" aria-pressed="false" title="按住反斜杠临时查看原图">原图</button>
+  <span class="push"></span><button id="toggleFilm" class="with-icon" aria-label="展开或收起照片条"><i data-icon="film"></i><span id="filmCount">照片</span></button>
+ </div>
+ <section id="film" aria-label="当前项目的照片"><div id="filmHead"><span id="filmLabel">照片</span><span class="muted" id="filmSummary"></span><button class="push" id="batch">多选</button><button class="soft" id="sync" hidden>同步调色</button></div><div id="filmPhotos"></div></section>
+</main>
+<aside id="inspector" aria-label="当前工具参数"><div id="panelHead"><h1 id="panelTitle">调色</h1><span class="push" id="sectionKind"></span><button id="mobilePanel" class="mobile-only push">收起参数</button></div><div id="parameterScroll"></div></aside>
+</div>
+<dialog id="dialog" aria-labelledby="dialogTitle"><div class="dialog-head"><h2 id="dialogTitle"></h2><button id="closeDialog" class="icon-only" aria-label="关闭"><i data-icon="close"></i></button></div><div id="dialogBody" class="dialog-content"></div></dialog>
+<div id="toast" role="status" hidden></div>
+<script id="sampleData" type="application/json">[{"id":"ice","name":"展馆 · 蓝发场照","author":"TBD Tuyên","credit":"https://www.pexels.com/photo/cosplay-character-at-convention-center-event-37206376/","src":"https://images.pexels.com/photos/37206376/pexels-photo-37206376.jpeg?auto=compress&cs=tinysrgb&w=1250","thumb":"https://images.pexels.com/photos/37206376/pexels-photo-37206376.jpeg?auto=compress&cs=tinysrgb&w=120&h=120&fit=crop"},{"id":"silver","name":"银发 · 近景","author":"Martin.que","credit":"https://www.pexels.com/photo/elegant-cosplay-portrait-at-anime-convention-30462155/","src":"https://images.pexels.com/photos/30462155/pexels-photo-30462155.jpeg?auto=compress&cs=tinysrgb&h=1350","thumb":"https://images.pexels.com/photos/30462155/pexels-photo-30462155.jpeg?auto=compress&cs=tinysrgb&w=120&h=120&fit=crop"},{"id":"street","name":"街头 · 自然光","author":"Daniel Xavier","credit":"https://www.pexels.com/photo/woman-wearing-black-eyeglasses-1239291/","src":"https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=1400","thumb":"https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=120&h=120&fit=crop"}]</script>
+<script id="kernel" type="text/plain">const freq=(()=>{
+
+// Local frequency separation in the existing 8-bit sRGB editing space.
+// Low frequencies are alpha-weighted Gaussian approximations; signed residuals
+// stay in floating point until recombination. Tiles bound export memory use.
+const FREQUENCY_TOOLS = new Set(['low-smooth', 'low-clone', 'high-clone', 'high-soften']);
+const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+const TILE = 256;
+
+function radii(sigma) {
+  const ideal = Math.sqrt(4 * sigma * sigma + 1);
+  let lower = Math.floor(ideal);
+  if (!(lower % 2)) lower--;
+  lower = Math.max(1, lower);
+  const count = clamp(Math.round((12 * sigma * sigma - 3 * lower * lower - 12 * lower - 9) / (-4 * lower - 4)), 0, 3);
+  return Array.from({length: 3}, (_, i) => ((i < count ? lower : lower + 2) - 1) / 2);
+}
+
+function boxPass(input, output, width, height, radius, horizontal) {
+  if (!radius) { output.set(input); return; }
+  const length = horizontal ? width : height, lines = horizontal ? height : width;
+  const stride = horizontal ? 4 : width * 4, norm = 1 / (radius * 2 + 1);
+  for (let line = 0; line < lines; line++) {
+    const start = horizontal ? line * width * 4 : line * 4;
+    const sums = [0, 0, 0, 0];
+    for (let p = -radius; p <= radius; p++) {
+      const at = start + clamp(p, 0, length - 1) * stride;
+      for (let c = 0; c < 4; c++) sums[c] += input[at + c];
+    }
+    for (let p = 0; p < length; p++) {
+      const at = start + p * stride;
+      for (let c = 0; c < 4; c++) output[at + c] = sums[c] * norm;
+      const remove = start + clamp(p - radius, 0, length - 1) * stride;
+      const add = start + clamp(p + radius + 1, 0, length - 1) * stride;
+      for (let c = 0; c < 4; c++) sums[c] += input[add + c] - input[remove + c];
+    }
+  }
+}
+
+function blurRegion(source, width, height, rect, sigma, soften = false) {
+  const boxes = radii(sigma), halo = boxes.reduce((a, b) => a + b, 0) * (soften ? 2 : 1) + 2;
+  const left = Math.max(0, rect.left - halo), top = Math.max(0, rect.top - halo);
+  const right = Math.min(width - 1, rect.right + halo), bottom = Math.min(height - 1, rect.bottom + halo);
+  const w = right - left + 1, h = bottom - top + 1;
+  let data = new Float32Array(w * h * 4), scratch = new Float32Array(data.length);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = ((y + top) * width + x + left) * 4, o = (y * w + x) * 4, alpha = source[i + 3];
+    for (let c = 0; c < 3; c++) data[o + c] = source[i + c] * alpha / 255;
+    data[o + 3] = alpha;
+  }
+  const pass = () => { for (const radius of boxes) {
+    boxPass(data, scratch, w, h, radius, true); [data, scratch] = [scratch, data];
+    boxPass(data, scratch, w, h, radius, false); [data, scratch] = [scratch, data];
+  }};
+  const rw = rect.right - rect.left + 1, rh = rect.bottom - rect.top + 1;
+  const extract = () => {
+    const result = new Float32Array(rw * rh * 3);
+    for (let y = 0; y < rh; y++) for (let x = 0; x < rw; x++) {
+      const i = ((y + rect.top - top) * w + x + rect.left - left) * 4;
+      const raw = ((y + rect.top) * width + x + rect.left) * 4, o = (y * rw + x) * 3;
+      for (let c = 0; c < 3; c++) result[o + c] = data[i + 3] > .0001 ? data[i + c] * 255 / data[i + 3] : source[raw + c];
+    }
+    return result;
+  };
+  pass(); const low = extract();
+  let soft = null; if (soften) { pass(); soft = extract(); }
+  return {low, soft, rect, width: rw};
+}
+
+function sampleRGB(source, width, height, x, y) {
+  x = clamp(x, 0, width - 1); y = clamp(y, 0, height - 1);
+  const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0;
+  let alpha = 0; const rgb = [0, 0, 0];
+  for (const [px, py, weight] of [[x0,y0,(1-fx)*(1-fy)],[Math.min(x0+1,width-1),y0,fx*(1-fy)],[x0,Math.min(y0+1,height-1),(1-fx)*fy],[Math.min(x0+1,width-1),Math.min(y0+1,height-1),fx*fy]]) {
+    if (!weight) continue;
+    const at = (py * width + px) * 4, a = source[at + 3] / 255;
+    alpha += weight * a; for (let c = 0; c < 3; c++) rgb[c] += source[at + c] * weight * a;
+  }
+  return {rgb: alpha ? rgb.map(v => v / alpha) : rgb, alpha};
+}
+
+function sampleLow(patch, source, width, height, x, y) {
+  x = clamp(x, 0, width - 1); y = clamp(y, 0, height - 1);
+  const x0 = Math.floor(x), y0 = Math.floor(y), fx = x-x0, fy = y-y0;
+  let alpha = 0; const rgb = [0,0,0];
+  for (const [px,py,weight] of [[x0,y0,(1-fx)*(1-fy)],[Math.min(x0+1,width-1),y0,fx*(1-fy)],[x0,Math.min(y0+1,height-1),(1-fx)*fy],[Math.min(x0+1,width-1),Math.min(y0+1,height-1),fx*fy]]) {
+    if (!weight) continue;
+    const at = ((py-patch.rect.top)*patch.width+px-patch.rect.left)*3, a = source[(py*width+px)*4+3]/255;
+    alpha += weight*a; for (let c=0;c<3;c++) rgb[c] += patch.low[at+c]*weight*a;
+  }
+  return alpha ? rgb.map(v=>v/alpha) : rgb;
+}
+
+function frequencySigma(separation, width, height) {
+  const sigma = separation * Math.min(width, height);
+  if (!Number.isFinite(sigma) || sigma < 0 || sigma > 128) throw Error('分离半径最多128个原图像素。');
+  return sigma;
+}
+
+function applyFrequencyStroke(source, pixels, width, height, op, protection) {
+  const radius = Math.max(2, op.r * Math.min(width, height)), sigma = frequencySigma(op.separation, width, height);
+  const xs=op.points.map(p=>p[0]*width),ys=op.points.map(p=>p[1]*height);
+  const bounds={left:Math.max(0,Math.floor(Math.min(...xs)-radius)),right:Math.min(width-1,Math.ceil(Math.max(...xs)+radius)),top:Math.max(0,Math.floor(Math.min(...ys)-radius)),bottom:Math.min(height-1,Math.ceil(Math.max(...ys)+radius))};
+  const cloning = op.tool.endsWith('-clone'), dx=cloning?(op.sample[0]-op.points[0][0])*width:0,dy=cloning?(op.sample[1]-op.points[0][1])*height:0;
+  for(let top=bounds.top;top<=bounds.bottom;top+=TILE)for(let left=bounds.left;left<=bounds.right;left+=TILE){
+    const rect={left,top,right:Math.min(bounds.right,left+TILE-1),bottom:Math.min(bounds.bottom,top+TILE-1)},tw=rect.right-left+1,th=rect.bottom-top+1;
+    if(!op.points.some(p=>{const x=p[0]*width,y=p[1]*height;return x>=rect.left-radius&&x<=rect.right+radius&&y>=rect.top-radius&&y<=rect.bottom+radius;}))continue;
+    const amounts=new Float32Array(tw*th);let any=false;
+    for(let y=top;y<=rect.bottom;y++)for(let x=left;x<=rect.right;x++){
+      const at=y*width+x;if(protection[at]===255||!source[at*4+3])continue;let weight=0;
+      for(const p of op.points){const d=(x-p[0]*width)**2+(y-p[1]*height)**2;if(d<radius*radius)weight=Math.max(weight,(1-d/(radius*radius))**3);}
+      const amount=weight*op.strength*(1-protection[at]/255);amounts[(y-top)*tw+x-left]=amount;any ||= amount>0;
+    }
+    if(!any)continue;
+    const patch=blurRegion(source,width,height,rect,sigma,op.tool==='low-smooth');
+    const shifted=cloning?blurRegion(source,width,height,{left:Math.floor(clamp(left+dx,0,width-1)),top:Math.floor(clamp(top+dy,0,height-1)),right:Math.min(width-1,Math.ceil(clamp(rect.right+dx,0,width-1))),bottom:Math.min(height-1,Math.ceil(clamp(rect.bottom+dy,0,height-1)))},sigma):null;
+    for(let y=top;y<=rect.bottom;y++)for(let x=left;x<=rect.right;x++){
+      const p=(y-top)*tw+x-left,amount=amounts[p];if(!amount)continue;const at=(y*width+x)*4,low=p*3;
+      let reference=null,sampled=null;if(cloning){sampled=sampleRGB(source,width,height,x+dx,y+dy);if(sampled.alpha<.001)continue;reference=sampleLow(shifted,source,width,height,x+dx,y+dy);}
+      for(let c=0;c<3;c++){
+        const base=source[at+c],l=patch.low[low+c];let target;
+        if(op.tool==='low-smooth')target=base-l+patch.soft[low+c];
+        else if(op.tool==='low-clone')target=base-l+reference[c];
+        else if(op.tool==='high-clone')target=l+sampled.rgb[c]-reference[c];
+        else target=l;
+        pixels[at+c]=Math.round(clamp(base+(target-base)*amount,0,255));
+      }
+    }
+  }
+}
+
+function frequencyView(source, width, height, separation, high = false) {
+  const sigma=frequencySigma(separation,width,height),out=source.slice();
+  for(let top=0;top<height;top+=TILE)for(let left=0;left<width;left+=TILE){
+    const rect={left,top,right:Math.min(width-1,left+TILE-1),bottom:Math.min(height-1,top+TILE-1)},patch=blurRegion(source,width,height,rect,sigma);
+    for(let y=top;y<=rect.bottom;y++)for(let x=left;x<=rect.right;x++){
+      const at=(y*width+x)*4,p=((y-top)*patch.width+x-left)*3;
+      for(let c=0;c<3;c++)out[at+c]=Math.round(clamp(high?127.5+(source[at+c]-patch.low[p+c])*.5:patch.low[p+c],0,255));
+    }
+  }
+  return out;
+}
+
+return {FREQUENCY_TOOLS,applyFrequencyStroke,frequencyView};
+})();
+const neutral=(()=>{
+
+// An independent signed 16-bit field around exact 50% gray; zero is neutral.
+const NEUTRAL_TOOLS = new Set(['gray-dodge', 'gray-burn', 'gray-erase']);
+const MAX = 32767;
+function paintNeutral(field,width,height,op,protection){
+ const r=Math.max(2,op.r*Math.min(width,height)),xs=op.points.map(p=>p[0]*width),ys=op.points.map(p=>p[1]*height);
+ const left=Math.max(0,Math.floor(Math.min(...xs)-r)),right=Math.min(width-1,Math.ceil(Math.max(...xs)+r)),top=Math.max(0,Math.floor(Math.min(...ys)-r)),bottom=Math.min(height-1,Math.ceil(Math.max(...ys)+r));
+ for(let y=top;y<=bottom;y++)for(let x=left;x<=right;x++){
+  const at=y*width+x;if(protection[at]===255)continue;let weight=0;
+  for(const p of op.points){const d=(x-p[0]*width)**2+(y-p[1]*height)**2;if(d<r*r)weight=Math.max(weight,(1-d/(r*r))**3);}
+  const amount=weight*op.strength*(1-protection[at]/255),target=op.tool==='gray-dodge'?MAX:op.tool==='gray-burn'?-MAX:0;
+  field[at]=Math.round(field[at]+(target-field[at])*amount);
+ }
+}
+function compositeNeutral(pixels,field,{view=false}={}){
+ const output=pixels.slice();
+ for(let at=0;at<field.length;at++){
+  const delta=field[at],i=at*4;
+  if(view){const gray=Math.round(127.5+delta/MAX*127.5);output[i]=output[i+1]=output[i+2]=gray;continue;}
+  if(!delta||!pixels[i+3])continue;
+  const s=.5+delta/(MAX*2);
+  for(let c=0;c<3;c++){
+   const b=pixels[i+c]/255,d=b<=.25?((16*b-12)*b+4)*b:Math.sqrt(b);
+   const value=s<=.5?b-(1-2*s)*b*(1-b):b+(2*s-1)*(d-b);
+   output[i+c]=Math.round(Math.max(0,Math.min(1,value))*255);
+  }
+ }
+ return output;
+}
+
+return {NEUTRAL_TOOLS,paintNeutral,compositeNeutral};
+})();
+const manual=(()=>{
+const {FREQUENCY_TOOLS,applyFrequencyStroke,frequencyView}=freq;
+const {NEUTRAL_TOOLS,paintNeutral,compositeNeutral}=neutral;
+// Local pixel editing. No model, network, account or generated replacement pixels.
+const MANUAL_ENGINE='manual-portrait-v2';
+const MANUAL_TOOLS=new Set(['push','shrink','expand','smooth','clone','dodge','burn','restore','protect','unprotect','clear-protection','reset',...FREQUENCY_TOOLS,...NEUTRAL_TOOLS]);
+const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+function manualOperations(value){
+ if(!Array.isArray(value)||value.length>300)throw Error('手动操作最多保存300笔，请保存当前版本后继续。');let total=0;
+ return value.map(op=>{if(!op||!MANUAL_TOOLS.has(op.tool)||!Array.isArray(op.points)||!op.points.length||op.points.length>512)throw Error('手动笔触无效。');total+=op.points.length;if(total>10000)throw Error('笔触点过多，请保存当前版本后继续。');const number=(v,min,max)=>{if(!Number.isFinite(v)||v<min||v>max)throw Error('手动笔触参数超出范围。');return v;};const result={tool:op.tool,r:number(op.r,.005,.4),strength:number(op.strength,0,1),points:op.points.map(p=>{if(!Array.isArray(p)||p.length!==2)throw Error('笔触坐标无效。');return [number(p[0],0,1),number(p[1],0,1)];})};if(['clone','low-clone','high-clone'].includes(op.tool)){if(!Array.isArray(op.sample)||op.sample.length!==2)throw Error('请先选择纹理取样点。');result.sample=op.sample.map(v=>number(v,0,1));}if(FREQUENCY_TOOLS.has(op.tool))result.separation=number(op.separation,.000001,.2);return result;});
+}
+function weight(d2,r){if(d2>=r*r)return 0;const q=1-d2/(r*r);return q*q*q;}
+function maskWeight(d2,r){const distance=Math.sqrt(d2)/r;if(distance<=.6)return 1;if(distance>=1)return 0;const t=(distance-.6)/.4;return 1-t*t*(3-2*t);}
+function region(width,height,points,r){const xs=points.map(p=>p[0]*width),ys=points.map(p=>p[1]*height);return {left:Math.max(0,Math.floor(Math.min(...xs)-r)),right:Math.min(width-1,Math.ceil(Math.max(...xs)+r)),top:Math.max(0,Math.floor(Math.min(...ys)-r)),bottom:Math.min(height-1,Math.ceil(Math.max(...ys)+r))};}
+function sample(source,width,height,x,y){
+ x=clamp(x,0,width-1);y=clamp(y,0,height-1);const x0=Math.floor(x),y0=Math.floor(y),fx=x-x0,fy=y-y0,values=[0,0,0,0];
+ for(const [px,py,w]of [[x0,y0,(1-fx)*(1-fy)],[Math.min(x0+1,width-1),y0,fx*(1-fy)],[x0,Math.min(y0+1,height-1),(1-fx)*fy],[Math.min(x0+1,width-1),Math.min(y0+1,height-1),fx*fy]]){const i=(py*width+px)*4,a=source[i+3]/255;values[3]+=w*a;for(let c=0;c<3;c++)values[c]+=w*a*source[i+c];}
+ const a=values[3];return a?[values[0]/a,values[1]/a,values[2]/a,a*255]:[0,0,0,0];
+}
+function renderManualPortrait(input,width,height,operations,settings={}){
+ if(!(input instanceof Uint8ClampedArray)||!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1||width*height>24000000||input.length!==width*height*4)throw Error('人物图片尺寸无效，最多2400万像素。');
+ if(!settings||typeof settings!=='object'||!['composite','low','high','gray'].includes(settings.view||'composite'))throw Error('人物检查视图无效。');
+ const all=manualOperations(operations),ops=all.slice(all.findLastIndex(o=>o.tool==='reset')+1),protection=new Uint8Array(width*height),short=Math.min(width,height);let pixels=input.slice(),neutral=null;
+ for(const op of ops.filter(o=>['protect','unprotect','clear-protection'].includes(o.tool))){if(op.tool==='clear-protection'){protection.fill(0);continue;}const radius=Math.max(2,op.r*short),box=region(width,height,op.points,radius);for(let y=box.top;y<=box.bottom;y++)for(let x=box.left;x<=box.right;x++){let w=0;for(const p of op.points)w=Math.max(w,maskWeight((x-p[0]*width)**2+(y-p[1]*height)**2,radius));const i=y*width+x;protection[i]=op.tool==='protect'?Math.max(protection[i],Math.round(255*w*op.strength)):Math.max(0,protection[i]-Math.round(255*w*op.strength));}}
+ for(const op of ops.filter(o=>!['protect','unprotect','clear-protection'].includes(o.tool))){if(!op.strength)continue;if(NEUTRAL_TOOLS.has(op.tool)){neutral??=new Int16Array(width*height);paintNeutral(neutral,width,height,op,protection);continue;}if(FREQUENCY_TOOLS.has(op.tool)){applyFrequencyStroke(pixels.slice(),pixels,width,height,op,protection);continue;}if(neutral&&op.tool==='restore')paintNeutral(neutral,width,height,{...op,tool:'gray-erase'},protection);const radius=Math.max(2,op.r*short),box=region(width,height,op.points,radius),source=pixels.slice();
+  for(let y=box.top;y<=box.bottom;y++)for(let x=box.left;x<=box.right;x++){const at=y*width+x,index=at*4,available=1-protection[at]/255;if(available<=1e-7)continue;let amount=0,nearest=op.points[0],best=Infinity;
+   let centerX=0,centerY=0,centerWeight=0;for(const p of op.points){const d=(x-p[0]*width)**2+(y-p[1]*height)**2,w=weight(d,radius);if(d<best){best=d;nearest=p;}amount=Math.max(amount,w);centerX+=p[0]*w;centerY+=p[1]*w;centerWeight+=w;}if(centerWeight)nearest=[centerX/centerWeight,centerY/centerWeight];amount*=op.strength*available;if(amount<=0)continue;
+   let value;
+   if(['push','shrink','expand'].includes(op.tool)){
+    let sx=x,sy=y;
+    if(op.tool==='push'){let dx=0,dy=0;for(let i=1;i<op.points.length;i++){const a=op.points[i-1],b=op.points[i],w=weight((x-a[0]*width)**2+(y-a[1]*height)**2,radius);dx+=clamp((b[0]-a[0])*width,-radius*.3,radius*.3)*w;dy+=clamp((b[1]-a[1])*height,-radius*.3,radius*.3)*w;}sx-=clamp(dx,-radius*.65,radius*.65)*op.strength*available;sy-=clamp(dy,-radius*.65,radius*.65)*op.strength*available;}
+    else{const factor=(op.tool==='shrink'?1:-1)*amount*.23;sx+=(x-nearest[0]*width)*factor;sy+=(y-nearest[1]*height)*factor;}
+    if(Math.abs(sx-x)+Math.abs(sy-y)<1e-8)continue;value=sample(source,width,height,sx,sy);for(let c=0;c<4;c++)pixels[index+c]=Math.round(value[c]);continue;
+   }
+   if(op.tool==='restore'){if(amount>=1-1e-8){pixels.set(input.subarray(index,index+4),index);continue;}value=Array.from(input.subarray(index,index+4));}
+   else if(op.tool==='clone'){const first=op.points[0];value=sample(source,width,height,x+(op.sample[0]-first[0])*width,y+(op.sample[1]-first[1])*height);}
+   else if(op.tool==='smooth'){const sum=[0,0,0];let count=0;const distance=Math.max(1,Math.round(short*.0025));for(const [dx,dy]of [[0,0],[-distance,0],[distance,0],[0,-distance],[0,distance],[-distance,-distance],[distance,-distance],[-distance,distance],[distance,distance]]){const px=clamp(x+dx,0,width-1),py=clamp(y+dy,0,height-1),i=(py*width+px)*4;const contrast=Math.abs(source[i]-source[index])+Math.abs(source[i+1]-source[index+1])+Math.abs(source[i+2]-source[index+2]),w=Math.exp(-contrast/38);for(let c=0;c<3;c++)sum[c]+=source[i+c]*w;count+=w;}value=[sum[0]/count,sum[1]/count,sum[2]/count,source[index+3]];}
+   else{const multiplier=2**((op.tool==='dodge'?1:-1)*.8);value=[0,1,2].map(c=>255*clamp((source[index+c]/255)**2.2*multiplier,0,1)**(1/2.2));value.push(source[index+3]);}
+   // Premultiplied blending preserves transparent edges during texture replacement.
+   const a=source[index+3]/255,b=value[3]/255,alpha=a*(1-amount)+b*amount;for(let c=0;c<3;c++)pixels[index+c]=alpha?Math.round((source[index+c]*a*(1-amount)+value[c]*b*amount)/alpha):0;pixels[index+3]=Math.round(alpha*255);
+  }
+ }
+ if(neutral)pixels=compositeNeutral(pixels,neutral);
+ if(settings.view==='gray')pixels=compositeNeutral(pixels,neutral||new Int16Array(width*height),{view:true});
+ if(settings.view==='low'||settings.view==='high')pixels=frequencyView(pixels,width,height,settings.separation??.005,settings.view==='high');
+ return {pixels,protection};
+}
+
+return {renderManualPortrait};
+})();
+const grade=(()=>{
+
+// Shared, deterministic sRGB engine. Preview, full-size export and LUT use this file.
+const HUES = ['红','橙','黄','绿','青','蓝','紫','洋红'];
+const LIMITS = { exposure:[-4,4,.01], temperature:[-100,100,1], tint:[-100,100,1], contrast:[-100,100,1], highlights:[-100,100,1], shadows:[-100,100,1], whites:[-100,100,1], blacks:[-100,100,1], saturation:[-100,100,1], vibrance:[-100,100,1] };
+const clamp = (x,a=0,b=1) => Math.min(b,Math.max(a,x));
+const finite=(v,d=0)=>Number.isFinite(Number(v))?Number(v):d;
+function settings(input={}) {
+  const out={}; for(const [key,[min,max]] of Object.entries(LIMITS)) out[key]=clamp(finite(input[key]),min,max);
+  out.hsl=Array.from({length:8},(_,i)=>Array.from({length:3},(_,j)=>clamp(finite(input.hsl?.[i]?.[j]),-100,100)));
+  out.curves=Object.fromEntries(['rgb','r','g','b'].map(k=>[k,Array.from({length:5},(_,i)=>clamp(finite(input.curves?.[k]?.[i],i/4),0,1))]));
+  out.grade=Array.from({length:3},(_,i)=>[clamp(finite(input.grade?.[i]?.[0]),0,360),clamp(finite(input.grade?.[i]?.[1]),0,100)]);
+  return out;
+}
+function rgbToHsl(r,g,b) {
+  const max=Math.max(r,g,b),min=Math.min(r,g,b),l=(max+min)/2,d=max-min;
+  if(d<1e-8)return [0,0,l];
+  let h=max===r?((g-b)/d+(g<b?6:0)):max===g?(b-r)/d+2:(r-g)/d+4;
+  return [h/6,d/(1-Math.abs(2*l-1)),l];
+}
+function hslToRgb(h,s,l) {
+  h=((h%1)+1)%1; const c=(1-Math.abs(2*l-1))*s,x=c*(1-Math.abs((h*6)%2-1)),m=l-c/2;
+  return (h<1/6?[c,x,0]:h<2/6?[x,c,0]:h<3/6?[0,c,x]:h<4/6?[0,x,c]:h<5/6?[x,0,c]:[c,0,x]).map(v=>v+m);
+}
+const linear=x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4;
+const srgb=x=>x<=.0031308?x*12.92:1.055*Math.max(0,x)**(1/2.4)-.055;
+function whiteBalance(rgb){const [r,g,b]=rgb.map(v=>Math.log(Math.max(1e-6,linear(v))));const temperature=(b-r)/.004,tint=(g-(r+b)/2)/.0015;return {temperature:clamp(temperature,-100,100),tint:clamp(tint,-100,100),limited:Math.abs(temperature)>100||Math.abs(tint)>100};}
+const curve=(x,points)=>{x=clamp(x)*4; const i=Math.min(3,Math.floor(x)); return points[i]+(points[i+1]-points[i])*(x-i);};
+function compile(input) {
+  const s=settings(input), exp=2**s.exposure;
+  const identity=Object.keys(LIMITS).every(k=>s[k]===0)&&s.hsl.flat().every(v=>v===0)&&Object.values(s.curves).every(p=>p.every((v,i)=>v===i/4))&&s.grade.every(p=>p[1]===0);
+  const tones=s.grade.map(([h,amount])=>hslToRgb(h/360,1,.5).map(v=>(v-.5)*amount/100*.22));
+  return Object.assign((rgb)=>{
+    if(identity)return rgb;
+    let [r,g,b]=rgb.map(linear); r*=exp*Math.exp(s.temperature*.002+s.tint*.0005); g*=exp*Math.exp(-s.tint*.001); b*=exp*Math.exp(-s.temperature*.002+s.tint*.0005);
+    const lum=.2126*r+.7152*g+.0722*b, y=clamp(srgb(lum));
+    const shift=(s.shadows/100*(1-y)**2+s.highlights/100*y**2)*.28 + s.blacks/100*(1-y)**4*.15+s.whites/100*y**4*.25;
+    [r,g,b]=[r,g,b].map(v=>clamp((srgb(v)-.5)*(1+s.contrast/125)+.5+shift));
+    let [h,sat,l]=rgbToHsl(r,g,b); const centers=[0,30,60,120,180,240,280,320]; let dh=0,ds=0,dl=0,weight=0;
+    centers.forEach((c,i)=>{const d=Math.min(Math.abs(h*360-c),360-Math.abs(h*360-c));const w=Math.max(0,1-d/45);dh+=s.hsl[i][0]*w;ds+=s.hsl[i][1]*w;dl+=s.hsl[i][2]*w;weight+=w;});
+    if(weight){h+=dh/weight/600*sat; sat=clamp(sat*(1+ds/weight/100));l=clamp(l+dl/weight/100*.28*sat);}
+    sat=clamp(sat*(1+s.saturation/100)*(1+s.vibrance/100*(1-sat)));
+    [r,g,b]=hslToRgb(h,sat,l); const w=[(1-y)**2,2*y*(1-y),y*y];
+    return [r,g,b].map((v,c)=>clamp(curve(curve(clamp(v+tones.reduce((n,t,i)=>n+t[c]*w[i],0)),s.curves[['r','g','b'][c]]),s.curves.rgb)));
+  },{identity});
+}
+function render(data,width,height,global,layers=[]) {
+  const result=new Uint8ClampedArray(data.length), base=compile(global);
+  const local=layers.filter(l=>l.enabled!==false&&l.alpha).map(l=>({...l,fn:compile(l.settings)}));
+  for(let p=0,i=0;p<width*height;p++,i+=4){
+    let rgb=base([data[i]/255,data[i+1]/255,data[i+2]/255]);
+    for(const l of local){const a=clamp(l.alpha[p]/255*(l.opacity??1));if(a&&!l.fn.identity){const next=l.fn(rgb);rgb=rgb.map((v,c)=>v+(next[c]-v)*a);}}
+    result[i]=rgb[0]*255; result[i+1]=rgb[1]*255; result[i+2]=rgb[2]*255; result[i+3]=data[i+3];
+  }return result;
+}
+function analyze(data) {
+  const histogram=Array.from({length:3},()=>Array(256).fill(0)), hues=Array(8).fill(0),sum=[0,0,0];let n=0,saturation=0,luma=0,clippedDark=0,clippedLight=0;
+  const stride=Math.max(1,Math.floor(data.length/4/80000));
+  for(let i=0;i<data.length;i+=4*stride){if(data[i+3]<16)continue;const rgb=[data[i],data[i+1],data[i+2]];rgb.forEach((v,c)=>{histogram[c][v]++;sum[c]+=v;});const [h,s,l]=rgbToHsl(...rgb.map(v=>v/255)); hues[Math.round(h*8)%8]+=s;saturation+=s;luma+=l;clippedDark+=Math.max(...rgb)<5?1:0;clippedLight+=Math.min(...rgb)>250?1:0;n++;}
+  n=Math.max(n,1);const mean=sum.map(v=>v/n/255);return {histogram,hues,mean,saturation:saturation/n,lightness:luma/n,warmth:mean[0]-mean[2],clippedDark:clippedDark/n,clippedLight:clippedLight/n};
+}
+function matchReference(source,reference,amount=.7) {
+  amount=clamp(amount);const s=settings();s.exposure=clamp(Math.log2((reference.lightness+.05)/(source.lightness+.05))*amount,-1.5,1.5);
+  s.temperature=clamp((reference.warmth-source.warmth)*160*amount,-45,45);
+  s.tint=clamp(((reference.mean[0]+reference.mean[2])/2-reference.mean[1]-(source.mean[0]+source.mean[2])/2+source.mean[1])*150*amount,-35,35);
+  s.saturation=clamp((reference.saturation-source.saturation)*110*amount,-35,35);
+  s.highlights=-15*amount;s.shadows=8*amount;return settings(s);
+}
+const BUILTINS=[
+  {id:'clear',name:'清透日光',description:'温和提亮，保留肤色与干净白色',settings:settings({exposure:.12,temperature:4,highlights:-20,shadows:14,vibrance:8}),target:[.66,.28,.03]},
+  {id:'film',name:'暖调胶片',description:'柔和高光、微暖中间调与轻抬黑位',settings:settings({temperature:12,contrast:-8,highlights:-24,blacks:12,saturation:-8,grade:[[215,12],[35,8],[45,10]]}),target:[.48,.28,.09]},
+  {id:'cinema',name:'冷暖叙事',description:'冷影暖光，控制肤色饱和度',settings:settings({contrast:12,highlights:-18,shadows:7,saturation:-7,grade:[[205,24],[30,5],[40,17]]}),target:[.4,.3,-.02]},
+  {id:'pastel',name:'柔雾二次元',description:'降低硬反差，抬起暗部，保留明快配色',settings:settings({contrast:-14,shadows:18,blacks:10,highlights:-10,vibrance:12,grade:[[270,8],[335,4],[45,5]]}),target:[.65,.38,.01]},
+  {id:'night',name:'蓝调夜景',description:'压住高光，以蓝紫暗部集中视觉',settings:settings({exposure:-.18,temperature:-12,highlights:-26,contrast:8,grade:[[235,22],[265,8],[35,5]]}),target:[.27,.35,-.1]},
+  {id:'neutral',name:'自然还原',description:'低介入，保留原图色彩关系',settings:settings({highlights:-8,shadows:6}),target:[.5,.24,0]},
+];
+function recommend(a){return [...BUILTINS].sort((x,y)=>score(x)-score(y));function score(p){return Math.abs(a.lightness-p.target[0])+Math.abs(a.saturation-p.target[1])*.6+Math.abs(a.warmth-p.target[2])*2;}}
+function cube(input,size=17){const f=compile(input),lines=['TITLE "Houtu Studio sRGB global grade"',`LUT_3D_SIZE ${size}`,'DOMAIN_MIN 0 0 0','DOMAIN_MAX 1 1 1'];for(let b=0;b<size;b++)for(let g=0;g<size;g++)for(let r=0;r<size;r++)lines.push(f([r/(size-1),g/(size-1),b/(size-1)]).map(v=>v.toFixed(7)).join(' '));return lines.join('\n');}
+
+return {render};
+})();
+
+let preview=null;
+self.onmessage=({data:job})=>{
+  try{
+    if(job.kind==='bind'){preview={key:job.key,width:job.width,height:job.height,data:job.data};return;}
+    const input=job.kind==='export'?job:preview;
+    if(!input||input.key!==job.key)throw Error('当前图片已切换。');
+    const {width,height}=input,s=job.edits;
+    let pixels=input.data;
+    if(s.strokes.length)pixels=manual.renderManualPortrait(pixels,width,height,s.strokes).pixels;
+    const layers=[];
+    if(s.mask&&Object.values(s.local).some(Boolean)){
+      const alpha=new Uint8Array(width*height),m=s.mask;
+      const left=Math.round(m.x*width),right=Math.round((m.x+m.w)*width);
+      const top=Math.round(m.y*height),bottom=Math.round((m.y+m.h)*height);
+      const feather=Math.max(1,Math.round(Math.min(right-left,bottom-top)*.07));
+      for(let y=top;y<bottom;y++)for(let x=left;x<right;x++){
+        const edge=Math.min(x-left+.5,right-x-.5,y-top+.5,bottom-y-.5);
+        const t=Math.max(0,Math.min(1,edge/feather));alpha[y*width+x]=Math.round(255*t*t*(3-2*t));
+      }
+      layers.push({alpha,settings:s.local,enabled:true,opacity:1});
+    }
+    if(layers.length||Object.values(s.global).some(Boolean))pixels=grade.render(pixels,width,height,s.global,layers);
+    if(pixels===input.data)pixels=pixels.slice();
+    self.postMessage({id:job.id,pixels},[pixels.buffer]);
+  }catch(error){self.postMessage({id:job.id,error:error.message});}
+};
+
+</script>
+<script>
+const aiDirectory=[{"id":"portrait-polish","name":"人物二次精修","group":"人物精修","short":"沿用成品，细化人物","aliases":""},{"id":"smooth-belly","name":"平滑瘦肚子","group":"人物精修","short":"自然收腹，衣褶顺势衔接","aliases":"瘦肚子 收腹"},{"id":"full-body","name":"整个人物精修","group":"人物精修","short":"从五官到服装，整体协调","aliases":""},{"id":"face","name":"面部精修","group":"人物精修","short":"五官衔接与面部体积","aliases":""},{"id":"eyes","name":"眼睛精修","group":"人物精修","short":"虹膜、睫毛与眼神光","aliases":""},{"id":"hair","name":"发丝整理","group":"人物精修","short":"发束与假发走向","aliases":""},{"id":"makeup","name":"妆容整理","group":"人物精修","short":"眼妆、唇妆与角色气质","aliases":""},{"id":"skin","name":"肤色统一","group":"人物精修","short":"脸、颈、手臂与腿部","aliases":""},{"id":"hands","name":"手部与肢体","group":"人物精修","short":"修整手指与衔接","aliases":""},{"id":"outfit","name":"服装整理","group":"造型细节","short":"褶皱、接缝与轮廓","aliases":""},{"id":"materials","name":"材质精修","group":"造型细节","short":"布料、皮革与金属","aliases":""},{"id":"accessories","name":"饰品与道具","group":"造型细节","short":"发饰、首饰与小道具","aliases":""},{"id":"hair-flow","name":"发丝飘动","group":"造型细节","short":"自然风感，不换发型","aliases":""},{"id":"lighting","name":"人物光影","group":"画面与风格","short":"从头到脚统一光感","aliases":""},{"id":"background","name":"背景清理","group":"画面与风格","short":"清理干扰，保留人物","aliases":""},{"id":"anime-paint","name":"二次元厚涂","group":"画面与风格","short":"柔和色块与手绘笔触","aliases":""},{"id":"cos-paint","name":"COS 质感厚涂","group":"画面与风格","short":"角色妆造与真人质感","aliases":"厚涂 真人COS"},{"id":"remove-people","name":"去人物／路人","group":"场照与次元","short":"保留主角，清理背景人群","aliases":"去路人 去人物 清场"},{"id":"remove-equipment","name":"去灯架","group":"场照与次元","short":"灯架、柔光箱与拍摄穿帮","aliases":"去灯架 去设备 灯具"},{"id":"clear-background","name":"清空背景／场照净场","group":"场照与次元","short":"保留主角，现场背景干净清空","aliases":"净场 场照 清空背景"},{"id":"hair-lift","name":"反重力发丝","group":"场照与次元","short":"自然飘发与次元动势","aliases":""},{"id":"hair-glow","name":"发丝辉光","group":"场照与次元","short":"沿光源增强发丝边缘","aliases":""},{"id":"dimension-effects","name":"次元氛围特效","group":"场照与次元","short":"轮廓光、雷电、火星与羽毛","aliases":""},{"id":"base-repair","name":"打底修复","group":"人物精修","short":"原有结构可信","aliases":""},{"id":"texture-restore","name":"质感增强","group":"人物精修","short":"材质各有区分","aliases":""},{"id":"skin-oil","name":"皮肤柔润光泽","group":"人物精修","short":"高光顺应原光源","aliases":""},{"id":"blemish","name":"痘痘斑点整理","group":"人物精修","short":"保留身份特征","aliases":""},{"id":"dark-circles","name":"黑眼圈淡化","group":"人物精修","short":"卧蚕眼窝保留","aliases":""},{"id":"eye-bags","name":"眼袋与眼周纹","group":"人物精修","short":"眼型表情不变","aliases":""},{"id":"face-lines","name":"面颈细纹整理","group":"人物精修","short":"表情纹合理保留","aliases":""},{"id":"teeth","name":"牙齿自然精修","group":"人物精修","short":"闭嘴不补牙","aliases":""},{"id":"nose-refine","name":"鼻部光影细化","group":"人物精修","short":"鼻型默认不换","aliases":""},{"id":"lip-refine","name":"唇部妆面细化","group":"人物精修","short":"唇型原样保留","aliases":""},{"id":"face-shape","name":"脸型保守微调","group":"人物精修","short":"五官位置固定","aliases":""},{"id":"body-shape","name":"全身自然美体","group":"人物精修","short":"衣褶背景不拉弯","aliases":""},{"id":"body-definition","name":"自然体态与肌理","group":"人物精修","short":"不生成隐藏身体","aliases":""},{"id":"garment-fit","name":"衣装胸腰贴合","group":"造型细节","short":"版型与覆盖保留","aliases":""},{"id":"neck-repair","name":"面颈与手臂肤色","group":"人物精修","short":"肤色连续","aliases":""},{"id":"wig-gap","name":"假发发缝与白发","group":"造型细节","short":"发缝自然","aliases":""},{"id":"iris-color","name":"美瞳与眼神光","group":"人物精修","short":"瞳孔眼型固定","aliases":""},{"id":"hair-draw","name":"手绘感发束","group":"造型细节","short":"发束走向连贯","aliases":""},{"id":"clothes-flow","name":"衣服裙摆飘动","group":"造型细节","short":"褶皱受力合理","aliases":""},{"id":"stockings-repair","name":"丝袜打底穿帮修复","group":"造型细节","short":"原材质覆盖修补","aliases":""},{"id":"weapon-material","name":"武器与道具材质","group":"造型细节","short":"握持关系正确","aliases":""},{"id":"soft-glow","name":"柔光辉光","group":"画面与风格","short":"高光柔和不过曝","aliases":""},{"id":"flash-light","name":"摄影闪光灯效","group":"画面与风格","short":"整场光一致","aliases":""},{"id":"cinema-light","name":"电影光影","group":"画面与风格","short":"肤色自然","aliases":""},{"id":"ambient-light","name":"氛围底光与轮廓","group":"画面与风格","short":"反光有环境依据","aliases":""},{"id":"water-fx","name":"水流特效","group":"场照与次元","short":"水流层次与折射自然","aliases":""},{"id":"flame-fx","name":"火焰与余烬","group":"场照与次元","short":"火焰反光和前后景一致","aliases":""},{"id":"lightning-fx","name":"雷电缠绕","group":"场照与次元","short":"雷电有明确主体关系","aliases":""},{"id":"slime-fx","name":"幻想流体特效","group":"场照与次元","short":"流体透明与光照自然","aliases":""},{"id":"smoke-fx","name":"粒子烟雾","group":"场照与次元","short":"烟雾不遮主体","aliases":""},{"id":"particle-wrap","name":"粒子缠绕","group":"场照与次元","short":"粒子遮挡有前后层次","aliases":""},{"id":"snow-scene","name":"雪景氛围","group":"场照与次元","short":"雪粒大小与虚实合理","aliases":""},{"id":"rain-scene","name":"雨景氛围","group":"场照与次元","short":"雨丝地面反光一致","aliases":""},{"id":"autumn-scene","name":"秋景落叶","group":"场照与次元","short":"秋色不污染肤色","aliases":""},{"id":"night-scene","name":"夜景氛围","group":"场照与次元","short":"暗部有层次不死黑","aliases":""},{"id":"studio-solid","name":"纯色棚拍","group":"场照与次元","short":"发丝接地阴影自然","aliases":""},{"id":"fufu-add","name":"添加角色玩偶","group":"场照与次元","short":"玩偶接触关系可信","aliases":""},{"id":"wash-fusion","name":"光影溶图","group":"画面与风格","short":"接缝无亮暗边","aliases":""},{"id":"detail-upscale","name":"AI细节修复与放大","group":"画面与风格","short":"不虚构细节","aliases":""},{"id":"outpaint","name":"扩图与补全画布","group":"画面与风格","short":"原图像素保持","aliases":"扩图 画幅"},{"id":"object-extract","name":"物品独立展示","group":"造型细节","short":"物品设计保留","aliases":""},{"id":"outfit-extract","name":"服装独立展示","group":"造型细节","short":"衣服款式原样","aliases":""},{"id":"outfit-transfer","name":"服装参考迁移","group":"参考与合成","short":"服装参考对应","aliases":""},{"id":"pose-transfer","name":"动作参考迁移","group":"参考与合成","short":"重心肢体自然","aliases":""},{"id":"palette-match","name":"参考图仿色","group":"参考与合成","short":"配色关系可辨","aliases":""},{"id":"element-transfer","name":"元素参考合成","group":"参考与合成","short":"元素来源明确","aliases":""},{"id":"makeup-transfer","name":"面部妆造参考","group":"参考与合成","short":"妆色画法对应","aliases":""},{"id":"scene-reference","name":"置景半合成","group":"参考与合成","short":"人景空间一致","aliases":""},{"id":"render3d-full","name":"2D转3D质感","group":"画面与风格","short":"材质区分清楚","aliases":""},{"id":"render3d-half","name":"局部3D转绘","group":"画面与风格","short":"只转换指定部分","aliases":""},{"id":"figurine","name":"角色手办效果","group":"画面与风格","short":"角色特征完整","aliases":"手办 2D转3D"},{"id":"custom","name":"自定义修图","group":"画面与风格","short":"直接写想修改的地方","aliases":""}];
+const layoutAPI=(()=>{
+
+const OUTPAINT_RATIOS=['1:1','4:5','2:3','3:2','16:9','9:16'];
+function outpaintCanvas(value){
+ if(value===undefined)return undefined;
+ if(!value||typeof value!=='object'||Array.isArray(value))throw Error('扩图画布设置无效。');
+ if(value.mode==='ratio'){
+  if(!OUTPAINT_RATIOS.includes(value.ratio))throw Error('请选择支持的扩图画幅。');
+  return {mode:'ratio',ratio:value.ratio};
+ }
+ if(value.mode!=='sides')throw Error('扩图方式无效。');
+ const result={mode:'sides'};for(const side of ['left','right','top','bottom']){
+  const n=value[side];if(!Number.isInteger(n)||n<0||n>100)throw Error('每边扩图比例为0–100%的整数。');result[side]=n;
+ }
+ return result;
+}
+function outpaintLayout(width,height,task={}){
+ if(!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1||width*height>40000000)throw Error('扩图输入尺寸无效，最多4000万像素。');
+ const canvas=outpaintCanvas(task.canvas),sides={left:0,right:0,top:0,bottom:0},long=Math.max(width,height);
+ if(canvas?.mode==='ratio'){
+  const [a,b]=canvas.ratio.split(':').map(Number),targetWidth=Math.max(width,Math.ceil(height*a/b)),targetHeight=Math.max(height,Math.ceil(width*b/a));
+  sides.left=Math.floor((targetWidth-width)/2);sides.right=targetWidth-width-sides.left;sides.top=Math.floor((targetHeight-height)/2);sides.bottom=targetHeight-height-sides.top;
+ }else if(canvas?.mode==='sides'){
+  for(const side of Object.keys(sides))sides[side]=canvas[side]?Math.max(1,Math.round(long*canvas[side]/100)):0;
+ }else{
+  const padding=task.padding??20,direction=task.direction??'all';if(!Number.isInteger(padding)||padding<5||padding>50)throw Error('扩图比例为5–50%。');if(!['all','left','right','top','bottom'].includes(direction))throw Error('扩图方向无效。');
+  const amount=Math.max(16,Math.round(long*padding/100));for(const side of Object.keys(sides))if(direction==='all'||direction===side)sides[side]=amount;
+ }
+ const targetWidth=width+sides.left+sides.right,targetHeight=height+sides.top+sides.bottom;
+ if(targetWidth===width&&targetHeight===height)throw Error('画布没有新增区域。请增加某一边的比例，或换一个画幅。');
+ if(targetWidth*targetHeight>40000000)throw Error('扩图后的画布超过4000万像素，请降低扩图比例或先缩小原图。');
+ return {...sides,width:targetWidth,height:targetHeight,originalWidth:width,originalHeight:height};
+}
+
+return {outpaintLayout};
+})();
+'use strict';
+const $ = id => document.getElementById(id);
+const samples = JSON.parse($('sampleData').textContent);
+const photos = [];
+const media = new Map();
+const checked = new Set();
+const sections = { color:'调色', portrait:'人物', layers:'图层', ai:'AI 修图', steps:'步骤' };
+const choices = { color:'light', portrait:'gray', layers:'caption', ai:'expand' };
+const ui = {
+  section:'color', editing:'pan', brush:'gray-dodge', radius:.055, strength:.3,
+  separation:8, target:'global', compare:false, original:false, split:50,
+  batch:false, previewId:null, selectionDraft:null, draftStep:null,
+  active:null, fit:null, panKey:false, holdOriginal:false, exporting:false
+};
+const icons = {
+  search:'M20.5 20.5l-5-5 M17 10.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0',
+  undo:'M8 5 3 10l5 5 M4 10h10a6 6 0 0 1 6 6v2',
+  redo:'m16 5 5 5-5 5 M20 10H10a6 6 0 0 0-6 6v2',
+  import:'M3 10V6h6l2 2h10v12H3z M12 17v-6m-3 3 3-3 3 3',
+  export:'M5 13v7h14v-7 M12 15V3m-4 4 4-4 4 4',
+  sliders:'M4 6h7m5 0h4 M4 12h2m5 0h9 M4 18h10m5 0h1 M11 3v6m-5 0v6m8 0v6',
+  brush:'m10 14 9-10q1.5-1.5 2.5 0L14 16 M10 14l4 2 M10 14c-6 0-2 6-7 7 9 1 11-3 11-5',
+  layers:'m3 8 9-5 9 5-9 5z M3 12l9 5 9-5 M3 16l9 5 9-5',
+  spark:'m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7z M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z',
+  steps:'M5 6h14 M8 12h11 M11 18h8 M4 6v6h3v6h3',
+  info:'M12 10v6m0-9v.4 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0',
+  image:'M3 4h18v16H3z M4 17l5-5 3 3 3-4 5 6 M8 8h.5',
+  hand:'M7 13V7a1.5 1.5 0 0 1 3 0v5-8a1.5 1.5 0 0 1 3 0v8-7a1.5 1.5 0 0 1 3 0v7-5a1.5 1.5 0 0 1 3 0v8q0 6-6 6h-1q-3 0-5-3l-3-4q-1-2 1-2z',
+  minus:'M5 12h14',plus:'M5 12h14m-7-7v14',
+  compare:'M3 5h18v14H3z M12 3v18',film:'M3 5h18v14H3z M9 5v14m6-14v14',
+  close:'m5 5 14 14M19 5 5 19'
+};
+function icon(name) {
+  const ns='http://www.w3.org/2000/svg', svg=document.createElementNS(ns,'svg');
+  svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('class','icon');svg.setAttribute('aria-hidden','true');
+  const line=document.createElementNS(ns,'path');line.setAttribute('d',icons[name]||'');svg.append(line);return svg;
+}
+for(const placeholder of document.querySelectorAll('[data-icon]')) placeholder.replaceWith(icon(placeholder.dataset.icon));
+$('logo').src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiNhNDRlMzEiLz48cGF0aCBkPSJtMTkgNDIgMjQtMjQgNSA1LTI0IDI0LTEwIDMgNS04WiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmZWZhIiBzdHJva2Utd2lkdGg9IjMiLz48cGF0aCBkPSJtMzUgMjYgNSA1IiBzdHJva2U9IiNmZmZlZmEiIHN0cm9rZS13aWR0aD0iMyIvPjwvc3ZnPgo=';
+function element(tag, text, cls) {
+  const node=document.createElement(tag);
+  if(text!==undefined) node.textContent=text;
+  if(cls) node.className=cls;
+  return node;
+}
+function action(text, handler, cls, id) {
+  const node=element('button',text,cls);node.type='button';
+  if(id)node.id=id;node.addEventListener('click',handler);return node;
+}
+function clear(node) { node.replaceChildren();return node; }
+function hint(text) { return element('p',text,'hint'); }
+let toastTimer;
+function announce(text) {
+  $('toast').textContent=text;$('toast').hidden=false;
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,3200);
+}
+function status(text, error=false) {
+  $('ioState').textContent=text;$('ioState').dataset.error=String(error);
+}
+const bound=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+const clone=value=>structuredClone(value);
+function makePhoto(id,name,source) {
+  return {id,name,source,width:0,height:0,thumbnail:null,
+    viewport:{zoom:1,panX:0,panY:0},
+    nodes:[{parent:null,label:'原始照片',action:null}],cursor:0,redo:{},
+    ai:{ratio:'1:1',amount:3},rehearsal:null};
+}
+function freshEdits() {
+  return {global:{},local:{},mask:null,strokes:[],caption:{value:'',opacity:80,visible:true}};
+}
+function applyEdit(state, edit) {
+  if(edit.type==='tone') Object.assign(state[edit.target],edit.values);
+  if(edit.type==='replace-tone') state.global={...edit.values};
+  if(edit.type==='mask'){state.mask=edit.rect;if(!edit.rect)state.local={};}
+  if(edit.type==='stroke') state.strokes.push(edit.stroke);
+  if(edit.type==='caption') Object.assign(state.caption,edit.values);
+  return state;
+}
+function chain(photo, id) {
+  const result=[];
+  for(let at=id;at!==null;at=photo.nodes[at].parent)result.push(at);
+  return result.reverse();
+}
+function editsAt(photo,id) {
+  const state=freshEdits();
+  for(const at of chain(photo,id)) if(photo.nodes[at].action) applyEdit(state,photo.nodes[at].action);
+  return state;
+}
+function currentPhoto(){return photos.find(p=>p.id===ui.active);}
+function visibleEdits(){
+  const photo=currentPhoto();if(!photo)return freshEdits();
+  const state=editsAt(photo,ui.previewId??photo.cursor);
+  return ui.draftStep?applyEdit(state,ui.draftStep):state;
+}
+function append(photo,label,edit) {
+  const index=photo.nodes.length, parent=photo.cursor;
+  photo.nodes.push({parent,label,action:clone(edit)});photo.redo[parent]=index;photo.cursor=index;
+}
+function commit(label,edit,refreshPanel=false) {
+  const photo=currentPhoto();if(!photo||ui.previewId!==null)return;
+  const alreadyPreviewed=ui.draftStep&&JSON.stringify(ui.draftStep)===JSON.stringify(edit);
+  ui.draftStep=null;
+  const before=editsAt(photo,photo.cursor);
+  const next=applyEdit(clone(before),edit);
+  if(JSON.stringify(before)===JSON.stringify(next))return;
+  append(photo,label,edit);ui.started=true;$('introTip')?.remove();
+  if(alreadyPreviewed||edit.type==='caption')paintCanvas();else requestPixels();
+  updateChrome();
+  if(refreshPanel)renderPanel();
+}
+function finishPendingEdit(){
+  if(!ui.draftStep)return;
+  const edit=ui.draftStep,label=edit.type==='caption'?'调整文字图层':edit.target==='local'?'调整局部色彩':'调整整体色彩';
+  commit(label,edit);
+}
+function moveHistory(direction) {
+  const photo=currentPhoto();if(!photo||ui.previewId!==null)return;finishPendingEdit();
+  const next=direction<0?photo.nodes[photo.cursor].parent:photo.redo[photo.cursor];
+  if(next===null||next===undefined)return;
+  if(direction<0)photo.redo[next]=photo.cursor;
+  photo.cursor=next;refreshEdits();
+}
+function refreshEdits(){ui.draftStep=null;renderPanel();updateChrome();requestPixels();}
+let switchTicket=0,importTicket=0;
+async function obtainMedia(photo) {
+  if(media.has(photo.id))return media.get(photo.id);
+  const promise=(async()=>{
+    const img=new Image();if(/^https:/.test(photo.source)){img.crossOrigin='anonymous';img.referrerPolicy='no-referrer';}img.src=photo.source;await img.decode();
+    if(img.naturalWidth*img.naturalHeight>24000000)throw Error('这张图片超过预览版的2400万像素上限。');
+    photo.width=img.naturalWidth;photo.height=img.naturalHeight;
+    const ratio=Math.min(1,960/Math.max(photo.width,photo.height));
+    const proxy=document.createElement('canvas');proxy.width=Math.max(1,Math.round(photo.width*ratio));proxy.height=Math.max(1,Math.round(photo.height*ratio));
+    const context=proxy.getContext('2d',{willReadFrequently:true});
+    context.drawImage(img,0,0,proxy.width,proxy.height);
+    return {img,proxy,raw:context.getImageData(0,0,proxy.width,proxy.height),result:proxy};
+  })();
+  media.set(photo.id,promise);
+  try{return await promise;}catch(error){media.delete(photo.id);throw error;}
+}
+let activeMedia=null;
+async function selectPhoto(id) {
+  const photo=photos.find(p=>p.id===id);if(!photo)return;
+  if(ui.batch){toggleChecked(id);return;}
+  const ticket=++switchTicket;
+  if(id===ui.active&&activeMedia)return;
+  settleCanvasInput();finishPendingEdit();
+  ui.active=id;ui.previewId=null;ui.draftStep=null;ui.selectionDraft=null;
+  ui.original=false;ui.holdOriginal=false;ui.target='global';activeMedia=null;gestureReset();
+  ++renderSerial;queuedRender=null;status('正在打开…');paintCanvas();updateChrome();renderPanel();renderFilm();
+  try{
+    const data=await obtainMedia(photo);if(ticket!==switchTicket)return;
+    activeMedia=data;const sourceCopy=data.raw.data.slice();
+    worker.postMessage({kind:'bind',key:id,width:data.raw.width,height:data.raw.height,data:sourceCopy},[sourceCopy.buffer]);
+    updateChrome();renderPanel();paintCanvas();requestPixels();
+    // Inactive source files stay in the session. Limit decoded full-size images.
+    if(media.size>3)for(const key of media.keys()){
+      if(key!==ui.active&&media.size>3)media.delete(key);
+    }
+  }catch(error){if(ticket===switchTicket){status('打开失败',true);announce(error.message);}}
+}
+async function importPhotos(files){
+  const intent=++importTicket,initialPhotoRequest=switchTicket,added=[],rejected=[];
+  for(const file of files){
+    if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>100*1024*1024){rejected.push(file.name);continue;}
+    const url=URL.createObjectURL(file),photo=makePhoto('user-'+crypto.randomUUID(),file.name,url);
+    try{
+      const data=await obtainMedia(photo);
+      const thumb=document.createElement('canvas');thumb.width=64;thumb.height=64;
+      const side=Math.min(data.img.naturalWidth,data.img.naturalHeight);
+      thumb.getContext('2d').drawImage(data.img,(data.img.naturalWidth-side)/2,(data.img.naturalHeight-side)/2,side,side,0,0,64,64);
+      photo.thumbnail=thumb.toDataURL('image/png');photos.push(photo);added.push(photo.id);
+      if(added.length>1)media.delete(photo.id);
+    }catch{URL.revokeObjectURL(url);rejected.push(file.name);}
+  }
+  if(added.length){
+    if(intent===importTicket&&initialPhotoRequest===switchTicket){ui.batch=false;checked.clear();await selectPhoto(added[0]);}
+    renderFilm();
+  }
+  if(rejected.length)announce('有 '+rejected.length+' 张未导入。预览支持 JPG、PNG、WebP，单张 100 MB、2400 万像素以内。');
+}
+function renderFilm(){
+  const wrap=clear($('filmPhotos'));const current=currentPhoto();
+  photos.forEach((photo,index)=>{
+    const b=action('',()=>selectPhoto(photo.id),'tile'+(current===photo?' current':''));
+    b.setAttribute('aria-label',photo.name);b.title=photo.name;
+    if(ui.batch){b.setAttribute('role','checkbox');b.setAttribute('aria-checked',String(checked.has(photo.id)));}
+    else if(photo===current)b.setAttribute('aria-current','true');
+    const img=document.createElement('img');img.src=photo.thumbnail||photo.source;img.alt='';
+    const desc=element('span');desc.append(element('b',photo.name),element('small',ui.batch?(checked.has(photo.id)?'已选为目标':'可选目标'):(photo.cursor?'已调整':'原始照片')));
+    if(ui.batch&&photo===current){b.disabled=true;desc.lastChild.textContent='同步来源';}
+    b.append(img,desc);wrap.append(b);
+  });
+  const add=action('',()=>$('files').click(),'add-photo');add.setAttribute('aria-label','导入更多照片');add.append(icon('plus'));wrap.append(add);
+  $('filmCount').textContent='照片 '+photos.length;$('filmSummary').textContent=ui.batch?'选择接收调色的照片':(current?String(photos.indexOf(current)+1).padStart(2,'0')+' / '+String(photos.length).padStart(2,'0'):'');
+  $('batch').textContent=ui.batch?'结束多选':'多选';$('sync').hidden=!ui.batch;$('sync').disabled=!checked.size;$('sync').textContent='同步调色（'+checked.size+'）';
+}
+function toggleChecked(id){if(id===ui.active)return;checked.has(id)?checked.delete(id):checked.add(id);renderFilm();}
+$('batch').onclick=()=>{ui.batch=!ui.batch;checked.clear();renderFilm();};
+$('sync').onclick=()=>{
+  const photo=currentPhoto(),targets=photos.filter(p=>checked.has(p.id)&&p!==photo);if(!targets.length)return;
+  const source=editsAt(photo,photo.cursor).global;
+  openDialog('同步调色',body=>{
+    body.append(element('p','将「'+photo.name+'」的整体调色应用到 '+targets.length+' 张照片。每张照片保留自己的局部蒙版和人物笔触。'));
+    body.append(action('应用到这 '+targets.length+' 张',()=>{
+      for(const target of targets)append(target,'同步调色 · '+photo.name,{type:'replace-tone',values:source});
+      ui.batch=false;checked.clear();$('dialog').close();renderFilm();announce('已同步整体调色');
+    },'primary wide'));
+  });
+};
+$('open').onclick=()=>$('files').click();
+$('files').onchange=async event=>{const files=[...event.target.files];event.target.value='';await importPhotos(files);};
+document.addEventListener('dragover',event=>{if(event.dataTransfer?.types.includes('Files'))event.preventDefault();});
+document.addEventListener('drop',event=>{if(event.dataTransfer?.files.length){event.preventDefault();importPhotos([...event.dataTransfer.files]);}});
+
+
+const workerURL=URL.createObjectURL(new Blob([$('kernel').textContent],{type:'text/javascript'}));
+const worker=new Worker(workerURL), jobs=new Map();
+let workerId=0,renderSerial=0,queuedRender=null,rendering=false;
+function askWorker(payload,transfer=[]){
+  return new Promise((resolve,reject)=>{
+    const id=++workerId;jobs.set(id,{resolve,reject});
+    try{worker.postMessage({...payload,id},transfer);}catch(error){jobs.delete(id);reject(error);}
+  });
+}
+worker.onmessage=({data})=>{
+  const job=jobs.get(data.id);if(!job)return;jobs.delete(data.id);
+  data.error?job.reject(Error(data.error)):job.resolve(data);
+};
+worker.onerror=()=>{for(const job of jobs.values())job.reject(Error('预览计算中断，请重新打开预览文件。'));jobs.clear();};
+function hasPixelChanges(s){return s.strokes.length||Object.values(s.global).some(Boolean)||(s.mask&&Object.values(s.local).some(Boolean));}
+function requestPixels(){
+  const serial=++renderSerial,p=currentPhoto(),data=activeMedia;if(!p||!data)return;
+  const state=visibleEdits();
+  if(!hasPixelChanges(state)){queuedRender=null;data.result=data.proxy;paintCanvas();status(ui.previewId===null?'当前会话':'历史预览');return;}
+  queuedRender={serial,p,data,state};status('更新预览…');pumpRender();
+}
+async function pumpRender(){
+  if(rendering||!queuedRender)return;
+  const {serial,p,data,state}=queuedRender;queuedRender=null;rendering=true;
+  try{
+    const reply=await askWorker({kind:'preview',key:p.id,edits:state});
+    if(serial!==renderSerial||ui.active!==p.id||activeMedia!==data)return;
+    const canvas=data.output??(data.output=document.createElement('canvas'));
+    canvas.width=data.proxy.width;canvas.height=data.proxy.height;
+    canvas.getContext('2d').putImageData(new ImageData(reply.pixels,canvas.width,canvas.height),0,0);
+    data.result=canvas;paintCanvas();ui.redrawLayout?.();status(ui.previewId===null?'当前会话':'历史预览');
+  }catch(error){if(serial===renderSerial){status('预览失败',true);announce(error.message);}}
+  finally{rendering=false;pumpRender();}
+}
+const surface=$('stage'),ctx=surface.getContext('2d',{alpha:false});
+const pointers=new Map();let gesture=null,brushCursor=null;
+function gestureReset(){gesture=null;brushCursor=null;pointers.clear();ui.selectionDraft=null;}
+function caption(context,layer,x,y,w,h){
+  if(!layer.visible||!layer.value.trim())return;
+  context.save();context.globalAlpha=layer.opacity/100;context.fillStyle='#fffefa';
+  const size=Math.max(7,Math.round(Math.min(w,h)*.046));
+  context.font='600 '+size+'px "Segoe UI","Microsoft YaHei",sans-serif';context.textBaseline='bottom';
+  context.shadowColor='rgba(0,0,0,.62)';context.shadowBlur=Math.max(1,size*.1);
+  context.fillText(layer.value,x+w*.055,y+h*.95,w*.9);context.restore();
+}
+function geometry(){
+  const p=currentPhoto();if(!p?.width||!activeMedia)return null;
+  const vw=surface.clientWidth,vh=surface.clientHeight,pad=vw<500?9:22;
+  const fit=Math.min(Math.max(5,vw-2*pad)/p.width,Math.max(5,vh-2*pad)/p.height);
+  const w=p.width*fit*p.viewport.zoom,h=p.height*fit*p.viewport.zoom;
+  return {vw,vh,w,h,x:(vw-w)/2+p.viewport.panX*w,y:(vh-h)/2+p.viewport.panY*h};
+}
+function paintCanvas(){
+  const vw=surface.clientWidth,vh=surface.clientHeight;if(!vw||!vh)return;
+  const dpr=Math.min(2,devicePixelRatio||1),pw=Math.max(1,Math.round(vw*dpr)),ph=Math.max(1,Math.round(vh*dpr));
+  if(surface.width!==pw||surface.height!==ph){surface.width=pw;surface.height=ph;}
+  ctx.setTransform(pw/vw,0,0,ph/vh,0,0);ctx.fillStyle='#282a2c';ctx.fillRect(0,0,vw,vh);
+  const g=geometry();ui.fit=g;if(!g)return;
+  const {x,y,w,h}=g,s=visibleEdits(),original=ui.original||ui.holdOriginal;
+  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+  ctx.drawImage(original?activeMedia.proxy:activeMedia.result,x,y,w,h);
+  if(!original)caption(ctx,s.caption,x,y,w,h);
+  const split=vw*ui.split/100;
+  if(ui.compare&&!original){
+    ctx.save();ctx.beginPath();ctx.rect(0,0,split,vh);ctx.clip();ctx.drawImage(activeMedia.proxy,x,y,w,h);ctx.restore();
+    ctx.strokeStyle='white';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(split,0);ctx.lineTo(split,vh);ctx.stroke();
+  }
+  if((ui.target==='local'||ui.editing==='mask'||ui.showMask)&&!original){
+    const m=ui.selectionDraft||s.mask;
+    if(m){
+      ctx.save();ctx.strokeStyle='#ffffff';ctx.lineWidth=1.4;ctx.setLineDash([5,4]);ctx.fillStyle='rgba(171,86,53,.12)';
+      ctx.fillRect(x+w*m.x,y+h*m.y,w*m.w,h*m.h);ctx.strokeRect(x+w*m.x,y+h*m.y,w*m.w,h*m.h);ctx.restore();
+    }
+  }
+  if(gesture?.type==='brush'&&gesture.points.length){
+    ctx.save();ctx.strokeStyle='rgba(255,248,234,.78)';ctx.lineWidth=2;ctx.beginPath();
+    gesture.points.forEach(([u,v],i)=>i?ctx.lineTo(x+w*u,y+h*v):ctx.moveTo(x+w*u,y+h*v));ctx.stroke();ctx.restore();
+  }
+  if(brushCursor&&ui.editing==='brush'&&!original){
+    ctx.save();ctx.strokeStyle='#fffefa';ctx.lineWidth=1;ctx.shadowColor='#25231f';ctx.shadowBlur=2;ctx.beginPath();
+    ctx.arc(brushCursor.x,brushCursor.y,Math.max(3,ui.radius*Math.min(w,h)),0,Math.PI*2);ctx.stroke();ctx.restore();
+  }
+  let label=original?'原图':ui.previewId!==null?'历史预览 · '+currentPhoto().nodes[ui.previewId].label:ui.compare?'左侧原图 · 右侧成片':'';
+  if(!label&&ui.editing==='mask')label='拖动框选局部调色范围';
+  if(!label&&ui.editing==='brush')label='人物笔刷 · '+brushName(ui.brush);
+  $('viewMode').hidden=!label;$('viewMode').textContent=label;$('dividerWrap').hidden=!ui.compare||original;
+  surface.classList.toggle('brush',ui.editing!=='pan'&&!ui.panKey);
+}
+new ResizeObserver(paintCanvas).observe($('mat'));
+function viewportPoint(e){const r=surface.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};}
+function imagePoint(point,clamped=false){
+  const g=geometry();if(!g)return null;let u=(point.x-g.x)/g.w,v=(point.y-g.y)/g.h;
+  if(!clamped&&(u<0||v<0||u>1||v>1))return null;
+  return[bound(u,0,1),bound(v,0,1)];
+}
+function limitPan(p,g){
+  const maxX=Math.max(0,(g.w+g.vw)/2-Math.min(g.w,g.vw)*.25)/g.w;
+  const maxY=Math.max(0,(g.h+g.vh)/2-Math.min(g.h,g.vh)*.25)/g.h;
+  p.viewport.panX=bound(p.viewport.panX,-maxX,maxX);p.viewport.panY=bound(p.viewport.panY,-maxY,maxY);
+}
+function zoomAround(point,factor,start=geometry()){
+  const p=currentPhoto();if(!start||!p)return;
+  const u=(point.x-start.x)/start.w,v=(point.y-start.y)/start.h;
+  p.viewport.zoom=bound(p.viewport.zoom*factor,.3,8);const g=geometry();
+  p.viewport.panX=(point.x-u*g.w-(g.vw-g.w)/2)/g.w;p.viewport.panY=(point.y-v*g.h-(g.vh-g.h)/2)/g.h;
+  limitPan(p,g);updateViewport();
+}
+function updateViewport(){const p=currentPhoto();$('zoomLabel').value=(p?.viewport.zoom||1).toFixed(1)+'×';paintCanvas();}
+function centerZoom(factor){const g=geometry();if(g)zoomAround({x:g.vw/2,y:g.vh/2},factor);}
+function setTool(tool){if(ui.previewId!==null)return;ui.editing=tool;ui.original=false;ui.holdOriginal=false;$('pan').setAttribute('aria-pressed',String(tool==='pan'));paintCanvas();}
+surface.addEventListener('wheel',e=>{if(geometry()){e.preventDefault();zoomAround(viewportPoint(e),Math.exp(-bound(e.deltaY,-90,90)*.003));}},{passive:false});
+surface.addEventListener('pointerdown',e=>{
+  if(!activeMedia||e.button!==0)return;e.preventDefault();surface.focus({preventScroll:true});surface.setPointerCapture(e.pointerId);
+  const pos=viewportPoint(e);pointers.set(e.pointerId,pos);
+  if(pointers.size===2){
+    const [a,b]=[...pointers.values()];gesture={type:'pinch',distance:Math.max(1,Math.hypot(a.x-b.x,a.y-b.y)),center:{x:(a.x+b.x)/2,y:(a.y+b.y)/2}};
+    ui.selectionDraft=null;paintCanvas();return;
+  }
+  const normalized=imagePoint(pos);
+  if(ui.panKey||ui.editing==='pan'||ui.original||ui.holdOriginal||ui.previewId!==null){gesture={type:'pan',last:pos};return;}
+  if(!normalized)return;
+  if(ui.editing==='mask')gesture={type:'mask',first:normalized,last:normalized};
+  else if(ui.editing==='brush')gesture={type:'brush',points:[normalized]};
+  paintCanvas();
+});
+surface.addEventListener('pointermove',e=>{
+  const pos=viewportPoint(e);brushCursor=pos;
+  if(!pointers.has(e.pointerId)){if(ui.editing==='brush')paintCanvas();return;}
+  pointers.set(e.pointerId,pos);const g=geometry(),p=currentPhoto();if(!g||!gesture)return;
+  if(gesture.type==='pinch'&&pointers.size>=2){
+    const [a,b]=[...pointers.values()],distance=Math.max(1,Math.hypot(a.x-b.x,a.y-b.y)),center={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+    zoomAround(gesture.center,distance/gesture.distance);
+    const next=geometry();p.viewport.panX+=(center.x-gesture.center.x)/next.w;p.viewport.panY+=(center.y-gesture.center.y)/next.h;limitPan(p,next);
+    gesture.distance=distance;gesture.center=center;
+  }else if(gesture.type==='pan'){
+    p.viewport.panX+=(pos.x-gesture.last.x)/g.w;p.viewport.panY+=(pos.y-gesture.last.y)/g.h;limitPan(p,g);gesture.last=pos;
+  }else if(gesture.type==='mask'){
+    const end=imagePoint(pos,true),[x,y]=gesture.first;gesture.last=end;
+    ui.selectionDraft={x:Math.min(x,end[0]),y:Math.min(y,end[1]),w:Math.abs(x-end[0]),h:Math.abs(y-end[1])};
+  }else if(gesture.type==='brush'){
+    const next=imagePoint(pos,true),last=gesture.points.at(-1);
+    if(gesture.points.length<512&&Math.hypot(next[0]-last[0],next[1]-last[1])>ui.radius/7)gesture.points.push(next);
+  }
+  paintCanvas();
+});
+function endGesture(e,cancelled){
+  if(!pointers.has(e.pointerId))return;pointers.delete(e.pointerId);
+  if(gesture?.type==='pinch'&&pointers.size===1){gesture={type:'pan',last:[...pointers.values()][0]};return;}
+  const completed=gesture;gesture=null;
+  if(!cancelled&&completed?.type==='brush'){
+    const p=currentPhoto(),stroke={tool:ui.brush,r:ui.radius,strength:ui.strength,points:completed.points};
+    if(['low-smooth','high-soften'].includes(ui.brush))stroke.separation=bound(ui.separation/Math.min(p.width,p.height),.000001,.2);
+    if(visibleEdits().strokes.length>=100){announce('预览版每张照片最多保留 100 笔，现有笔触可继续撤销。');}
+    else commit(brushName(ui.brush),{type:'stroke',stroke});
+  }else if(!cancelled&&completed?.type==='mask'&&ui.selectionDraft){
+    const rect=ui.selectionDraft;if(rect.w>.006&&rect.h>.006){ui.target='local';ui.showMask=true;setTool('pan');commit('设定局部调色范围',{type:'mask',rect},true);}
+  }
+  ui.selectionDraft=null;paintCanvas();
+}
+surface.addEventListener('pointerup',e=>endGesture(e,false));surface.addEventListener('pointercancel',e=>endGesture(e,true));
+function settleCanvasInput(){
+  for(const pointerId of [...pointers.keys()]){
+    endGesture({pointerId},false);
+    if(surface.hasPointerCapture(pointerId))surface.releasePointerCapture(pointerId);
+  }
+}
+surface.addEventListener('pointerleave',()=>{brushCursor=null;if(ui.editing==='brush')paintCanvas();});
+$('pan').onclick=()=>{setTool('pan');renderPanel();};$('smaller').onclick=()=>centerZoom(1/1.3);$('larger').onclick=()=>centerZoom(1.3);
+$('fit').onclick=()=>{if(currentPhoto()){currentPhoto().viewport={zoom:1,panX:0,panY:0};updateViewport();}};
+$('compare').onclick=()=>{ui.compare=!ui.compare;ui.original=false;updateChrome();paintCanvas();};
+$('original').onclick=()=>{ui.original=!ui.original;updateChrome();paintCanvas();};
+$('splitPosition').oninput=e=>{ui.split=Number(e.target.value);paintCanvas();};
+$('toggleFilm').onclick=()=>{
+  const small=matchMedia('(max-width:700px)').matches,cls=small?'mobile-film':'film-closed';
+  $('desk').classList.toggle(cls);updateChrome();
+};
+function openDialog(title,fill) {
+  const dialog=$('dialog');if(dialog.open)dialog.close();
+  $('dialogTitle').textContent=title;const content=clear($('dialogBody'));fill(content);dialog.showModal();
+}
+$('closeDialog').onclick=()=>$('dialog').close();
+$('dialog').addEventListener('click',e=>{if(e.target===$('dialog')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.target.close();}});
+function exportDialog(){
+  const p=currentPhoto(),data=activeMedia;if(!p||!data||ui.exporting)return;
+  settleCanvasInput();finishPendingEdit();
+  const version=ui.previewId??p.cursor,snapshot=editsAt(p,version),label=p.nodes[version].label;
+  openDialog(ui.previewId===null?'导出当前成片':'导出历史快照',body=>{
+    body.append(element('p',p.name+' · '+p.width+' × '+p.height+' px'),hint('导出版本 · '+label));
+    const format=element('select');format.id='exportFormat';format.add(new Option('PNG · 保留透明度','image/png'));format.add(new Option('JPEG · 白色底','image/jpeg'));
+    const field=element('label','格式','panel-field');field.append(format);body.append(field);
+    const button=action('导出图片',async()=>{
+      if(ui.exporting)return;ui.exporting=true;button.disabled=true;
+      const mime=format.value;button.textContent='正在生成成片…';updateChrome();
+      try{
+        const canvas=document.createElement('canvas');canvas.width=p.width;canvas.height=p.height;
+        const c=canvas.getContext('2d',{willReadFrequently:true});c.drawImage(data.img,0,0);
+        if(hasPixelChanges(snapshot)){
+          const raw=c.getImageData(0,0,p.width,p.height);
+          const result=await askWorker({kind:'export',key:p.id,width:p.width,height:p.height,data:raw.data,edits:snapshot},[raw.data.buffer]);
+          c.putImageData(new ImageData(result.pixels,p.width,p.height),0,0);
+        }
+        caption(c,snapshot.caption,0,0,p.width,p.height);
+        if(mime==='image/jpeg'){c.globalCompositeOperation='destination-over';c.fillStyle='white';c.fillRect(0,0,p.width,p.height);}
+        const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('图片编码失败。')),mime,.94));
+        const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=p.name.replace(/\.[^.]+$/,'')+'-成片.'+(mime==='image/jpeg'?'jpg':'png');
+        document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+        if(button.isConnected)$('dialog').close();announce('成片已交给浏览器下载');
+      }catch(error){announce(error.message);}finally{ui.exporting=false;button.disabled=false;button.textContent='导出图片';updateChrome();}
+    },'primary wide','doExport');
+    body.append(button);
+  });
+}
+$('export').onclick=exportDialog;
+
+
+const toolIndex=[
+  ['color','light','光线','曝光 提亮 压暗 阴影 对比度', 'exposure'],
+  ['color','color','颜色','色温 冷暖 饱和度 自然饱和度','temperature'],
+  ['color','looks','风格预设','暖调 胶片 电影 清透'],
+  ['color','mask','局部调色','蒙版 选区 框选 范围'],
+  ['portrait','gray','中性灰','局部 加深 减淡 修肤 提亮 擦除'],
+  ['portrait','frequency','高低频','高频 低频 毛孔 纹理 皮肤 匀色'],
+  ['layers','caption','文字图层','签名 题字 不透明度 显示 隐藏'],
+  ['layers','stack','图层顺序','原图 底图 图层结构'],
+  ['ai','expand','扩图','补全画布 扩展 横屏 竖屏'],
+  ['ai','paint','厚涂','二次元 COS 自然 强度 风格'],
+  ['steps','changes','编辑记录','历史 撤销 重做 旧版本'],
+  ['steps','flow','工作流','失败 重试 AI 中间步骤']
+];
+const brushNames={'gray-dodge':'中性灰减淡','gray-burn':'中性灰加深','gray-erase':'擦除灰层','low-smooth':'低频匀色','high-soften':'高频柔化'};
+function brushName(key){return brushNames[key]||'画笔';}
+const starts={color:'light',portrait:'gray',layers:'caption',ai:'expand',steps:'changes'};
+const scrollPositions=new Map();
+function showSection(section,group,focusId){
+  if(!sections[section])return;
+  settleCanvasInput();finishPendingEdit();
+  scrollPositions.set(ui.section,$('parameterScroll').scrollTop);
+  ui.section=section;
+  if(group!==undefined)choices[section]=group;
+  if(!(section in choices))choices[section]=starts[section];
+  if(section==='portrait'&&ui.previewId===null){
+    const isFrequency=choices.portrait==='frequency';
+    if(isFrequency!==['low-smooth','high-soften'].includes(ui.brush))ui.brush=isFrequency?'low-smooth':'gray-dodge';
+    ui.editing='brush';
+  }else ui.editing='pan';
+  $('app').classList.remove('focus-view');renderPanel();updateChrome();paintCanvas();
+  $('parameterScroll').scrollTop=group?0:(scrollPositions.get(section)||0);
+  if(group){
+    const groupNode=$('group-'+group);if(groupNode)groupNode.scrollIntoView({block:'nearest'});
+    const focusTarget=focusId?document.getElementById(focusId):groupNode?.querySelector('summary');
+    focusTarget?.focus({preventScroll:true});
+  }
+}
+for(const b of document.querySelectorAll('[data-section]'))b.onclick=()=>showSection(b.dataset.section);
+$('mobilePanel').onclick=()=>{$('app').classList.add('focus-view');announce('点底栏工具可展开参数');};
+$('undo').onclick=()=>moveHistory(-1);$('redo').onclick=()=>moveHistory(1);
+function updateChrome(){
+  const p=currentPhoto(),ready=Boolean(p&&activeMedia);
+  $('docName').textContent=p?.name||'打开照片';$('docSize').textContent=p?.width?p.width+' × '+p.height:'';
+  $('undo').disabled=!p||ui.previewId!==null||p.nodes[p.cursor].parent===null;
+  $('redo').disabled=!p||ui.previewId!==null||p.redo[p.cursor]===undefined;
+  $('export').disabled=!ready||ui.exporting;$('compare').disabled=$('original').disabled=!ready;
+  $('original').setAttribute('aria-pressed',String(ui.original||ui.holdOriginal));
+  $('compare').setAttribute('aria-pressed',String(ui.compare));
+  $('pan').setAttribute('aria-pressed',String(ui.editing==='pan'));
+  $('toggleFilm').setAttribute('aria-expanded',String(matchMedia('(max-width:700px)').matches?$('desk').classList.contains('mobile-film'):!$('desk').classList.contains('film-closed')));
+  $('zoomLabel').value=(p?.viewport.zoom||1).toFixed(1)+'×';
+  document.querySelector('[data-section=steps]').title=p?'编辑历史与工作流 · '+(chain(p,p.cursor).length-1)+' 项调整':'编辑历史与工作流';
+  const tile=document.querySelector('.tile.current small');if(tile&&p&&!ui.batch)tile.textContent=p.cursor?'已调整':'原始照片';
+  for(const btn of document.querySelectorAll('[data-section]'))btn.setAttribute('aria-pressed',String(btn.dataset.section===ui.section));
+}
+function range(parent,{id,label,min,max,step=1,value,format=String,input,change}){
+  const wrap=element('div',undefined,'range-row'),line=element('div',undefined,'range-line'),name=element('label',label),out=element('output',format(value));
+  name.htmlFor=id;out.htmlFor=id;
+  const control=document.createElement('input');Object.assign(control,{type:'range',id,min,max,step,value});
+  control.oninput=()=>{const n=Number(control.value);out.value=format(n);input?.(n);};
+  control.onchange=()=>change?.(Number(control.value));
+  line.append(name,out);wrap.append(line,control);parent.append(wrap);return control;
+}
+function field(parent,label,control){
+  const wrap=element('label',label,'panel-field');wrap.append(control);parent.append(wrap);return control;
+}
+function select(options,value,handler,id){
+  const control=document.createElement('select');if(id)control.id=id;
+  for(const [v,label] of options)control.add(new Option(label,v));
+  control.value=value;control.onchange=()=>handler(control.value);return control;
+}
+function buttons(parent,items){
+  const row=element('div',undefined,'panel-actions');
+  for(const [id,label,fn,pressed]of items){
+    const b=action(label,fn,undefined,id);
+    if(pressed!==undefined)b.setAttribute('aria-pressed',String(pressed));row.append(b);
+  }parent.append(row);return row;
+}
+function accordion(key,title,fill){
+  const group=element('details',undefined,'panel-group');group.id='group-'+key;
+  const summary=element('summary',title),content=element('div',undefined,'group-content');
+  group.open=key===choices[ui.section];group.append(summary,content);
+  summary.onclick=e=>{
+    e.preventDefault();choices[ui.section]=group.open?'':key;
+    if(ui.section==='portrait'&&!group.open){ui.editing='brush';ui.brush=key==='frequency'?'low-smooth':'gray-dodge';}
+    renderPanel();updateChrome();paintCanvas();$('group-'+key)?.querySelector('summary')?.focus({preventScroll:true});
+  };
+  if(group.open)fill(content);
+  $('parameterScroll').append(group);
+}
+function toneRange(parent,key,label,min,max,step){
+  const target=ui.target==='local'&&visibleEdits().mask?'local':'global',value=visibleEdits()[target][key]||0;
+  const format=n=>key==='exposure'?(n>0?'+':'')+n.toFixed(2)+' EV':(n>0?'+':'')+n;
+  range(parent,{id:key,label,min,max,step,value,format,
+    input:n=>{ui.draftStep={type:'tone',target,values:{[key]:n}};requestPixels();},
+    change:n=>commit((target==='local'?'局部':'')+label+' '+format(n),{type:'tone',target,values:{[key]:n}})});
+}
+function renderColor(){
+  accordion('light','基础光线',box=>{
+    toneRange(box,'exposure','曝光',-2,2,.05);toneRange(box,'contrast','对比度',-60,60,1);toneRange(box,'shadows','阴影',-80,80,1);
+  });
+  accordion('color','颜色',box=>{
+    toneRange(box,'temperature','色温',-70,70,1);toneRange(box,'saturation','饱和度',-75,75,1);
+  });
+  accordion('looks','风格预设',box=>{
+    const looks=[['清透日光',{exposure:.15,shadows:12,temperature:4,contrast:3,saturation:2}],['暖调胶片',{exposure:.05,temperature:15,shadows:12,contrast:-10,saturation:-12}],['冷调电影',{exposure:-.2,temperature:-10,contrast:16,shadows:-6,saturation:-14}]];
+    for(const [label,values]of looks)box.append(action(label,()=>{const target=ui.target==='local'&&visibleEdits().mask?'local':'global';commit(label,{type:'tone',target,values});},'step-row'));
+  });
+  accordion('mask','局部调色',box=>{
+    const mask=visibleEdits().mask;
+    box.append(hint(mask?'矩形蒙版已保留。局部参数只作用于框内。':'在照片上框出要单独调整的范围。'));
+    buttons(box,[['drawMask',mask?'重新框选':'框选范围',()=>{setTool('mask');announce('在照片上拖出一个矩形');},ui.editing==='mask']]);
+    if(mask){
+      if(ui.target==='local')toneRange(box,'exposure','框内曝光',-2,2,.05);
+      box.append(action('移除蒙版',()=>{ui.target='global';ui.showMask=false;commit('移除局部蒙版',{type:'mask',rect:null},true);}));
+    }
+  });
+}
+function brushControls(box,ids){
+  buttons(box,ids.map(([id,label])=>['brush-'+id,label,()=>{ui.brush=id;setTool('brush');renderPanel();},ui.editing==='brush'&&ui.brush===id]));
+  range(box,{id:'brushSize',label:'画笔大小',min:1,max:20,value:ui.radius*100,step:.5,format:n=>n+'%',input:n=>{ui.radius=n/100;paintCanvas();}});
+  range(box,{id:'brushStrength',label:'力度',min:1,max:100,value:Math.round(ui.strength*100),format:n=>n+'%',input:n=>{ui.strength=n/100;}});
+}
+function renderPortrait(){
+  accordion('gray','中性灰 · 光影',box=>{
+    box.append(hint('选减淡或加深，然后在照片上轻涂。每一笔都可撤销。'));
+    brushControls(box,[['gray-dodge','减淡'],['gray-burn','加深'],['gray-erase','擦除灰层']]);
+  });
+  accordion('frequency','高低频 · 纹理',box=>{
+    box.append(hint('低频匀色整理色块，高频柔化减弱刷过的纹理。'));
+    brushControls(box,[['low-smooth','低频匀色'],['high-soften','高频柔化']]);
+    const p=currentPhoto(),maximum=Math.max(1,Math.min(80,Math.floor(Math.min(p.width,p.height)*.2)));
+    range(box,{id:'separation',label:'分离半径',min:1,max:maximum,value:Math.min(maximum,ui.separation),format:n=>n+' px',input:n=>{ui.separation=n;}});
+  });
+}
+function renderLayers(){
+  accordion('caption','文字图层',box=>{
+    const layer=visibleEdits().caption;
+    const input=document.createElement('input');input.id='captionText';input.maxLength=80;input.placeholder='输入照片题字';input.value=layer.value;
+    input.oninput=()=>{ui.draftStep={type:'caption',values:{value:input.value}};toggle.disabled=!input.value.trim();paintCanvas();};
+    input.onchange=()=>commit(input.value.trim()?'修改文字图层':'清空题字',{type:'caption',values:{value:input.value}});
+    field(box,'题字',input);
+    range(box,{id:'captionOpacity',label:'不透明度',min:0,max:100,value:layer.opacity,format:n=>n+'%',
+      input:n=>{ui.draftStep={type:'caption',values:{opacity:n}};paintCanvas();},change:n=>commit('文字不透明度 '+n+'%',{type:'caption',values:{opacity:n}})});
+    const toggle=action(layer.visible?'隐藏文字':'显示文字',()=>commit(layer.visible?'隐藏文字':'显示文字',{type:'caption',values:{visible:!layer.visible}},true),'outline','toggleCaption');
+    toggle.disabled=!layer.value.trim();box.append(toggle);
+  });
+  accordion('stack','图层顺序',box=>{
+    const state=visibleEdits();
+    const lines=[[state.caption.value?'题字 · '+state.caption.value:'文字图层',state.caption.value&&state.caption.visible?'显示':'空或隐藏'],['整体与局部调色',state.mask?'含局部蒙版':'全图'],['人物笔触',state.strokes.length+' 笔'],['原始照片','底图']];
+    for(const [name,detail]of lines){const row=element('div',undefined,'step-row');row.append(element('span',name),element('small',detail,'push muted'));box.append(row);}
+  });
+}
+function drawLayout(box,layout,photo,data){
+  const chart=document.createElement('canvas');chart.width=480;chart.height=180;chart.style.cssText='display:block;width:100%;height:auto;background:#e8e6df;border:1px solid var(--line);border-radius:5px;margin:8px 0';chart.setAttribute('aria-label','扩图构图示意，边框内为当前图片');
+  const c=chart.getContext('2d'),scale=Math.min(440/layout.width,156/layout.height),w=layout.width*scale,h=layout.height*scale,x=(480-w)/2,y=(180-h)/2;
+  const xx=x+layout.left*scale,yy=y+layout.top*scale,ww=photo.width*scale,hh=photo.height*scale;
+  ui.redrawLayout=()=>{
+    if(ui.active!==photo.id)return;
+    c.clearRect(0,0,480,180);c.fillStyle='#c4c7c4';c.fillRect(x,y,w,h);
+    c.drawImage(data.result,xx,yy,ww,hh);caption(c,visibleEdits().caption,xx,yy,ww,hh);
+    c.strokeStyle='#91452f';c.lineWidth=2;c.strokeRect(xx,yy,ww,hh);
+  };ui.redrawLayout();
+  box.append(chart,element('div',layout.originalWidth+' × '+layout.originalHeight+' → '+layout.width+' × '+layout.height+' px','small number'));
+}
+function renderAI(){
+  const p=currentPhoto();
+  accordion('expand','扩图 · 补全画布',box=>{
+    field(box,'目标画幅',select(['1:1','4:5','2:3','3:2','16:9','9:16'].map(v=>[v,v]),p.ai.ratio,value=>{p.ai.ratio=value;renderPanel();},'aiRatio'));
+    let layout;
+    try{layout=layoutAPI.outpaintLayout(p.width,p.height,{canvas:{mode:'ratio',ratio:p.ai.ratio}});drawLayout(box,layout,p,activeMedia);}
+    catch(error){box.append(hint(error.message));}
+    box.append(hint('预演会显示输入、画布与生成步骤，未连接模型。'));
+    const btn=action('预演扩图流程',()=>startRehearsal('扩图',layout),'soft wide','rehearse');btn.disabled=!layout;box.append(btn);
+  });
+  accordion('paint','厚涂 · 风格化',box=>{
+    field(box,'画风',select([['cos','真人 COS 厚涂'],['anime','二次元厚涂'],['natural','自然精修']],p.ai.style||'cos',v=>{p.ai.style=v;renderPanel();},'aiStyle'));
+    if(p.ai.style!=='natural')range(box,{id:'paintLevel',label:'厚涂程度',min:1,max:10,value:p.ai.amount,format:n=>n+' / 10',input:n=>{p.ai.amount=n;}});
+    box.append(hint('可以查看这一步将使用哪一版图片。预览版只演练工作流。'),action('预演修图流程',()=>startRehearsal(p.ai.style==='natural'?'自然精修':'厚涂',null),'soft wide'));
+  });
+  accordion('catalog','按用途找任务',box=>{
+    const task=aiDirectory.find(t=>t.id===(p.ai.taskId||'remove-equipment'))||aiDirectory[0];
+    const groups=[...new Set(aiDirectory.map(t=>t.group))];
+    field(box,'用途',select(groups.map(g=>[g,g]),task.group,g=>{
+      p.ai.taskId=aiDirectory.find(t=>t.group===g).id;renderPanel();
+    },'aiGroup'));
+    field(box,'任务',select(aiDirectory.filter(t=>t.group===task.group).map(t=>[t.id,t.name]),task.id,id=>{
+      p.ai.taskId=id;
+      if(id==='outpaint')showSection('ai','expand');else if(id==='cos-paint')showSection('ai','paint');else renderPanel();
+    },'aiTask'));
+    box.append(hint(task.short),hint('可预演步骤和恢复流程。'),action('预演此任务',()=>{if(task.id==='outpaint')showSection('ai','expand');else startRehearsal(task.name,null,task);},'soft wide'));
+  });
+}
+function startRehearsal(name,layout,task=null){
+  const p=currentPhoto();p.rehearsal={name,layout,task,source:p.cursor,state:'ready',tries:0,level:p.ai.amount,style:p.ai.style||'cos'};
+  showSection('steps','flow');
+}
+function inspectHistory(index){finishPendingEdit();ui.previewId=index;ui.original=false;ui.holdOriginal=false;ui.editing='pan';refreshEdits();}
+function exitHistory(){ui.previewId=null;refreshEdits();}
+function branchFromPreview(){
+  const p=currentPhoto();if(ui.previewId===null)return;
+  p.cursor=ui.previewId;ui.previewId=null;refreshEdits();announce('已回到所选步骤，其他版本仍在记录中');
+}
+function renderSteps(){
+  const p=currentPhoto();
+  accordion('changes','编辑历史',box=>{
+    box.append(hint('点一步查看当时的画面。选择「从此处继续」可建立新分支。'));
+    const ancestors=new Set(chain(p,p.cursor));
+    for(let i=p.nodes.length-1;i>=0;i--){
+      const entry=p.nodes[i],row=action('',()=>inspectHistory(i),'step-row'+(i===p.cursor?' current':'')+(ui.previewId===i?' previewed':''));
+      row.dataset.entry=i;const label=element('span',String(i).padStart(2,'0')+' · '+entry.label);
+      row.append(element('span','','step-dot'),label);if(i===p.cursor||!ancestors.has(i))row.append(element('time',i===p.cursor?'当前':'分支'));box.append(row);
+    }
+  });
+  accordion('flow','AI 工作流',box=>{
+    const run=p.rehearsal;if(!run){box.append(hint('选择 AI 修图里的扩图或厚涂，即可预演各步输入与恢复。'),action('打开 AI 修图',()=>showSection('ai','expand'),'outline'));return;}
+    box.append(element('p',run.name+' · 流程演练','history-meta'));
+    const input=element('div',undefined,'step-summary');input.append(element('h3','1. 输入快照'),element('p',p.name+' · '+p.nodes[run.source].label),action('在画布查看输入',()=>inspectHistory(run.source),'outline'));box.append(input);
+    const setup=element('div',undefined,'step-summary');
+    const title=run.layout?'准备扩展画布':run.task?'准备任务要求':'准备风格参数';
+    const detail=run.layout?run.layout.width+' × '+run.layout.height+' px，保留原图区域':run.task?run.task.short:run.style==='natural'?'保留原有画风':'厚涂程度 '+run.level+' / 10';
+    setup.append(element('h3','2. '+title),element('p',detail));box.append(setup);
+    const step=element('div',undefined,'step-summary');step.append(element('h3','3. 生成 · '+({ready:'待运行',failed:'模拟中断',recovered:'已恢复到待运行'}[run.state])),hint('此处只演练恢复操作，不生成图片。'));
+    const failed=run.state==='failed';
+    step.append(action(failed?'从生成步骤恢复':'演练一次中断',()=>{run.state=failed?'recovered':'failed';if(failed)run.tries++;renderPanel();},failed?'soft':'outline','simulateRetry'));
+    if(run.tries)step.append(hint('已恢复 '+run.tries+' 次，复用同一输入快照和参数。'));box.append(step);
+  });
+}
+function renderPanel(){
+  ui.redrawLayout=null;
+  const holder=$('parameterScroll'),savedScroll=holder.scrollTop;clear(holder);$('panelTitle').textContent=sections[ui.section];
+  $('sectionKind').textContent=ui.section==='ai'?'流程预演':ui.section==='steps'?'当前照片':'本机编辑';
+  $('scopeControl')?.remove();$('sectionKind').hidden=false;
+  if(!activeMedia){holder.append(hint('正在读取照片…'));return;}
+  if(ui.section==='color'&&visibleEdits().mask&&ui.previewId===null){
+    const scope=select([['global','调整全图'],['local','调整框内']],ui.target,value=>{
+      ui.target=value;ui.showMask=value==='local';setTool('pan');renderPanel();
+    },'scopeControl');
+    scope.setAttribute('aria-label','当前调色范围');$('sectionKind').hidden=true;$('mobilePanel').before(scope);
+  }
+  if(ui.section==='color'&&!ui.started&&samples.some(sample=>sample.id===ui.active)&&ui.previewId===null){
+    const intro=element('p','试着拖动曝光，或点「导入」打开自己的照片。');intro.id='introTip';holder.append(intro);
+  }
+  if(ui.previewId!==null){
+    const note=element('div',undefined,'step-summary');note.append(element('h3','正在查看历史快照'),hint(currentPhoto().nodes[ui.previewId].label));
+    buttons(note,[['returnCurrent','返回当前成片',exitHistory],['branchHere','从此处继续',branchFromPreview]]);holder.append(note);
+    if(ui.section!=='steps')return;
+  }
+  ({color:renderColor,portrait:renderPortrait,layers:renderLayers,ai:renderAI,steps:renderSteps}[ui.section])();
+  holder.scrollTop=savedScroll;
+}
+function toolSearch(){
+  openDialog('查找工具',body=>{
+    const query=document.createElement('input');query.type='search';query.id='toolSearch';query.placeholder='例如：高低频、蒙版、扩图';query.setAttribute('aria-label','搜索工具名称');const list=element('div');body.append(query,list);
+    function show(){
+      clear(list);const q=query.value.trim().toLowerCase();
+      const directory=aiDirectory.filter(t=>!['outpaint','cos-paint'].includes(t.id)).map(t=>['ai','catalog',t.name,t.group+' '+t.aliases,undefined,t]);
+      const matches=q?[...toolIndex,...directory].filter(([section,group,title,aliases])=>(sections[section]+title+aliases).toLowerCase().includes(q)):
+        toolIndex.filter(([,g])=>['light','gray','mask','frequency','expand','changes'].includes(g));
+      if(!matches.length){list.append(hint('没有匹配的工具，试试“曝光”或“扩图”。'));return;}
+      for(const [section,group,title,,focus,task]of matches){
+        const b=action('',()=>{if(task&&currentPhoto())currentPhoto().ai.taskId=task.id;$('dialog').close();showSection(section,group,focus);},'match');
+        b.append(element('strong',title),element('small',sections[section]+' › '+(task?task.group+' › ':'')+title));list.append(b);
+      }
+    }
+    query.oninput=show;query.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();e.stopPropagation();list.querySelector('button')?.click();}};show();setTimeout(()=>query.focus(),0);
+  });
+}
+$('find').onclick=toolSearch;
+function about(){
+  openDialog('试用说明',body=>{
+    body.append(element('p','先调曝光，放大看脸，再切到人物画笔。画布、缩放、选区和历史随这张照片保留。'),
+      hint('这是交互原型。调整只保留在当前窗口，导出可下载成片。可导入 JPG、PNG、WebP。AI 只预演步骤。'),
+      element('h3','快捷键'),hint('Ctrl/⌘ + K 找工具，Ctrl/⌘ + Z 撤销，Ctrl/⌘ + Shift + Z 重做。空格临时平移，按住反斜杠查看原图。移动端可双指缩放。'),
+      element('h3','内置练习照片'));
+    for(const sample of samples){
+      const p=element('p'),a=element('a',sample.name+' · '+sample.author);a.href=sample.credit;a.target='_blank';a.rel='noopener noreferrer';p.append(a);body.append(p);
+    }
+    const license=element('a','Pexels 素材许可');license.href='https://www.pexels.com/license/';license.target='_blank';license.rel='noopener noreferrer';body.append(license);
+  });
+}
+$('about').onclick=about;
+$('sessionInfo').onclick=about;
+document.addEventListener('keydown',e=>{
+  const typing=e.target.matches('textarea,input:not([type=range]):not([type=button])')||e.target.isContentEditable;
+  if(e.isComposing||$('dialog').open)return;
+  const mod=e.ctrlKey||e.metaKey,key=e.key.toLowerCase();
+  if(mod&&key==='k'){e.preventDefault();toolSearch();return;}
+  if(typing)return;
+  if(mod&&key==='o'){e.preventDefault();$('files').click();return;}
+  if(mod&&key==='z'){e.preventDefault();moveHistory(e.shiftKey?1:-1);return;}
+  if(mod&&key==='y'){e.preventDefault();moveHistory(1);return;}
+  if(e.target.matches('select,input,button,summary')&&e.key!=='Escape')return;
+  if(e.code==='Space'){e.preventDefault();ui.panKey=true;paintCanvas();}
+  if(e.code==='Backslash'){e.preventDefault();ui.holdOriginal=true;updateChrome();paintCanvas();}
+  if(['ArrowLeft','ArrowRight'].includes(e.key)&&!ui.batch){
+    const i=photos.indexOf(currentPhoto()),j=bound(i+(e.key==='ArrowRight'?1:-1),0,photos.length-1);if(photos[j]){e.preventDefault();selectPhoto(photos[j].id);}
+  }
+  if(e.key==='Escape'){if(ui.previewId!==null)exitHistory();else{ui.editing='pan';ui.original=ui.compare=false;updateChrome();paintCanvas();}}
+});
+document.addEventListener('keyup',e=>{
+  if(e.code==='Space'&&ui.panKey)ui.panKey=false;
+  else if(e.code==='Backslash'&&ui.holdOriginal)ui.holdOriginal=false;
+  else return;
+  updateChrome();paintCanvas();
+});
+window.addEventListener('blur',()=>{ui.panKey=ui.holdOriginal=false;paintCanvas();});
+for(const item of samples){const p=makePhoto(item.id,item.name,item.src);p.thumbnail=item.thumb;photos.push(p);}
+selectPhoto(photos[0].id);
+
+
+</script></body></html>
