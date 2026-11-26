@@ -1,20 +1,64 @@
 {
   "schema": "houtu-release-status",
   "version": 1,
-  "checkedAt": "2026-11-26T14:38:19.062Z",
+  "checkedAt": "2026-11-26T15:14:28.770Z",
   "repository": "DOOM12138/houtu-studio",
-  "latestVerified": "v1.38.0",
+  "latestVerified": "v1.38.1",
   "scope": "Release publication, available workflow attempts, artifact inventory and supplied checksum lists against GitHub asset digests. Historical binaries were not all reinstalled; real AI quality and ARM physical-device coverage remain separately recorded.",
   "counts": {
-    "applications": 36,
-    "published": 29,
+    "applications": 37,
+    "published": 30,
     "failedOrStopped": 7,
-    "recovered": 3,
+    "recovered": 4,
     "knownIssues": 4,
     "historicalSourceTags": 6,
     "dependencyReleases": 1
   },
   "applications": [
+    {
+      "tag": "v1.38.1",
+      "status": "recovered",
+      "label": "重试后已恢复",
+      "draft": false,
+      "publishedAt": "2026-11-26T15:13:05Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.38.1",
+      "assetCount": 5,
+      "assets": [
+        {
+          "name": "houtu-studio-1.38.1-Android-arm64-v8a.apk",
+          "bytes": 205673503,
+          "digest": "sha256:3657979612dcf863b0d0bec5573ed9dd58e81d7a4efab49c0f67672af69d2f18"
+        },
+        {
+          "name": "houtu-studio-1.38.1-Android-x86_64.apk",
+          "bytes": 213283859,
+          "digest": "sha256:8fae1b5c27cb0cb3bbaa3850ed0eeceb8edc7fdcf685181b2c0f1121602de306"
+        },
+        {
+          "name": "houtu-studio-1.38.1-SHA256.txt",
+          "bytes": 423,
+          "digest": "sha256:95bdf6ab722bd06322dd4c0493fdbc64db40b1e46e5222c021bcc36ab5da7b4f"
+        },
+        {
+          "name": "houtu-studio-1.38.1-Windows-x64-Setup.exe",
+          "bytes": 186461872,
+          "digest": "sha256:01438945c59c242c51b11cd2924c9291fd0a5107d103e5845feb287c2fe2f1db"
+        },
+        {
+          "name": "houtu-studio-1.38.1-Windows-x64.zip",
+          "bytes": 268208484,
+          "digest": "sha256:47a1225b278ba07804801999cdd29a3ab28140f6d3f56eca887af1fa3e354977"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": {
+        "runId": 45841815937,
+        "latestAttempt": 2,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45841815937"
+      },
+      "note": "首次安卓验收在冷启动后未能重新连接 WebView，同一构建重试后完整通过。修复常见位图 MIME 和过早限像素问题。已验证真实 Nikon Z8 RAW 原尺寸 8256×5504、旧半尺寸恢复、同尺寸 JPG/TIFF 导入与导出。"
+    },
     {
       "tag": "v1.38.0",
       "status": "published",
