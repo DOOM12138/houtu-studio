@@ -1,3 +1,4 @@
+import './workspace-continuation.js';
 import './update-notice.js';
 import {installImageImports} from './image-import.js';
 installImageImports();

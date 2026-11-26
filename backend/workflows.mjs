@@ -6,6 +6,7 @@ import {randomUUID,createHash} from 'node:crypto';
 import sharp from 'sharp';
 import {replaceFile,linkOrCopyFile} from '../lib/files.mjs';
 export const FLOW_STEPS={
+ 'image-handoff':[['source','跨板块保留的完整图片',[]]],
  'agent-batch':[['source','本轮勾选与执行授权',[]],['prepare','为各张建立Agent新流程',['source']],['execute','后台执行与人工检查边界',['prepare']],['deliver','本轮结果与历史',['execute']]],
  'retouch-agent':[['source','Agent原图与设置',[]],['deliver','保存成品',['source']]],
  'studio-plan':[['source','规划输入与参考用途',[]],['analysis','逐张分析与任务拆分',['source']],['proposal','可执行方案与步骤预算',['analysis']],['apply','确认应用到照片新版本',['proposal']]],

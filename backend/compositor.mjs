@@ -1,6 +1,7 @@
 import sharp from 'sharp';
 import {effectSvg} from '../frontend/effects.js';
 export async function composite(source,material,mask,options){
+ const orient=async bytes=>{if(!bytes)return bytes;const m=await sharp(bytes).metadata();return m.orientation&&m.orientation!==1?sharp(bytes).rotate().png().toBuffer():bytes;};source=await orient(source);material=await orient(material);mask=await orient(mask);
  const meta=await sharp(source).metadata(),width=meta.width,height=meta.height;let base=source;
  if(options.mode==='background'){
   if(!material||!mask)throw Error('换背景需要背景素材和人物蒙版，请先分析人物。');

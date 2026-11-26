@@ -264,7 +264,7 @@ public final class MainActivity extends Activity {
   }
 
   void go(String path) {
-    if (ready) web.loadUrl(RuntimeHost.origin + path);
+    if (ready) web.evaluateJavascript("window.houtuWorkspaceNavigate ? window.houtuWorkspaceNavigate(" + JSONObject.quote(path) + ") : location.assign(" + JSONObject.quote(RuntimeHost.origin + path) + ")", null);
   }
 
   void openExternal(String value) {

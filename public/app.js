@@ -1,3 +1,4 @@
+import {registerWorkspaceEditor,workspaceFile,saveWorkspaceImage,resetWorkspaceImage,navigateWorkspace,trackWorkspaceInput,workspaceStartupCurrent} from './workspace-continuation.js';
 import {EditHistory,bindHistoryShortcuts,historyList} from './editor-history.js';
 import {MAX_IMAGE_UPLOAD_BYTES,IMAGE_UPLOAD_MESSAGE} from './upload-limits.js';
 import {imageOrigin} from './image-import.js';
@@ -19,7 +20,7 @@ let lastAiResultKey='';let aiHistoryRestoring=false,aiHistoryBusy=false,aiRedoJo
 let checking = false, busy = false,portraitChecking=false,portraitTaskType='';
 let operation = 'full-body', toolFilter = '全部', selection = null, selecting = false, parentId = null;
 let sourceMeta = null, dragStart = null, previousSelection = null, compiledVersion = 0;
-let sourceReference = null, sourceObjectUrl = null;
+let sourceReference = null, sourceObjectUrl = null,sourceFileBlob=null,sourceFileRevision=0,restoringSources=0;
 let promptInitialized = false, templates = [], packageJob = null, packageTimer = null;
 // Keep the original media and editing canvases; only their viewing containers change.
 const oldCanvases=$('canvases'),oldComparison=$('comparison'),viewMount=document.createElement('div');viewMount.id='retouch-view';oldCanvases.before(viewMount);
@@ -251,21 +252,21 @@ try { document.documentElement.dataset.theme = localStorage.getItem('paint-theme
 function splitMode(){photoView.setMode('side');}
 function sourceMode(){photoView.setMode('before');}
 
-async function setFile(file, reference = null) {
+async function setFile(file, reference = null,{isCurrent=()=>true}={}) {
   reference=reference||imageOrigin(file)?.source||null;
-  if (!file || busy || portraitChecking || running(currentJob?.status)||aiHistoryBusy&&!aiHistoryRestoring) return;
+  if (!isCurrent() || !file || busy || portraitChecking || running(currentJob?.status)||aiHistoryBusy&&!aiHistoryRestoring) return;
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) return feedback('请选择 PNG、JPG 或 WebP 图片。');
   if (!reference && file.size > MAX_IMAGE_UPLOAD_BYTES) return feedback(IMAGE_UPLOAD_MESSAGE);
-  try {
+  const fileRevision=++sourceFileRevision;try {
     const data = reference ? URL.createObjectURL(file) : await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); });
     const img = new Image();
-    img.src = data; await img.decode();
+    img.src = data; await img.decode();if(fileRevision!==sourceFileRevision||!isCurrent()){if(reference)URL.revokeObjectURL(data);return false;}
     if (img.width * img.height > 40_000_000) return feedback('图片像素过大，请缩小到 4000 万像素以内。');
     if(!aiHistoryRestoring){aiOptionReady=false;aiRedoJobs=[];aiUndoParent=null;}clearInterval(timer); currentJob = null;portraitTools.reset();sceneTools.resetMask();featureTools.resetReferences();featureTools.resetTarget();$('portrait-versions').hidden=true;
     parentId = null; selection = null; selecting = false; sourceMeta = { width: img.width, height: img.height };
     if (sourceObjectUrl) URL.revokeObjectURL(sourceObjectUrl);
     sourceObjectUrl = reference ? data : null;
-    sourceReference = reference; sourceData = reference ? '' : data;
+    sourceReference = reference; sourceData = reference ? '' : data;sourceFileBlob=file;if(!reference)resetWorkspaceImage();
     $('source').src = data; $('source-frame').hidden = false; $('upload').hidden = true; $('replace').hidden = false;
     $('file-name').textContent = file.name;
     $('file-name').title = file.name;
@@ -285,10 +286,10 @@ function clearResult() {
 
 $('upload').addEventListener('click', () => $('file').click());
 $('replace').addEventListener('click', () => $('file').click());
-$('file').addEventListener('change', event => { setFile(event.target.files[0]); event.target.value = ''; });
+$('file').addEventListener('change', event => { if(event.target.files[0])trackWorkspaceInput(chooseImageFile(event.target.files[0])); event.target.value = ''; });
 document.querySelector('.source-pane').addEventListener('dragover', event => { event.preventDefault(); if (!running(currentJob?.status)) $('upload').classList.add('dragging'); });
 document.querySelector('.source-pane').addEventListener('dragleave', () => $('upload').classList.remove('dragging'));
-document.querySelector('.source-pane').addEventListener('drop', event => { event.preventDefault(); $('upload').classList.remove('dragging'); setFile(event.dataTransfer.files[0]); });
+document.querySelector('.source-pane').addEventListener('drop', event => { event.preventDefault(); $('upload').classList.remove('dragging'); trackWorkspaceInput(chooseImageFile(event.dataTransfer.files[0])); });
 document.addEventListener('dragover', event => event.preventDefault());
 document.addEventListener('drop', event => event.preventDefault());
 $('prompt').addEventListener('input', optionsChanged);
@@ -431,12 +432,12 @@ $('cancel').addEventListener('click', async () => {
   catch (error) { feedback(error.message); updateControls(); }
 });
 
-async function restoreJob(job) {
-  try {
+async function restoreJobImpl(job,{isCurrent=()=>true}={}) {
+  restoringSources++;const previousRevision=sourceFileRevision;try {
     const response = await fetch(job.sourceUrl);
     if (!response.ok) throw new Error('原图不存在。');
-    const blob = await response.blob();
-    if (!await setFile(new File([blob], '之前的原图', { type: blob.type }), { jobId: job.id, kind: 'source' })) return;
+    const blob = await response.blob();if(previousRevision!==sourceFileRevision||!isCurrent())return false;
+    if (!await setFile(new File([blob], '之前的原图', { type: blob.type }), { jobId: job.id, kind: 'source' },{isCurrent})) return;
     modelPicker.set(job.model||job.resolvedModel||null);
     $('prompt').value = job.prompt || state.defaultPrompt;
     $('prompt-mode').value = job.promptMode || 'guided';
@@ -452,8 +453,10 @@ async function restoreJob(job) {
     if(job.portrait){portraitTools.hydrate(job.portrait);$('portrait-profile').value='custom';}$('portrait-protect-bg').checked=job.operation==='portrait-polish'?Boolean(job.maskAsset):true;if(job.portraitAuditId){try{const audit=await api('/api/portrait/source?audit='+job.portraitAuditId);portraitTools.setAuditId(job.portraitAuditId);if(audit.diagnosis)portraitTools.showDiagnosis(audit.diagnosis,job.portraitAuditId);}catch{}}if(job.operation==='portrait-polish'&&job.maskAsset&&job.workflowId){$('portrait-protect-bg').checked=true;await portraitTools.loadMask(`/api/workflows/${job.workflowId}/assets/${job.maskAsset}`);}if(isSceneOperation(job.operation)){const mask=job.compositionMaskOverride?job.compositionMaskAsset:job.maskAsset;if(mask&&job.workflowId)await sceneTools.loadEditingMask(`/api/workflows/${job.workflowId}/assets/${mask}`);}
     renderJob(job);
     if (running(job.status)) watchJob();resetAiOptions('打开保存的成品');return true;
-  } catch (error) { feedback(error.message);return false; }
+  } catch (error) { feedback(error.message);return false; }finally{restoringSources--;}
 }
+function restoreJob(job,options){return trackWorkspaceInput(restoreJobImpl(job,options));}
+async function chooseImageFile(file){if(!file)return;resetWorkspaceImage();while(restoringSources)await new Promise(r=>setTimeout(r,20));return setFile(file);}
 
 async function loadHistory() {
   try {
@@ -574,24 +577,13 @@ $('portrait-rollback').addEventListener('click',()=>undoAi({resultOnly:true}));
 async function loadPortraitVersions(job){try{const response=await api(`/api/jobs/${job.id}/lineage`);if(currentJob?.id!==job.id)return;$('portrait-version-list').replaceChildren();for(const version of response.versions){const button=document.createElement('button');button.type='button';button.className='portrait-version';button.dataset.jobId=version.id;button.disabled=busy||portraitChecking||running(currentJob?.status);button.setAttribute('aria-pressed',String(version.id===job.id));if(version.outputUrl){const img=document.createElement('img');img.src=version.outputUrl;img.alt='人物精修第'+(version.round||1)+'轮';button.append(img);}const label=document.createElement('span');label.textContent=`从第${version.round||1}轮成品继续 · ${PRESETS.find(p=>p.id===version.operation)?.name||'人物精修'}`;button.append(label);button.onclick=()=>checkoutPortraitVersion(version);$('portrait-version-list').append(button);}if(job.sourceWorkflowId){const a=document.createElement('a');a.href='/workflows/?id='+job.sourceWorkflowId;a.className='text-button';a.textContent='查看本轮来源工作流';$('portrait-version-list').append(a);}$('portrait-versions').hidden=false;}catch{/* The ordinary history remains available if the version query fails. */}}
 
 $('to-superres').onclick=async()=>{if(!hasSource()||busy||running(currentJob?.status))return;busy=true;updateControls();try{const value=await api('/api/superres/import',{...(sourceReference?{source:sourceReference}:{image:sourceData}),name:$('file-name').textContent});location.href=value.url;}catch(e){feedback(e.message);}finally{busy=false;updateControls();}};
-$('to-color').addEventListener('click', async () => {
-  try {
-    if(currentJob?.outputUrl&&currentJob.workflowId){location.href='/color/?fromWorkflow='+currentJob.workflowId;return;}
-    const referenceJob=sourceReference&&historyJobs.find(j=>j.id===sourceReference.jobId);
-    const url=currentJob?.outputUrl || sourceData || (sourceReference?.kind==='result'?referenceJob?.outputUrl:referenceJob?.sourceUrl);
-    if(!url){location.href='/color/';return;}
-    const blob=await (await fetch(url)).blob();
-    const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('houtu-handoff',1);r.onupgradeneeded=()=>r.result.createObjectStore('images');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
-    await new Promise((resolve,reject)=>{const tx=db.transaction('images','readwrite');tx.objectStore('images').put({blob,name:'人物精修.png'},'current');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});
-    db.close();location.href='/color/#from-retouch';
-  } catch {feedback('图片交接未成功，请下载图片后在调色工作台打开。');}
-});
+$('to-color').addEventListener('click',()=>{void navigateWorkspace('/color/');});
 
 setOperation('full-body');
 await Promise.all([refreshState(), loadHistory(), loadTemplates()]);
-const portraitParams=new URLSearchParams(location.search);if(portraitParams.get('tool')&&PRESETS.some(p=>p.id===portraitParams.get('tool'))&&!portraitParams.get('job')&&!portraitParams.get('refineWorkflow')&&!portraitParams.get('portraitAudit'))setOperation(portraitParams.get('tool'));if(portraitParams.get('refineWorkflow')||portraitParams.get('portraitAudit')){try{const query=portraitParams.get('portraitAudit')?'audit='+encodeURIComponent(portraitParams.get('portraitAudit')):'workflow='+encodeURIComponent(portraitParams.get('refineWorkflow'))+'&asset='+encodeURIComponent(portraitParams.get('refineAsset'));const info=await api('/api/portrait/source?'+query),r=await fetch(info.url),blob=await r.blob();if(await setFile(new File([blob],info.name+'-成品.png',{type:blob.type}),{kind:'workflow',workflowId:info.workflowId,assetId:info.assetId})){$('prompt-mode').value='guided';setOperation('portrait-polish');if(info.auditId)portraitTools.setAuditId(info.auditId);if(info.diagnosis)portraitTools.showDiagnosis(info.diagnosis,info.auditId);feedback('已载入已保存成品，可以开始人物二次精修，前面的合成与调色不会重跑。',true);}}catch(e){feedback(e.message);}}
+const portraitParams=new URLSearchParams(location.search);if(portraitParams.get('tool')&&PRESETS.some(p=>p.id===portraitParams.get('tool'))&&!portraitParams.get('job')&&!portraitParams.get('refineWorkflow')&&!portraitParams.get('portraitAudit'))setOperation(portraitParams.get('tool'));if(workspaceStartupCurrent()&&(portraitParams.get('refineWorkflow')||portraitParams.get('portraitAudit'))){try{const query=portraitParams.get('portraitAudit')?'audit='+encodeURIComponent(portraitParams.get('portraitAudit')):'workflow='+encodeURIComponent(portraitParams.get('refineWorkflow'))+'&asset='+encodeURIComponent(portraitParams.get('refineAsset'));const info=await api('/api/portrait/source?'+query),r=await fetch(info.url),blob=await r.blob();if(await setFile(new File([blob],info.name+'-成品.png',{type:blob.type}),{kind:'workflow',workflowId:info.workflowId,assetId:info.assetId},{isCurrent:workspaceStartupCurrent})){$('prompt-mode').value='guided';setOperation('portrait-polish');if(info.auditId)portraitTools.setAuditId(info.auditId);if(info.diagnosis)portraitTools.showDiagnosis(info.diagnosis,info.auditId);feedback('已载入已保存成品，可以开始人物二次精修，前面的合成与调色不会重跑。',true);}}catch(e){feedback(e.message);}}
 const requestedOperation=new URLSearchParams(location.search).get('operation');if(PRESETS.some(p=>p.id===requestedOperation))setOperation(requestedOperation);
-const requestedJob=new URLSearchParams(location.search).get('job');if(requestedJob&&/^[a-f0-9-]{36}$/.test(requestedJob)){try{await restoreJob(await api('/api/jobs/'+requestedJob));}catch(e){feedback(e.message);}}
+const requestedJob=new URLSearchParams(location.search).get('job');if(workspaceStartupCurrent()&&requestedJob&&/^[a-f0-9-]{36}$/.test(requestedJob)){try{await restoreJob(await api('/api/jobs/'+requestedJob),{isCurrent:workspaceStartupCurrent});}catch(e){feedback(e.message);}}
 setInterval(() => { if (state.loginPending || !state.csrf) refreshState(); }, 3000);
 window.addEventListener('focus', () => { if (!running(currentJob?.status)) refreshState(); });
 
@@ -618,3 +610,5 @@ function renderAiOptionsHistory(){if(!document.getElementById('ai-settings-histo
 function recordAiOptions(event){if(!aiOptionReady||aiHistoryRestoring||aiHistoryBusy||busy||portraitChecking||running(currentJob?.status))return;const label=event.target.closest('label')?.textContent?.trim().slice(0,35)||event.target.textContent?.trim().slice(0,35)||'修改参数';if(aiOptionHistory.push(aiOptionsSnapshot(),label)){aiRedoJobs=[];renderAiOptionsHistory();updateControls();}}
 function restoreAiOptions(index){const o=aiOptionHistory.move(index);if(!o)return;aiHistoryRestoring=true;try{modelPicker.set(o.model);$('prompt').value=o.prompt;$('prompt-mode').value=o.promptMode;$('edit-style').value=o.style;$('paint-level').value=o.paintLevel;$('preserve').checked=o.preserve;$('portrait-protect-bg').checked=o._portraitProtect;const strength=document.querySelector('[name="strength"][value="'+o.strength+'"]');if(strength)strength.checked=true;document.querySelectorAll('[name="area"]').forEach(n=>n.checked=o.areas.includes(n.value));selection=o.selection;hydrateBelly(o.belly,o._tool);sceneTools.hydrate(o.scene,o._tool);featureTools.hydrate(o.task);if(o.portrait)portraitTools.hydrate(o.portrait);setOperation(o._tool,{autoStyle:false});updateRegion();feedback('已恢复修图设置，未调用AI。',true);}finally{aiHistoryRestoring=false;renderAiOptionsHistory();updateControls();}}
 document.addEventListener('change',event=>{if(event.target.closest('.settings,#prompt-workshop,#model-picker'))recordAiOptions(event);});document.addEventListener('click',event=>{if(event.target.closest('#tool-list button,#apply-template,#reset-prompt'))recordAiOptions(event);});
+
+await registerWorkspaceEditor({tool:'ai',prepare:async()=>{if(!hasSource())return null;if(busy||portraitChecking)throw Error('当前工具仍在保存，请稍后切换。');if(currentJob?.workflowId){const w=await api('/api/workflows/'+currentJob.workflowId),node=currentJob.outputUrl&&currentJob.status==='done'?w.steps.find(n=>n.id==='compose'&&n.status==='done'):w.steps.find(n=>n.id==='source'&&n.status==='done');if(node?.output?.imageAsset)return {workflowId:w.id,assetId:node.output.imageAsset,stepId:node.id,attemptId:node.attempts?.at(-1)?.id};}if(sourceReference?.kind==='workflow')return {workflowId:sourceReference.workflowId,assetId:sourceReference.assetId,stepId:sourceReference.stepId,attemptId:sourceReference.attemptId};if(sourceReference?.jobId){const j=await api('/api/jobs/'+sourceReference.jobId);if(j.workflowId){const w=await api('/api/workflows/'+j.workflowId),n=w.steps.find(n=>n.id===(sourceReference.kind==='result'?'compose':'source')&&n.status==='done');if(n?.output?.imageAsset)return {workflowId:w.id,assetId:n.output.imageAsset,stepId:n.id,attemptId:n.attempts?.at(-1)?.id};}}let blob=sourceFileBlob;if(!blob){const response=await fetch($('source').src);if(!response.ok)throw Error('当前原图暂时无法读取。');blob=await response.blob();}const value=await saveWorkspaceImage(blob,$('file-name').textContent);sourceReference={kind:'workflow',...value};sourceData='';return value;},open:async(value,{isCurrent=()=>true}={})=>{const file=await workspaceFile(value);if(!isCurrent())return;const ok=await setFile(file,{kind:'workflow',...value.origin},{isCurrent});if(!isCurrent())return;if(!ok)throw Error('当前图片未能载入AI修图，原版本保留。');feedback('已接续其他板块的完整尺寸效果，点击生成前不会调用AI。',true);},resume:async value=>{if(sourceReference?.kind==='workflow'&&sourceReference.workflowId===value.workflowId&&sourceReference.assetId===value.assetId)sourceReference={...value.origin,kind:'workflow'};}});
