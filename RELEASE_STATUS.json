@@ -1,13 +1,13 @@
 {
   "schema": "houtu-release-status",
   "version": 1,
-  "checkedAt": "2026-11-26T16:12:05.549Z",
+  "checkedAt": "2026-11-26T16:38:42.964Z",
   "repository": "DOOM12138/houtu-studio",
-  "latestVerified": "v1.38.2",
+  "latestVerified": "v1.39.1",
   "scope": "Release publication, available workflow attempts, artifact inventory and supplied checksum lists against GitHub asset digests. Historical binaries were not all reinstalled; real AI quality and ARM physical-device coverage remain separately recorded.",
   "counts": {
-    "applications": 39,
-    "published": 31,
+    "applications": 40,
+    "published": 32,
     "failedOrStopped": 8,
     "recovered": 4,
     "knownIssues": 4,
@@ -15,6 +15,50 @@
     "dependencyReleases": 1
   },
   "applications": [
+    {
+      "tag": "v1.39.1",
+      "status": "published",
+      "label": "发布成功",
+      "draft": false,
+      "publishedAt": "2026-11-26T16:37:16Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.39.1",
+      "assetCount": 5,
+      "assets": [
+        {
+          "name": "houtu-studio-1.39.1-Android-arm64-v8a.apk",
+          "bytes": 205681695,
+          "digest": "sha256:bc73bcccd0b2086437e142a0e5b40bfbe8198cb522b256c768733d27e384b8ee"
+        },
+        {
+          "name": "houtu-studio-1.39.1-Android-x86_64.apk",
+          "bytes": 213292051,
+          "digest": "sha256:33ae382c24173991393b8728532d66e540587b16eb4a266ae85ea10e20aec3a2"
+        },
+        {
+          "name": "houtu-studio-1.39.1-SHA256.txt",
+          "bytes": 423,
+          "digest": "sha256:922de0d2ca8bd0411020a3c9d8d1499a853577f62afcbdb0e97e07d94aeb04a2"
+        },
+        {
+          "name": "houtu-studio-1.39.1-Windows-x64-Setup.exe",
+          "bytes": 186463190,
+          "digest": "sha256:5391fdb9d37926cbd06b8a5577a43728fcbb973091b29b0b4caff0b240c66a89"
+        },
+        {
+          "name": "houtu-studio-1.39.1-Windows-x64.zip",
+          "bytes": 268221828,
+          "digest": "sha256:d4271845e1165c4e61e56e677e24a693bfe1eff737dc0031feb9b975408c7751"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": {
+        "runId": 45856679744,
+        "latestAttempt": 1,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45856679744"
+      },
+      "note": "更新横幅与画布隔离，照片条去重与移除恢复，自动参考默认小红书、可选抖音和角色名／外号。验证覆盖模拟平台回执。"
+    },
     {
       "tag": "v1.39.0",
       "status": "stopped",
