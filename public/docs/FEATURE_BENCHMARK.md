@@ -59,3 +59,8 @@ node scripts/project-node.mjs scripts/feature-benchmark-gate.mjs check data/priv
 
 - **线性与径向渐变蒙版通过 98 分独立验收**。新增渐变以画布像素为坐标。径向蒙版在宽幅和竖幅仍为圆形，45° 线性渐变沿画面角度变化。宽幅和竖幅径向蒙版的平均灰阶误差由 58.763、49.722 降到 0。两组斜渐变最大差 1 个灰阶，平均差低于 0.003。两张不同正例和一张方幅反例均超过 99.99。旧工程和无几何版本的预设沿用原坐标规则，新增预设保存新规则。[帝王蝶](https://specimen.gallery/specimen_assets/14) · [月面照片](https://science.nasa.gov/photojournal/nearside-of-earths-moon-as-seen-by-the-clementine-spacecraft/)
 - **高低频四支笔**。新增高低频笔触连续跨越图块。两张不同实图各复测低频匀色、低频取样、高频取样和高频柔化。旧版同一笔画由 2 点改为 85 点时，有 11,691–43,080 个图像像素变化，新版八次均为 0。保护区、alpha 和笔触以外保持原样。半透明餐具另外验证了 16,111 个半透明像素和 150,428 个全透明像素的 alpha，均无变化。这是笔触实际行为检查，各项修图审美仍待独立验收。[透明餐具](https://commons.wikimedia.org/wiki/File:Plasticware_-_isolated.png)
+
+## 第七轮实图
+
+- **跨模块图片交接通过 98 分验收**。横幅方向 6 的 JPEG 显示尺寸从旧回执的 1200 × 1800 修正为 1800 × 1200。竖幅方向 7 的 JPEG 从 1800 × 1200 修正为 1200 × 1800。新建及历史交接回执均使用正向显示尺寸。目标编辑器的图片字节、独立 EXIF 坐标映射与来源步骤一致。两张实拍和一张无方向标记反例均为 100 分。对照所示旧预览为按旧宽高模拟。[EXIF 样片与许可](https://github.com/recurser/exif-orientation-examples) · [无旋转对照](https://science.nasa.gov/photojournal/east-limb-view-of-earths-moon-as-seen-by-the-clementine-spacecraft/)
+- **批量 ZIP 交付通过 98 分验收**。针对长中文名、重复选择、旧扩展名与实际格式不同、Windows 保留名进行实包解压检查。超长名保留正确后缀，JPEG 和 WebP 条目按实际 MIME 命名。重复选择的对照由 3 张改为 2 张，两个预期成片均保持原 SHA-256。正常 PNG 反例保留名称和字节。两组正例和反例均为 100 分。该轮与第五轮共用导出类目，分别验证合包和画质。[Windows 文件命名规则](https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file)

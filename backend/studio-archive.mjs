@@ -13,10 +13,27 @@ import sharp from 'sharp';
 const ROOT=fileURLToPath(new URL('../',import.meta.url));
 export async function hashFile(file){const hash=createHash('sha256');for await(const bytes of createReadStream(file))hash.update(bytes);return hash.digest('hex');}
 export async function archiveFolder(source,target){if(process.platform==='android')return archivePortable(source,target);await new Promise((resolve,reject)=>{const child=spawn(powershell(),['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.join(ROOT,'scripts','archive.ps1'),'-Source',source,'-Destination',target],{cwd:ROOT,windowsHide:true,stdio:['ignore','ignore','pipe']});child.stderr.resume();child.on('error',reject);child.on('exit',code=>code===0?resolve():reject(Error('项目压缩失败，请检查目录和磁盘空间。')));});}
+const deliveryExtension={'image/png':'.png','image/jpeg':'.jpg','image/webp':'.webp'};
+const windowsDeviceName=/^(?:CON|PRN|AUX|NUL|CONIN\$|CONOUT\$|COM[1-9¹²³]|LPT[1-9¹²³])(?:[. ]|$)/i;
+function deliveryName(input,type,names){
+ const extension=deliveryExtension[type];
+ if(!extension)throw Error('成片格式不支持打包。');
+ const points=Array.from(safeName(path.parse(String(input)).name.normalize('NFC')).replace(/[\uD800-\uDFFF]/gu,''));
+ // Keep room for the collision suffix and extension on UTF-8 filesystems.
+ while(Buffer.byteLength(points.join(''),'utf8')>230)points.pop();
+ const original=points.join('').replace(/[ .]+$/,'')||'成片';
+ const stem=windowsDeviceName.test(original)?'_'+original:original;
+ const key=name=>name.toLocaleLowerCase('en-US').normalize('NFC');
+ let name=stem+extension;
+ for(let suffix=2;names.has(key(name));suffix++)name=stem+'-'+String(suffix).padStart(3,'0')+extension;
+ names.add(key(name));
+ return name;
+}
 async function exportProjectPhotosInternal(studio,id,photoIds){
- const project=await studio.get(id),selected=photoIds||project.photos.filter(photo=>photo.selected&&photo.flag!=='reject').map(photo=>photo.id);if(!Array.isArray(selected)||!selected.length||selected.some(value=>!project.photos.some(photo=>photo.id===value)))throw Error('请选择需要导出的照片。');
+ const project=await studio.get(id),requested=photoIds||project.photos.filter(photo=>photo.selected&&photo.flag!=='reject').map(photo=>photo.id);if(!Array.isArray(requested)||!requested.length||requested.some(value=>!project.photos.some(photo=>photo.id===value)))throw Error('请选择需要导出的照片。');
+ const selected=[...new Set(requested)];
  const archiveId=randomUUID(),temporary=path.join(ROOT,'tmp','studio-delivery-'+archiveId),output=path.join(studio.directory,'exports',archiveId+'.zip');await mkdir(temporary,{recursive:true});const names=new Set();let count=0;
- try{for(const photoId of selected){const {photo,workflow}=await studio.photo(id,photoId),node=workflow.steps.find(node=>node.id==='deliver');if(node?.status!=='done'||!node.output?.imageAsset)continue;const asset=await studio.workflows.asset(workflow.id,node.output.imageAsset);let name=safeName(node.output.fileName||photo.name);const original=name;let suffix=1;while(names.has(name.toLocaleLowerCase('en-US')))name=path.parse(original).name+'-'+String(++suffix).padStart(3,'0')+path.extname(original);names.add(name.toLocaleLowerCase('en-US'));await copyFile(asset.file,path.join(temporary,name));count++;}if(!count)throw Error('选中照片还没有已完成的成片，请先运行流程。');await archiveFolder(temporary,output);const receipt={id:archiveId,name:safeName(project.name)+'-成片.zip',count,skipped:selected.length-count,bytes:(await stat(output)).size,sha256:await hashFile(output),created:Date.now(),kind:'delivery'};await writeFile(path.join(studio.directory,'exports',archiveId+'.json'),JSON.stringify(receipt));return {...receipt,downloadUrl:'/api/studio/downloads/'+archiveId};}
+ try{for(const photoId of selected){const {photo,workflow}=await studio.photo(id,photoId),node=workflow.steps.find(node=>node.id==='deliver');if(node?.status!=='done'||!node.output?.imageAsset)continue;const asset=await studio.workflows.asset(workflow.id,node.output.imageAsset);const name=deliveryName(node.output.fileName||photo.name,asset.type,names);await copyFile(asset.file,path.join(temporary,name));count++;}if(!count)throw Error('选中照片还没有已完成的成片，请先运行流程。');await archiveFolder(temporary,output);const receipt={id:archiveId,name:safeName(project.name)+'-成片.zip',count,skipped:selected.length-count,bytes:(await stat(output)).size,sha256:await hashFile(output),created:Date.now(),kind:'delivery'};await writeFile(path.join(studio.directory,'exports',archiveId+'.json'),JSON.stringify(receipt));return {...receipt,downloadUrl:'/api/studio/downloads/'+archiveId};}
  finally{const relative=path.relative(path.join(ROOT,'tmp'),temporary);if(!relative||relative.startsWith('..')||path.isAbsolute(relative)||!/^studio-delivery-[a-f0-9-]+$/.test(relative))throw Error('导出临时目录校验失败。');await rm(temporary,{recursive:true,force:true,maxRetries:5,retryDelay:100});}
 }
 const UUID=/^[a-f0-9-]{36}$/,HASH=/^[a-f0-9]{64}$/,sha=bytes=>createHash('sha256').update(bytes).digest('hex');
