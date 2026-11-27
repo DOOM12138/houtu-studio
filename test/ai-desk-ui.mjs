@@ -39,7 +39,7 @@ try{
  await page.waitForFunction(()=>document.querySelector('#ioState')?.textContent==='本机草稿');await page.locator('[data-section=ai]').click();
  const before=await page.evaluate(()=>{window.stageIdentity=document.querySelector('#stage');return {...window.uiProbe,zoom:document.querySelector('#zoomLabel').value,url:location.href};});
  await page.locator('#desk-mode-semi').click();await selectTool('soft-glow','柔光');await selectTool('lighting','人物光影');
- await page.locator('#desk-mode-auto').click();await page.locator('#desk-auto-paint').check();await page.locator('#desk-paint-style').selectOption('anime');assert.equal(await page.locator('#desk-paint-style').inputValue(),'anime');const level=page.getByRole('spinbutton',{name:'厚涂程度 1–8'});await level.fill('');assert.ok(await page.locator('#desk-start').isDisabled());await level.fill('8');assert.ok(!await page.locator('#desk-start').isDisabled());await level.fill('9');assert.ok(await page.locator('#desk-start').isDisabled());await page.locator('#desk-auto-paint').uncheck();await page.locator('#desk-mode-semi').click();
+ await page.locator('#desk-mode-auto').click();await page.locator('#desk-auto-paint').check();await page.locator('#desk-paint-style').selectOption('anime');const paintScope=page.getByRole('combobox',{name:'厚涂范围'});assert.equal(await paintScope.inputValue(),'portrait');await paintScope.selectOption({label:'全身厚涂'});assert.equal(await paintScope.inputValue(),'full-body');assert.equal(await page.locator('#desk-paint-style').inputValue(),'anime');const level=page.getByRole('spinbutton',{name:'厚涂程度 1–8'});await level.fill('');assert.ok(await page.locator('#desk-start').isDisabled());await level.fill('8');assert.ok(!await page.locator('#desk-start').isDisabled());await level.fill('9');assert.ok(await page.locator('#desk-start').isDisabled());await page.locator('#desk-auto-paint').uncheck();await page.locator('#desk-mode-semi').click();
  const after=await page.evaluate(()=>({...window.uiProbe,zoom:document.querySelector('#zoomLabel').value,url:location.href,same:window.stageIdentity===document.querySelector('#stage')}));
  assert.equal(after.same,true);for(const key of ['decode','encode','posts','renders','zoom','url'])assert.equal(after[key],before[key],key);
  assert.equal(f.bridge.images.length,0);assert.equal(f.bridge.reads.length,0);
@@ -70,7 +70,11 @@ try{
  await page.locator('#desk-reference-provider').selectOption('douyin');
  await page.locator('#desk-reference-character').fill('影宝');
  await page.locator('#desk-reference-work').fill('原神');
+ await page.locator('#desk-auto-paint').check();
+ assert.equal(await paintScope.inputValue(),'full-body');
+ const fullBodyRequest=page.waitForRequest(r=>r.method()==='POST'&&new URL(r.url()).pathname==='/api/studio/ai-runs');
  await page.locator('#desk-start').click();
+ assert.equal((await fullBodyRequest).postDataJSON().auto.paintScope,'full-body');
  await page.waitForFunction(()=>document.querySelector('[data-desk-step=deliver]')?.textContent.includes('已完成'),null,{timeout:30000});
  const ai=await read('/api/studio/ai-runs/'+new URL(page.url()).searchParams.get('deskRun'));assert.equal(ai.mode,'auto');assert.equal(ai.agent.referenceProvider,'douyin');assert.equal(ai.agent.sceneGuide.character,'影宝');assert.equal(ai.agent.sceneGuide.work,'原神');assert.equal(ai.origin.assetId,v.result.assetId);assert.ok(ai.done);assert.equal(f.bridge.images.length,4);
  // The update notice must not add a grid row or resize the photo.
@@ -102,6 +106,7 @@ try{
   await page.locator('#desk-mode-semi').click();await page.locator('#desk-mode-auto').click();await page.screenshot({path:path.join(out,'phone-'+width+'.png')});
  }
  await page.goto(f.origin+'/ai/');await page.locator('#desk-mode-auto').waitFor();assert.equal(await page.locator('#desk-mode-auto').getAttribute('aria-selected'),'true');
+ await page.locator('#desk-auto-paint').check();assert.ok(await paintScope.isVisible());assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
  await page.locator('#desk-mode-semi').click();assert.ok(await page.locator('#desk-search').isVisible());await page.getByRole('button',{name:'单项精修工具',exact:true}).click();
  assert.ok(await page.locator('#operation-title').isVisible());
  // A RAW profile changes the base without clearing previous non-destructive adjustments.

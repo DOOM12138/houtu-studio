@@ -247,6 +247,7 @@ export function createAiDesk(host){
   check('加入厚涂',p.paint,v=>{p.paint=v;persist();render();},dataArea).id='desk-auto-paint';
   if(p.paint){
    select('厚涂画风',[['cos','COS 质感厚涂'],['anime','二次元质感厚涂']],p.paintStyle,value=>{p.paintStyle=value;persist();},dataArea).id='desk-paint-style';
+   select('厚涂范围',[['portrait','面部与发束'],['full-body','全身厚涂']],p.paintScope,value=>{p.paintScope=value;persist();},dataArea).id='desk-paint-scope';
    numberField(dataArea,`厚涂程度 1–${PAINT_LEVEL_MAX}`,1,PAINT_LEVEL_MAX,p.paintLevel,v=>{p.paintLevel=v;persist();sync();});
   }
   check('加入小特效',p.effects,v=>{p.effects=v;persist();render();},dataArea).id='desk-auto-effects';
@@ -340,7 +341,7 @@ export function createAiDesk(host){
    const source=host.pinDisplayed?await host.pinDisplayed():adopted||await host.pin();
    if(!guard())return;
    if(!boundKey)boundKey=keyFor(source);
-   const intent={mode,source,name:host.state().name,model:host.state().model||models.image,operations:[...draft.operations],auto:{paint:draft.auto.paint,effects:draft.auto.effects,paintLevel:draft.auto.paintLevel,paintStyle:draft.auto.paintStyle,effect:draft.auto.effect,referenceProvider:draft.auto.referenceProvider,character:draft.auto.referenceProvider==='none'?'':draft.auto.character?.trim(),work:draft.auto.referenceProvider==='none'?'':draft.auto.work?.trim()}};
+   const intent={mode,source,name:host.state().name,model:host.state().model||models.image,operations:[...draft.operations],auto:{paint:draft.auto.paint,effects:draft.auto.effects,paintLevel:draft.auto.paintLevel,paintStyle:draft.auto.paintStyle,...(draft.auto.paint&&draft.auto.paintScope==='full-body'?{paintScope:'full-body'}:{}),effect:draft.auto.effect,referenceProvider:draft.auto.referenceProvider,character:draft.auto.referenceProvider==='none'?'':draft.auto.character?.trim(),work:draft.auto.referenceProvider==='none'?'':draft.auto.work?.trim()}};
    const signature=JSON.stringify(intent);
    const previous=pendingPreparations[mode];
    if(previous&&previous.signature!==signature)throw Error('上次准备回执未知，请先恢复原设置或打开工作流。');

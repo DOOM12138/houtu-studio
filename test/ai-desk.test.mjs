@@ -119,3 +119,19 @@ test('full auto 4/10 retains the person result and pauses when texture review fa
  assert.ok(agent.steps.find(s=>s.id==='person').imageAsset);
  assert.equal(agent.steps.find(s=>s.id==='deliver').status,'pending');
 });
+
+test('full-body paint keeps the authored light and skips a second global grade',async t=>{
+ const f=await deskFixture();t.after(()=>f.close());
+ const run=await f.ok('/api/studio/ai-runs',{mode:'auto',auto:{paint:true,paintStyle:'anime',paintLevel:8,paintScope:'full-body',referenceProvider:'none'},requestKey:randomUUID(),source:await f.source()});
+ const pipeline=await f.ok('/api/workflows/'+run.workflowId);
+ assert.equal(pipeline.recipe.stages[0].options.paintScope,'full-body');
+ await f.ok('/api/studio/ai-runs/'+run.id+'/next',{workflowId:run.workflowId,step:run.next,revision:run.revision});
+ const done=await f.wait(run.id);
+ assert.ok(done.done,done.message);
+ assert.match(f.bridge.images[1].prompt,/全身厚涂按图1完整画幅.*腿部和鞋靴/);
+ assert.match(f.bridge.images[1].prompt,/侧光一半亮一半暗时保留阴影位置/);
+ const agent=await f.ok('/api/retouch-agents/'+done.agent.id);
+ const person=agent.steps.find(s=>s.id==='person'),color=agent.steps.find(s=>s.id==='color');
+ assert.equal(color.output.skipped,true);
+ assert.equal(color.imageAsset,person.imageAsset);
+});

@@ -3,7 +3,7 @@ import {PRESETS} from './catalog.js';
 export const deskTools=new Map(PRESETS.map(tool=>[tool.id,tool]));
 export const deskGroups=[...new Set(PRESETS.map(tool=>tool.group))];
 export const toolName=id=>deskTools.get(id)?.name||id;
-export const deskDefaults=()=>({operations:[],parameters:{},auto:{paint:false,effects:false,paintLevel:2,paintStyle:'cos',effect:'sparkles',referenceProvider:'xiaohongshu',character:'',work:''},model:null});
+export const deskDefaults=()=>({operations:[],parameters:{},auto:{paint:false,effects:false,paintLevel:2,paintStyle:'cos',paintScope:'portrait',effect:'sparkles',referenceProvider:'xiaohongshu',character:'',work:''},model:null});
 export function stageOptions(id,params={}){
  const tool=deskTools.get(id);
  if(!tool)throw Error('此修图功能不存在。');
