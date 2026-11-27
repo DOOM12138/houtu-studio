@@ -34,6 +34,26 @@ try{
  const flow=await get('/api/workflows/'+done.workflowId),prepared=flow.steps.find(n=>n.id==='prepare').output;assert.deepEqual(flow.steps[0].output.options.task.canvas,{mode:'sides',left:0,right:0,top:10,bottom:0});assert.equal(prepared.expansion.top,48);const grown=await sharp(Buffer.from(await(await fetch(origin+done.outputUrl)).arrayBuffer())).ensureAlpha().raw().toBuffer({resolveWithObject:true}),input=await sharp(Buffer.from(await(await fetch(origin+done.sourceUrl)).arrayBuffer())).ensureAlpha().raw().toBuffer();assert.equal(grown.info.width,360);assert.equal(grown.info.height,528);for(let y=0;y<480;y++)for(let x=0;x<360;x++){const a=(y*360+x)*4,b=((y+48)*360+x)*4;assert.deepEqual(grown.data.subarray(b,b+4),input.subarray(a,a+4));}
 
  const health=await get('/api/health'),projectResponse=await fetch(origin+'/api/studio/projects',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json','X-Paint-CSRF':health.csrf},body:JSON.stringify({name:'扩图预览项目',recipe:{stages:[{type:'retouch',options:{operation:'outpaint',style:'natural',task:{padding:20,direction:'all'}}},{type:'export'}]}})});assert.equal(projectResponse.status,201);const project=await projectResponse.json(),uploaded=await fetch(origin+'/api/studio/projects/'+project.id+'/photos?name=canvas.png',{method:'POST',headers:{Origin:origin,'Content-Type':'image/png','X-Paint-CSRF':health.csrf},body:source});assert.equal(uploaded.status,201);const importedPhoto=(await uploaded.json()).photo;await page.goto(origin+'/studio/?project='+project.id);await page.waitForFunction(()=>document.querySelector('#detail-original').naturalWidth===360&&document.querySelector('#stage-outpaint-0-canvas-info')?.dataset.width==='552');const pendingDetail=await get('/api/studio/projects/'+project.id+'/photos/'+importedPhoto.id);assert.ok(pendingDetail.workflow.steps.slice(1).every(n=>n.status!=='done'),'preview is available before any retouch stage completes');await page.locator('#studio-tab-recipe').click();await page.locator('.studio-stage').first().locator('summary').click();await page.locator('#stage-outpaint-0-canvas-mode').selectOption('ratio');await page.locator('#stage-outpaint-0-canvas-ratio').selectOption('1:1');assert.equal(await page.locator('#stage-outpaint-0-canvas-info').getAttribute('data-width'),'480');assert.equal(await page.locator('#stage-outpaint-0-canvas-info').getAttribute('data-height'),'480');assert.equal(bridge.images,1);await page.screenshot({path:path.join(out,'studio-outpaint-first-run.png'),fullPage:true});
- assert.deepEqual(errors,[]);console.log(JSON.stringify({result:'PASS',frequencyBrush:true,neutralGray:true,undoRedo:true,diagnosticsNeverExported:true,fullResolution:true,reopenedStrokes:2,crossWorkspace:true,outpaintCanvasPreview:true,settingsTriggerNoGeneration:true,syntheticOutpaintSubmissions:1,originalPixelsExact:true,firstRunRecipePreview:true,mobileToolMenu:true,mobile320:true,realAIImages:0}));
+ await page.goto(origin+'/portrait/?workflow='+manualId);
+ await page.waitForFunction(()=>!document.querySelector('#manual-save').disabled&&document.querySelector('#manual-stroke-count').textContent.startsWith('2 '));
+ await page.locator('[data-group=skin]').click();
+ await page.locator('[data-tool=clone]').click();
+ await page.locator('#manual-sample').click();
+ await stroke(.28,.42);
+ const plane=await page.locator('#manual-overlay').boundingBox();
+ assert.ok(plane);
+ await page.mouse.move(plane.x+plane.width*.5,plane.y+plane.height*.5);
+ await page.mouse.down();
+ await page.mouse.move(plane.x+plane.width*.75,plane.y+plane.height*.5);
+ await page.mouse.up();
+ await page.waitForFunction(()=>document.querySelector('#manual-stroke-count').textContent.startsWith('3 '));
+ await page.locator('#manual-save').click();
+ await page.waitForFunction(()=>!document.querySelector('#manual-save').disabled&&document.querySelector('#manual-save-status').textContent.includes('已保存'));
+ const cloned=await get('/api/workflows/'+manualId);
+ const cloneOp=cloned.steps.find(step=>step.id==='edit').output.operations.at(-1);
+ assert.equal(cloneOp.tool,'clone');
+ assert.equal(cloneOp.continuous,true);
+ assert.equal(cloneOp.points.length,2);
+ assert.deepEqual(errors,[]);console.log(JSON.stringify({result:'PASS',continuousClone:true,frequencyBrush:true,neutralGray:true,undoRedo:true,diagnosticsNeverExported:true,fullResolution:true,reopenedStrokes:2,crossWorkspace:true,outpaintCanvasPreview:true,settingsTriggerNoGeneration:true,syntheticOutpaintSubmissions:1,originalPixelsExact:true,firstRunRecipePreview:true,mobileToolMenu:true,mobile320:true,realAIImages:0}));
 }catch(error){if(page){console.error({url:page.url(),manual:await page.locator('#manual-notice').textContent().catch(()=>null),ai:await page.locator('#feedback').textContent().catch(()=>null),errors});await page.screenshot({path:path.join(out,'failed.png'),fullPage:true}).catch(()=>{});}throw error;}
 finally{await browser?.close();await app?.close();assert.ok(directory.startsWith(path.resolve('tmp')+path.sep));await fs.rm(directory,{recursive:true,force:true});}
