@@ -28,6 +28,8 @@ export function evaluatePaintCases(records, { revision } = {}) {
       && row.revision === revision && row.partition === 'held-out'
       && videoURL(row.videoURL)
       && row.referenceTool === 'yao-ai'
+      && row.referenceCreator === 'lesir'
+      && typeof row.referenceCreatorEvidence === 'string' && row.referenceCreatorEvidence.trim().length > 0
       && Number.isFinite(row.toolEvidenceSeconds) && row.toolEvidenceSeconds >= 0
       && typeof row.toolEvidenceNote === 'string' && row.toolEvidenceNote.trim().length > 0
       && Number.isFinite(row.beforeSeconds) && row.beforeSeconds >= 0
