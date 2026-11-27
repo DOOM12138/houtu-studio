@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {PRESETS} from '../public/catalog.js';
 import {paintingPrompt} from '../lib/painting.mjs';
-import {agentOptions,AGENT_VERSION,AGENT_LONG_SHOT_REVISION,AGENT_TEXTURE_REVISION,AGENT_PROMPT_REVISION} from '../public/retouch-agent-options.js';
+import {agentOptions,AGENT_VERSION,AGENT_LONG_SHOT_REVISION,AGENT_TEXTURE_REVISION,AGENT_HIGH_PAINT_REVISION,AGENT_PROMPT_REVISION} from '../public/retouch-agent-options.js';
 import {compileAgentPrompt,inspectionPrompt,planPrompt,checkPrompt,validateAgentCheck} from '../backend/agent-planning.mjs';
 
 test('all default edit prompts preserve a concrete task and guided output',()=>{
@@ -89,4 +89,11 @@ test('new 8/10 has a distinct reference-calibrated scope and requires texture re
  assert.match(checkPrompt(c),/8\/10的scope须有明显而连续的颊鼻塑形/);
  assert.match(checkPrompt(c),/texture为必检项/);
  assert.match(paintingPrompt({operation:'anime-paint',style:'anime',paintLevel:8}),/厚涂程度8\/10/);
+ assert.match(paintingPrompt({operation:'cos-paint',style:'cos',paintLevel:8}),/眼下、受光上颊和额鼻中间调.*下颌角或下巴折点/);
+ assert.match(compileAgentPrompt(c,{id:'person',prompt:'保持原妆。'},[]),/颊侧、下颌角或下巴折点.*遮挡、远景看不清/);
+ assert.match(checkPrompt(c),/整脸发闷.*旧轮廓双边/);
+ const old=agentOptions({...c,promptRevision:AGENT_HIGH_PAINT_REVISION});
+ assert.equal(old.paintLevel,8);
+ assert.doesNotMatch(checkPrompt(old),/旧轮廓双边/);
+ assert.doesNotMatch(paintingPrompt({operation:'anime-paint',style:'anime',paintLevel:4}),/下颌角或下巴折点/);
 });
