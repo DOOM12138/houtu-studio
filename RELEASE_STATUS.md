@@ -1,13 +1,14 @@
 # 全部版本发布状态
 
-核查日期：2026-11-26。最新完整验证版：[v1.40.2](https://github.com/DOOM12138/houtu-studio/releases/tag/v1.40.2)。
+核查日期：2026-11-27。最新完整验证版：[v1.40.4](https://github.com/DOOM12138/houtu-studio/releases/tag/v1.40.4)。
 
-现有43条应用Release中，33条已公开、10条发布失败／中止；已公开版本中另标4条恢复交付、4条已知运行问题。另有6个历史源码标签和1条安卓构建依赖。具体原因和后续跟进规则见 [RELEASE_RECOVERY.md](RELEASE_RECOVERY.md)，机器可读目录见 [RELEASE_STATUS.json](RELEASE_STATUS.json)。
+现有45条应用Release中，34条已公开、11条发布失败／中止；已公开版本中另标4条恢复交付、4条已知运行问题。另有6个历史源码标签和1条安卓构建依赖。具体原因和后续跟进规则见 [RELEASE_RECOVERY.md](RELEASE_RECOVERY.md)，机器可读目录见 [RELEASE_STATUS.json](RELEASE_STATUS.json)。
 
 核查覆盖发布状态、现存工作流尝试、附件清单，以及已提供的SHA清单与GitHub附件摘要；仅最新版本另核对实际Windows安装、安卓模拟器及本机更新回执。旧版并未逐个重新安装或重做AI画质验收。草稿仅维护者可见，失败版本原有Git标签和运行记录保留。
 
 ## 发布失败／已中止
 
+- **v1.40.3 · 发布中止·已被替代**。候选发布前发现刷新步骤页时编辑历史折叠。已停止分发，历史与原标签保留，修复由 v1.40.4 交付。[运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45975030171)
 - **v1.40.1 · 发布中止·已被替代**：安卓旧验收要求传统 AI 页预览元素；新版统一画布改按照片名、尺寸和导出状态验收。[运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45865429401)。由1.40.2交付。
 - **v1.40.0 · 发布中止·已被替代**：旧安卓验收在新版首页等待隐藏文件输入可见。已修正验收入口；v1.40.1 仍未完成发布，最终由 v1.40.2 交付。[运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45863945620)。
 - **v1.39.0 · 发布中止·已被替代**：传统照片项目验收卡在参考平台初始化，已停止发布。[运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45854982639)。修复包含在 1.39.1。
@@ -35,6 +36,7 @@
 
 ## 其余已公开版本
 
+- **v1.40.4 · 发布成功**。5 个发布附件。修复直接打开或刷新步骤页时编辑历史折叠的问题。核对 320px 历史页、Windows 安装、安卓独立运行和公开更新入口。[运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45975778704)
 - **v1.40.2 · 发布成功**：5个发布附件。只保留修图和设置两个主入口。Windows 安装、页内工具接续和安卓独立运行通过验证。[运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45866917798)。
 - **v1.39.1 · 发布成功**：5个发布附件。更新提示布局、照片条和平台参考已修复。Windows 安装和安卓独立运行通过验证。[运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45856679744)。
 - **v1.38.2 · 发布成功**：5个发布附件。Windows 日志、PNG、JPEG 下载已通过真实原生客户端验收，安卓通过独立运行测试。[运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45849585428)。
