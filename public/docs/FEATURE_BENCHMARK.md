@@ -71,3 +71,11 @@ node scripts/project-node.mjs scripts/feature-benchmark-gate.mjs check data/priv
 - **创作合成的透明主体蒙版**。蒙版先以黑色为底将透明度折算成灰度覆盖，再对齐画幅。换背景、特效保护和自动摆放共用读取规则。卡西尼、土星两张实图的换背景误差分别从 268,887、385,700 像素降到 0，特效保护误差分别从 1,545、2,044 降到 0。不透明灰度蒙版反例保持原样。[土星透明素材](https://commons.wikimedia.org/wiki/File:Saturn_transparent.png)
 
 两项均通过各自的 98 分门槛。超分重建的纹理观感继续按实拍高清参考另行验收。
+
+## 第九轮实图
+
+- **平滑推拉**。沿真实笔触线段连续累积带羽化的位移，消除同轨迹的采样点密度差。同一条横向拖动用 2 点和 81 点重放时，旧版藤编与包豪斯窗格分别有 62,716、64,777 个像素不同，新版均为 0。新版与独立数值积分参考逐像素一致，完全保护区和笔触外未改动。[藤编](https://commons.wikimedia.org/wiki/File:Basketwork_wicker_basket_close_up.jpg) · [包豪斯立面](https://commons.wikimedia.org/wiki/File:Fassade_des_Bauhausgeb%C3%A4des,_Dessau_2019.jpg)
+- **保护与擦除保护**。新笔触按连续距离生成覆盖，两种实图的保护与部分擦除均与独立几何蒙版一致。旧保护笔疏密差异最多 38,541 个像素，新版为 0。单画布的新增高低频和中性灰笔触也显式保存连续模式。
+- **恢复原图**。新笔触连续恢复原像素，并同步擦除同区域的中性灰编辑。两种实图中线漏恢复的像素由 486、434 降到 0，新图与独立灰层参考一致。格纹布料用作无操作反例。[格纹布料](https://commons.wikimedia.org/wiki/File:Tartan_cloth_closeup.jpg)
+
+本轮四项各包含两个正例与一个反例，12 组均达 100 分。已保存并缺少连续标记的笔触继续使用原算法。分数衡量笔触覆盖、位移和像素恢复，面部及身材塑形的审美仍待同人像对照。

@@ -4,3 +4,43 @@ test('reset and protection clearing remain undoable vector actions after reopeni
 test('manual body deformation changes the selected area and preserves every RGBA byte outside its smooth support',()=>{const a=fixture(),op={tool:'push',r:.18,strength:.6,points:[[.45,.5],[.54,.5]]},b=renderManualPortrait(a,w,h,[op]).pixels;let changed=0;for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=(y*w+x)*4;if(Math.hypot(x-.45*w,y-.5*h)>=.18*Math.min(w,h))assert.deepEqual(b.subarray(i,i+4),a.subarray(i,i+4));else if(!b.subarray(i,i+4).every((v,c)=>v===a[i+c]))changed++;}assert.ok(changed>30);assert.deepEqual(a,fixture());});
 test('manual protection has a fully protected core and replays deterministically for full-size export',()=>{const a=fixture(),ops=[{tool:'protect',r:.12,strength:1,points:[[.5,.5]]},{tool:'push',r:.3,strength:1,points:[[.4,.5],[.6,.5]]},{tool:'dodge',r:.3,strength:.7,points:[[.5,.5]]}],first=renderManualPortrait(a,w,h,ops),again=renderManualPortrait(a,w,h,ops);assert.deepEqual(first.pixels,again.pixels);for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(first.protection[y*w+x]===255){const i=(y*w+x)*4;assert.deepEqual(first.pixels.subarray(i,i+4),a.subarray(i,i+4));}assert.ok(first.protection.some(v=>v===255));assert.ok(first.protection.some(v=>v>0&&v<255));});
 test('manual texture sampling uses existing pixels, local lighting retains alpha, and invalid records never enter replay',()=>{const a=fixture(),clone=renderManualPortrait(a,w,h,[{tool:'clone',r:.12,strength:1,points:[[.7,.5]],sample:[.2,.5]}]).pixels,i=(56*w+67)*4;assert.ok(clone[i]<a[i]-50);const lit=renderManualPortrait(a,w,h,[{tool:'burn',r:.4,strength:.4,points:[[.05,.5]]}]).pixels;for(let p=3;p<a.length;p+=4)assert.equal(lit[p],a[p]);assert.throws(()=>manualOperations([{tool:'automatic-ai',r:.1,strength:1,points:[[.5,.5]]}]));assert.throws(()=>manualOperations([{tool:'push',r:.1,strength:1,points:[[Infinity,.5]]}]));assert.throws(()=>manualOperations([{tool:'clone',r:.1,strength:1,points:[[.5,.5]]}]));assert.deepEqual(renderManualPortrait(a,w,h,[]).pixels,a);});
+
+test('continuous push is independent of event density for a multi-segment path and keeps protected pixels',()=>{
+ const width=416,height=220,source=new Uint8ClampedArray(width*height*4);
+ for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+  const i=(y*width+x)*4;source.set([x%19*11,y%12*19,(x+y)%23*10,x<2?0:255],i);
+ }
+ const path=[[.17,.42],[.48,.42],[.68,.68]],dense=[];
+ for(let i=1;i<path.length;i++)for(let step=0;step<64;step++)dense.push(path[i-1].map((v,c)=>v+(path[i][c]-v)*step/64));
+ dense.push(path.at(-1));
+ const mark={tool:'protect',continuous:true,points:[[.28,.42],[.41,.42]],strength:1,r:.045};
+ const brush={tool:'push',continuous:true,points:path,strength:.76,r:.13};
+ const a=renderManualPortrait(source,width,height,[mark,brush]);
+ const b=renderManualPortrait(source,width,height,[mark,{...brush,points:dense}]);
+ assert.deepEqual(a.pixels,b.pixels);
+ assert.notDeepEqual(a.pixels,source);
+ assert.notDeepEqual(a.pixels,renderManualPortrait(source,width,height,[mark,{...brush,continuous:false}]).pixels);
+ assert.deepEqual(renderManualPortrait(source,width,height,[{...brush,points:[path[0]]}]).pixels,source);
+ for(let i=0;i<a.protection.length;i++)if(a.protection[i]===255)assert.deepEqual(a.pixels.subarray(i*4,i*4+4),source.subarray(i*4,i*4+4));
+ assert.deepEqual(manualOperations(JSON.parse(JSON.stringify([mark,brush]))),[mark,brush]);
+});
+
+test('continuous protection, unprotect and restoration fill sparse segments',()=>{
+ const width=180,height=100,source=new Uint8ClampedArray(width*height*4);
+ for(let i=0;i<source.length;i+=4)source.set([87,103,133,255],i);
+ const path=[[.2,.5],[.8,.5]],brush={r:.12,strength:1,points:path,continuous:true},x=90,y=50,i=y*width+x,p=i*4;
+ const protectedArea=renderManualPortrait(source,width,height,[{...brush,tool:'protect'}]).protection;
+ assert.equal(protectedArea[i],255);
+ const erased=renderManualPortrait(source,width,height,[{...brush,tool:'protect'},{...brush,tool:'unprotect',points:[[.4,.5],[.6,.5]]}]).protection;
+ assert.equal(erased[i],0);
+ assert.equal(erased[y*width+45],255);
+ const gray=renderManualPortrait(source,width,height,[{...brush,tool:'gray-dodge'}]).pixels;
+ assert.ok(gray[p]>source[p]);
+ for(const first of [{...brush,tool:'gray-dodge'},{...brush,tool:'dodge',points:Array.from({length:61},(_,j)=>[.2+j/100,.5])}]){
+  const legacy=renderManualPortrait(source,width,height,[first,{...brush,tool:'restore',continuous:false}]).pixels;
+  assert.ok(legacy[p]>source[p]);
+  const repaired=renderManualPortrait(source,width,height,[first,{...brush,tool:'restore'}]).pixels;
+  assert.deepEqual(repaired.subarray(p,p+4),source.subarray(p,p+4));
+  assert.deepEqual(repaired.subarray(0,width*4),source.subarray(0,width*4));
+ }
+});

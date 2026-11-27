@@ -463,7 +463,7 @@ function endGesture(e,cancelled){
   if(gesture?.type==='pinch'&&pointers.size===1){gesture={type:'pan',last:[...pointers.values()][0]};return;}
   const completed=gesture;gesture=null;if(['pan','pinch'].includes(completed?.type))rememberViewport();
   if(!cancelled&&completed?.type==='brush'){
-    const p=currentPhoto(),stroke={tool:ui.brush,r:ui.radius,strength:ui.strength,points:completed.points};
+    const p=currentPhoto(),stroke={tool:ui.brush,r:ui.radius,strength:ui.strength,points:completed.points,continuous:true};
     if(['low-smooth','high-soften'].includes(ui.brush))stroke.separation=bound(ui.separation/Math.min(p.width,p.height),.000001,.2);
     try{validateStrokes([...visibleEdits().strokes,stroke]);commit(brushName(ui.brush),{type:'stroke',stroke});}catch(error){announce(error.message);}
   }else if(!cancelled&&completed?.type==='mask'&&ui.selectionDraft){
