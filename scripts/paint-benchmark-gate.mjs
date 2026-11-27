@@ -1,12 +1,18 @@
-﻿import { readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 
-const categories = ['dark-face', 'split-light', 'full-body'];
+const categories = ['dark-face', 'split-light', 'even-bright', 'full-body'];
 const weights = { palette: 20, lighting: 20, contour: 20, makeup: 15, texture: 15, seams: 10 };
 const required = 50;
 const minimum = 98;
 const sha256 = value => typeof value === 'string' && /^[a-f\d]{64}$/.test(value);
 const videoURL = value => {
-  try { return new URL(value).protocol === 'https:'; } catch { return false; }
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:') return false;
+    if (['bilibili.com', 'www.bilibili.com'].includes(url.hostname)) return /^\/video\/(?:BV[\da-z]+|av\d+)\/?$/i.test(url.pathname);
+    if (['douyin.com', 'www.douyin.com'].includes(url.hostname)) return /^\/video\/\d+\/?$/.test(url.pathname);
+    return false;
+  } catch { return false; }
 };
 
 export function evaluatePaintCases(records, { revision } = {}) {
@@ -21,6 +27,9 @@ export function evaluatePaintCases(records, { revision } = {}) {
     const valid = categories.includes(row?.category)
       && row.revision === revision && row.partition === 'held-out'
       && videoURL(row.videoURL)
+      && row.referenceTool === 'yao-ai'
+      && Number.isFinite(row.toolEvidenceSeconds) && row.toolEvidenceSeconds >= 0
+      && typeof row.toolEvidenceNote === 'string' && row.toolEvidenceNote.trim().length > 0
       && Number.isFinite(row.beforeSeconds) && row.beforeSeconds >= 0
       && Number.isFinite(row.afterSeconds) && row.afterSeconds >= 0 && row.afterSeconds !== row.beforeSeconds
       && sha256(row.sourceSha256) && sha256(row.targetSha256) && sha256(row.resultSha256)
@@ -37,7 +46,7 @@ export function evaluatePaintCases(records, { revision } = {}) {
     const group = summary[row.category];
     group.eligible++;
     const weighted = Object.entries(weights).reduce((n, [key, weight]) => n + row.scores[key] * weight / 100, 0);
-    if (weighted + Number.EPSILON >= minimum && row.colourStable && row.structureStable) group.passed++;
+    if (weighted >= minimum - 1e-9 && row.colourStable && row.structureStable) group.passed++;
     else group.failed++;
   }
   for (const group of Object.values(summary)) group.missing = Math.max(0, required - group.eligible);
