@@ -20,12 +20,14 @@ export function deskRecipe(input){
  if(input.mode==='auto'){
   const a=input.auto||{};
   if(a.paint===true&&a.paintLevel!==undefined&&(!Number.isInteger(a.paintLevel)||a.paintLevel<1||a.paintLevel>10))throw error('厚涂程度需要 1–10 的整数。');
+  const tone=a.tone??'none';
+  if(!['none','dark','bright'].includes(tone))throw error('请选择沿用原图、暗调或亮调。');
   const paintStyle=a.paintStyle??'cos';
   if(a.paint===true&&!['cos','anime'].includes(paintStyle))throw error('请选择二次元或 COS 质感厚涂。');
   const provider=a.referenceProvider??'xiaohongshu';
   if(!['xiaohongshu','douyin','commons','none'].includes(provider))throw error('请选择有效的参考图来源。');
   const tasks=['portrait','color',...(a.paint===true?['paint']:[]),...(a.effects===true?['effects']:[])];
-  const opts=agentOptions({mode:'auto',provider:'auto',hardwarePolicy:'auto',sceneGuide:{character:a.character,work:a.work},tasks,...(a.paint===true&&a.paintScope!==undefined?{paintScope:a.paintScope}:{}),style:a.paint===true?paintStyle:'natural',paintLevel:a.paintLevel??2,effect:a.effect||'sparkles',autoSearch:provider!=='none',referenceProvider:provider==='none'?'xiaohongshu':provider,allowPublicFallback:false,quality:true,autoRepair:false,maxImageSteps:6,planningModel:input.model,generationModel:input.model});
+  const opts=agentOptions({mode:'auto',provider:'auto',hardwarePolicy:'auto',tone,...(tone!=='none'?{toneMethod:'source-curve-v1'}:{}),sceneGuide:{character:a.character,work:a.work},tasks,...(a.paint===true&&a.paintScope!==undefined?{paintScope:a.paintScope}:{}),style:a.paint===true?paintStyle:'natural',paintLevel:a.paintLevel??2,effect:a.effect||'sparkles',autoSearch:provider!=='none',referenceProvider:provider==='none'?'xiaohongshu':provider,allowPublicFallback:false,quality:true,autoRepair:false,maxImageSteps:6,planningModel:input.model,generationModel:input.model});
   return recipeValue({name:'全自动 · 场景精修',model:input.model,stages:[{type:'agent',name:'分析场景并自动精修',options:opts},finish]});
  }
  if(input.mode!=='semi')throw error('请选择全自动或半自动。');

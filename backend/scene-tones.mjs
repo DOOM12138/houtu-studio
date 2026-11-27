@@ -30,3 +30,13 @@ export function finalSceneGrade(planned,profile){
   return result;
  };
 }
+
+// The tonal curve is anchored at black and white. The requested look cannot set white balance.
+export function tutorialToneSettings(tone, planned, metrics) {
+ const alreadyDark=metrics?.median<65;
+ const bright=tone==='bright';
+ const curve=bright?[0,.29,.55,.778,1]:alreadyDark?[0,.287,.54,.77,1]:[0,.216,.477,.749,1];
+ const softness=Math.min(1,Math.max(0,((metrics?.p95??204)-220)/35));
+ const exposure=Math.max(-.08,Math.min(.13,Number(planned?.exposure)||0));
+ return settings({exposure:bright?exposure*(1-softness):alreadyDark?Math.max(0,exposure):Math.min(0,exposure),curves:{rgb:curve},highlights:Math.min(0,Math.max(-16,Number(planned?.highlights)||0))});
+}

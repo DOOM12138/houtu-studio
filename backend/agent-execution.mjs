@@ -7,7 +7,7 @@ import {agentActions,imageAction,socialReferenceProvider,strictSocialReferences}
 import {inspectionPrompt,validateInspection,planPrompt,validateAgentPlan,localAgentPlan,checkPrompt,checksPaintTexture,keepsOriginalGrade,validateAgentCheck,licensedMaterial} from './agent-planning.mjs';
 import {sceneReferenceStep} from './scene-reference-search.mjs';
 import {resolveSceneProfile,catalogBoundProfile} from './scene-direction.mjs';
-import {frameTones,finalSceneGrade} from './scene-tones.mjs';
+import {frameTones,finalSceneGrade,tutorialToneSettings} from './scene-tones.mjs';
 const inputRequired=message=>Object.assign(Error(message),{code:'INPUT_REQUIRED'});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 export async function executeAgentStep(service,w,node,token,run,inputAsset){
@@ -106,6 +106,12 @@ export async function executeAgentStep(service,w,node,token,run,inputAsset){
  if(imageAction(action.id))return service.renderImage(w,node,token,run,inputAsset,action,{repair});
  if(action.id==='color'){
   if(keepsOriginalGrade(config))return {...base,skipped:true,reason:'厚涂沿用原图影调，继续使用人物步骤成品，不叠加全局色温或曝光。'};
+  if(config.toneMethod==='source-curve-v1'){
+   const scene=w.steps.find(s=>s.id==='plan').output.plan.sceneProfile;
+   const settings=tutorialToneSettings(config.tone,action.parameters.settings,scene?.tones);
+   const output=await gradeProcess(await bytes(),settings);
+   return {...base,imageAsset:(await service.workflows.putAsset(id,output,'image/png')).id,engine:'local-sRGB',settings,tone:config.tone,sceneProtection:'保留白平衡，以原片亮度分布决定中间调曲线。'};
+  }
   const tone=config.tone==='none'?null:{id:{dark:'dark-clean',bright:'bright-air',cinema:'cinema-teal'}[config.tone],amount:50},report={};const output=await gradeProcess(await bytes(),action.parameters.settings||{},{look:tone,report,...(config.sceneGuide?{resolveSettings:finalSceneGrade(action.parameters.settings,w.steps.find(s=>s.id==='plan').output.plan.sceneProfile)}:{})});return {...base,imageAsset:(await service.workflows.putAsset(id,output,'image/png')).id,engine:'local-sRGB',settings:report.settings,tone:report.tone,...(action.colorGuard?{sceneProtection:action.colorGuard+(tone?' 已合并所选影调，并对最终基础参数限幅。':'')}:{})};
  }
  if(action.id==='effects'){

@@ -135,3 +135,13 @@ test('full-body paint keeps the authored light and skips a second global grade',
  assert.equal(color.output.skipped,true);
  assert.equal(color.imageAsset,person.imageAsset);
 });
+
+test('scene desk selects an explicit source-curve profile for dark and bright looks',()=>{
+ for(const tone of ['dark','bright']){
+  const agent=deskRecipe({mode:'auto',auto:{tone,referenceProvider:'none'}}).stages[0].options;
+  assert.equal(agent.tone,tone);
+  assert.equal(agent.toneMethod,'source-curve-v1');
+ }
+ assert.equal(deskRecipe({mode:'auto'}).stages[0].options.toneMethod,undefined);
+ assert.throws(()=>deskRecipe({mode:'auto',auto:{tone:'invalid'}}),/暗调或亮调/);
+});
