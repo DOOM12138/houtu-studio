@@ -74,3 +74,12 @@ button{white-space:nowrap}
 @media(min-width:701px){#app:has(#desk.film-closed) .advanced-tools{bottom:0}}
 
 #app:has(#advancedTools:not([hidden])) #topbar :is(#open,#export,#undo,#redo){display:none}
+
+.tool-browser{display:grid;gap:12px;min-width:0}
+.tool-category-bar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;background:var(--canvas);padding:4px;border:1px solid var(--line);border-radius:9px}
+.tool-category{padding:7px 3px;min-height:38px;font-size:12px;min-width:0}
+.tool-category[aria-pressed=true]{background:var(--panel);border-color:var(--line);color:var(--ink);font-weight:700}
+.tool-browser input{width:100%;min-width:0}
+.tool-browser-results{display:grid;gap:4px}
+.tool-browser-item{min-height:44px}
+.tool-browser-status{margin:0;color:var(--sub)}

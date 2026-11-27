@@ -847,13 +847,34 @@ function openAdvanced(url){
  settleCanvasInput();finishPendingEdit();
  void tools.open(url);
 }
-$('moreTools').onclick=()=>openDialog('更多修图工具',body=>{
- for(const [title,items]of groups){
-  const group=element('section',undefined,'tool-menu-group');
-  group.append(element('h3',title));
-  for(const [label,url]of items)group.append(action(label,()=>openAdvanced(url),'match'));
-  body.append(group);
+$('moreTools').onclick=()=>openDialog('修图工具',body=>{
+ const query=element('input');query.type='search';query.placeholder='搜索工具，例如超分';query.setAttribute('aria-label','搜索更多工具');
+ const categories=element('div',undefined,'tool-category-bar');categories.setAttribute('role','group');categories.setAttribute('aria-label','工具分类');
+ const results=element('div',undefined,'tool-browser-results');
+ const status=element('p',undefined,'tool-browser-status');status.setAttribute('role','status');
+ let selected=ui.section==='ai'?1:ui.section==='steps'?2:0;
+ const controls=groups.map(([title],index)=>action(title,()=>{selected=index;query.value='';render();},'tool-category'));
+ categories.append(...controls);
+ function render(){
+  clear(results);
+  const term=query.value.trim().toLowerCase();
+  for(const [index,control] of controls.entries())control.setAttribute('aria-pressed',String(!term&&index===selected));
+  const matches=term?groups.flatMap(([group,items])=>items.map(item=>[...item,group])).filter(([name,,group])=>(name+' '+group).toLowerCase().includes(term)):groups[selected][1];
+  status.textContent=term&&!matches.length?'没有找到匹配的工具。':'';
+  status.hidden=!status.textContent;
+  for(const [name,url,group] of matches){
+   const entry=action(name,()=>openAdvanced(url),'match tool-browser-item');
+   entry.setAttribute('aria-label',name);
+   if(group)entry.append(element('small',group));
+   results.append(entry);
+  }
  }
+ query.addEventListener('input',render);
+ query.addEventListener('keydown',event=>{
+  if(event.key==='Enter'){event.preventDefault();event.stopPropagation();results.querySelector('button')?.click();}
+ });
+ const menu=element('div',undefined,'tool-browser');
+ menu.append(categories,query,status,results);body.append(menu);render();
 });
 $('project-menu').onclick=()=>openDialog('工作台菜单',body=>{
  body.append(action('照片项目',()=>openAdvanced('/studio/'),'match'));
