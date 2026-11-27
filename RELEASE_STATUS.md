@@ -1,8 +1,8 @@
 # 全部版本发布状态
 
-核查日期：2026-11-27。最新完整验证版：[v1.40.4](https://github.com/DOOM12138/houtu-studio/releases/tag/v1.40.4)。
+核查日期：2026-11-27。最新完整验证版：[v1.40.5](https://github.com/DOOM12138/houtu-studio/releases/tag/v1.40.5)。
 
-现有45条应用Release中，34条已公开、11条发布失败／中止；已公开版本中另标4条恢复交付、4条已知运行问题。另有6个历史源码标签和1条安卓构建依赖。具体原因和后续跟进规则见 [RELEASE_RECOVERY.md](RELEASE_RECOVERY.md)，机器可读目录见 [RELEASE_STATUS.json](RELEASE_STATUS.json)。
+现有46条应用Release中，35条已公开、11条发布失败／中止；已公开版本中另标5条恢复交付、4条已知运行问题。另有6个历史源码标签和1条安卓构建依赖。具体原因和后续跟进规则见 [RELEASE_RECOVERY.md](RELEASE_RECOVERY.md)，机器可读目录见 [RELEASE_STATUS.json](RELEASE_STATUS.json)。
 
 核查覆盖发布状态、现存工作流尝试、附件清单，以及已提供的SHA清单与GitHub附件摘要；仅最新版本另核对实际Windows安装、安卓模拟器及本机更新回执。旧版并未逐个重新安装或重做AI画质验收。草稿仅维护者可见，失败版本原有Git标签和运行记录保留。
 
@@ -22,6 +22,7 @@
 
 ## 中断或失败后已恢复
 
+- **v1.40.5 · 重试后已恢复**。首轮 Windows 原生安装验收发生本机请求异常，重跑失败任务后通过。5 个附件通过校验。手机照片条与参数面板交替显示，键盘切片时保持当前缩略图可见。批量同步写入完整草稿，失败项可单独重试。历史快照可在工具切换后退出并按步骤编号导出。[首轮 Windows 验收](https://github.com/DOOM12138/houtu-studio/actions/runs/45982518600/job/140452954858) · [发布运行](https://github.com/DOOM12138/houtu-studio/actions/runs/45982518600)
 - **v1.38.1 · 重试后已恢复**：5个发布附件。一般位图导入及 RAW 原尺寸恢复。已核对原尺寸 NEF、JPG、TIFF 以及 Windows 安装和安卓独立运行。[运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45841815937)。
 - **v1.31.0 · 重试后已恢复**：NuGet下载可选CUDA组件网络失败，重跑成功；测试宿主安装已加固。 [运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45722872866)；[替代／恢复版 v1.31.0](https://github.com/DOOM12138/houtu-studio/releases/tag/v1.31.0)。
 - **v1.27.0 · 发布已恢复**：GitHub创建Release返回HTTP500，随后同提交本机恢复发布并验证。 [运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45645379331)；[替代／恢复版 v1.27.0](https://github.com/DOOM12138/houtu-studio/releases/tag/v1.27.0)。

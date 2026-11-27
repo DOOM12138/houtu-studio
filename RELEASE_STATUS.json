@@ -1,20 +1,64 @@
 {
   "schema": "houtu-release-status",
   "version": 1,
-  "checkedAt": "2026-11-27T10:05:51.033Z",
+  "checkedAt": "2026-11-27T11:10:23.291Z",
   "repository": "DOOM12138/houtu-studio",
-  "latestVerified": "v1.40.4",
+  "latestVerified": "v1.40.5",
   "scope": "Release publication, available workflow attempts, artifact inventory and supplied checksum lists against GitHub asset digests. Historical binaries were not all reinstalled; real AI quality and ARM physical-device coverage remain separately recorded.",
   "counts": {
-    "applications": 45,
-    "published": 34,
+    "applications": 46,
+    "published": 35,
     "failedOrStopped": 11,
-    "recovered": 4,
+    "recovered": 5,
     "knownIssues": 4,
     "historicalSourceTags": 6,
     "dependencyReleases": 1
   },
   "applications": [
+    {
+      "tag": "v1.40.5",
+      "status": "recovered",
+      "label": "重试后已恢复",
+      "draft": false,
+      "publishedAt": "2026-11-27T11:08:22Z",
+      "releaseUrl": "https://github.com/DOOM12138/houtu-studio/releases/tag/v1.40.5",
+      "assetCount": 5,
+      "assets": [
+        {
+          "name": "houtu-studio-1.40.5-Android-arm64-v8a.apk",
+          "bytes": 205734943,
+          "digest": "sha256:e73f4f18f9fa57ca1b5a70c3ff746ce480da02f70592dbfa894f30ac950002a6"
+        },
+        {
+          "name": "houtu-studio-1.40.5-Android-x86_64.apk",
+          "bytes": 213345299,
+          "digest": "sha256:39b0810b4219c29fefd8f14eda4117117668b22a816ba1764dc30057fecc519a"
+        },
+        {
+          "name": "houtu-studio-1.40.5-SHA256.txt",
+          "bytes": 423,
+          "digest": "sha256:d0ff632708379065352ae4af57fef9b04716e78ca6dfcad60307c954ccf80049"
+        },
+        {
+          "name": "houtu-studio-1.40.5-Windows-x64-Setup.exe",
+          "bytes": 186501229,
+          "digest": "sha256:e09ad38ecbaa7e74bbfbfbcdbc127c603409f1b65a99bf9428bac454d52c2174"
+        },
+        {
+          "name": "houtu-studio-1.40.5-Windows-x64.zip",
+          "bytes": 268281906,
+          "digest": "sha256:23c763c75a2c5c7efde4b9b792ca47ddfcfac81d6dcbc6bd9e69b888a3949aea"
+        }
+      ],
+      "checksum": "matched-server-digests",
+      "workflow": {
+        "runId": 45982518600,
+        "latestAttempt": 2,
+        "latestConclusion": "success",
+        "url": "https://github.com/DOOM12138/houtu-studio/actions/runs/45982518600"
+      },
+      "note": "手机照片条与参数面板交替显示，键盘切片时保持当前缩略图可见。批量同步写入完整草稿，失败项可单独重试。历史快照可在工具切换后退出并按步骤编号导出。 首轮 Windows 原生安装验收发生本机请求异常，仅重跑失败任务后通过。"
+    },
     {
       "tag": "v1.40.4",
       "status": "published",
