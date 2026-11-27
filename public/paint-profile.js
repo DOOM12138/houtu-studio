@@ -1,7 +1,8 @@
 // Calibrated visual targets, not an opacity percentage or a model-weight setting.
-export const PAINT_PROFILE_VERSION='2026.11.27-paint-r8';
+export const PAINT_PROFILE_VERSION='2026.11.27-paint-r9';
 export const PAINT_LEVEL_MAX=6;
 export const PAINT_FOUR_PHOTO_GUARD='4/10 在真人照片上保留摄影媒介和原有妆造。只沿原有光向局部调整面颊、发束、衣褶的中间调与阴影，形成中等体积。保留原眼型、视线、唇线和自然不对称，保留可见皮肤与粉底纹理、零散发丝和织物纹理。眼妆只整理原有边缘；不放大虹膜、重描五官、磨成蜡面或把假发抹成交叠的光滑色带。远景看不清的地方保持原样。若图1本身是插画，保留其原笔触和媒介。以上边界优先于参考画风和本步的细化建议。';
+export const PAINT_FOUR_SCULPT='真人COS的4/10把主要变化放在脸部。沿原主光收掉分散的鼻面与面颊杂反光，保留鼻梁受光、鼻侧和下眼睑的软阴影；用局部提亮与压暗形成清楚但连续的颊鼻体积，保留脸到颈部的阴影。以原有睫毛根部、眼线与虹膜明暗突出眼神，保留原瞳色、眼型与大小。沿现有发束只整理一两处大反光，保留碎发、发饰和原高光方向。衣料与场地按原片处理；脸部太小时只整理能读出的光块，避免加深妆线或补画眼部细节。';
 export const PAINT_DISTANCE_GUARD='全身远景按原片可见细节修整：脸部较小时，以原有光向、轮廓、衣料明暗和材质分离表现体积；看不清的虹膜、睫毛、纹样与饰品保留，不补画细节或放大人物。'
 export const PAINT_SURFACE_GUARD='靠连贯的深浅层次、体积转折和分材质受光增强厚涂。收干净眼线、发缘与衣褶，阴影保留反光和纹理，禁止涂鸦、乱线、粗糙刷痕、碎色斑和硬切的大片色块。';
 export const PAINT_EDIT_BRIEF='保留原人物身份、角色设计和摄影光源，在已选部位完成所选档位可辨识的二次元厚涂塑形：眼妆与眼神、面部明暗体积、成束假发各有层次，脸颈光色连贯；不以单纯磨皮或几乎不变代替风格任务。';

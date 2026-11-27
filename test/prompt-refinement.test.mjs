@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {PRESETS} from '../public/catalog.js';
 import {paintingPrompt} from '../lib/painting.mjs';
-import {agentOptions,AGENT_VERSION,AGENT_LONG_SHOT_REVISION,AGENT_PROMPT_REVISION} from '../public/retouch-agent-options.js';
+import {agentOptions,AGENT_VERSION,AGENT_LONG_SHOT_REVISION,AGENT_TEXTURE_REVISION,AGENT_PROMPT_REVISION} from '../public/retouch-agent-options.js';
 import {compileAgentPrompt,inspectionPrompt,planPrompt,checkPrompt,validateAgentCheck} from '../backend/agent-planning.mjs';
 
 test('all default edit prompts preserve a concrete task and guided output',()=>{
@@ -61,6 +61,11 @@ test('4/10 protects photographic texture throughout planning, rendering and revi
  assert.match(planPrompt(config,{summary:'真人场照',observations:[],queries:[]},[]),/不能安排统一磨皮或重画妆面/);
  assert.doesNotMatch(compileAgentPrompt(old,action,[]),/保留摄影媒介/);
  assert.match(compileAgentPrompt(old,action,[]),/全身远景按原片可见细节/);
+ const r4=agentOptions({...config,promptRevision:AGENT_TEXTURE_REVISION});
+ assert.match(compileAgentPrompt(config,action,[]),/鼻面与面颊杂反光.*突出眼神/);
+ assert.doesNotMatch(compileAgentPrompt(r4,action,[]),/鼻面与面颊杂反光/);
+ assert.match(checkPrompt(r4),/texture为必检项/);
+ assert.match(checkPrompt(config),/脸部只有整体提亮、纹理变柔且没有局部体积变化/);
  assert.doesNotMatch(checkPrompt(old),/texture/);
  assert.doesNotMatch(checkPrompt({...config,paintLevel:6}),/texture/);
  assert.doesNotMatch(paintingPrompt({operation:'lighting',style:'natural',paintLevel:4}),/保留摄影媒介/);
