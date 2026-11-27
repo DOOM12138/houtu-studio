@@ -1,4 +1,4 @@
-﻿import assert from 'node:assert/strict';
+import assert from 'node:assert/strict';
 import test from 'node:test';
 import os from 'node:os';
 import path from 'node:path';
@@ -70,4 +70,3 @@ test('hashes the actual artifacts and rejects files outside the private manifest
   await writeFile(filename, JSON.stringify({ revision: 'build-1', cases: [row] }));
   await assert.rejects(checkFeatureManifest(filename, { operation: op }), /素材路径超出了案例清单目录/);
 });
-
