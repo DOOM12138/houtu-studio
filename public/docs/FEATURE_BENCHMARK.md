@@ -48,3 +48,9 @@ node scripts/project-node.mjs scripts/feature-benchmark-gate.mjs check data/priv
 
 - **图层蒙版边缘通过 98 分验收**。新版在素材像素网格上应用蒙版，再缩放 RGBA。对三个不同透明素材和一个无蒙版反例，alpha 与可见色和独立参考一致。企鹅和雕像的边缘可见色误差分别从 8.588、4.478 降至 0，超过 2 个 8 位等级的边缘像素从 559、535 降至 0。最近邻路径在雕像上导致更明显的边缘误差，未采用。旧工程的已保存成片为旧版本记录，新导出使用新版渲染器。[透明色轮](https://commons.wikimedia.org/wiki/File:Hue_alpha.png) · [企鹅](https://commons.wikimedia.org/wiki/File:Tux.png) · [雕像](https://commons.wikimedia.org/wiki/File:Plato_(transparent).png) · [无蒙版反例](https://commons.wikimedia.org/wiki/File:Hi_definition_apple_cartoon_with_transparent_background.png)
 - **ORF／MRW 实拍导入**。旧版在读取原片文件头时拒绝两例。新版通过 LibRaw 完成奥林巴斯 C5050Z 的 1926 × 2576 和美能达 DiMAGE A1 的 2568 × 1928 本机显影。相机／自动白平衡分别建立尝试，8 位编辑图和 16 位母版已实际读取。原片哈希一致。这里记录相机格式恢复和显影行为，未用相机内嵌 JPEG 作为 98 分色彩真值。[Olympus RAW 样本](https://rawsamples.ch/index.php/en/olympus) · [Minolta RAW 样本](https://rawsamples.ch/index.php/en/minolta)
+
+## 第五轮实图
+
+- **照片配方无损 WebP 通过 98 分验收**。质量 100 使用与图层导出一致的无损编码。透明骰子、几维鸟和 PNG 反例的可见 RGB、所有透明度及尺寸均与参考一致，三例 100 分。旧版质量 100 未发生 alpha 失真，但可见 RGB 分别有 145,907 和 271,629 个像素变化。新版为零，文件分别比旧版大约 49% 和 76%，两张仍小于原 PNG。全透明处隐藏 RGB 无视觉贡献，未纳入可见色评分。质量 90 保留较小的有损输出。[透明骰子](https://commons.wikimedia.org/wiki/File:PNG_transparency_demonstration_1.png) · [几维鸟](https://commons.wikimedia.org/wiki/File:Kiwi_bird_transparent_background.png) · [羽片 PNG](https://commons.wikimedia.org/wiki/File:Feather_flight_Furnarius_rufus_OpenTaxa.png)
+- **局部调色蒙版**。新笔触计算一次线段覆盖，沿同一路径的 2 点和 21 点画法完全一致。旧版两组素材分别有 39,700 和 33,321 个蒙版像素受采样点密度影响，新版均为 0。保持已保存旧笔触的回放。像素验证限定于蒙版，调色审美仍待独立验收。
+- **中性灰加深／减淡／擦除**。稀疏点由连续线段覆盖，白羽和暗色羽毛两组的误差像素分别从 21,438 和 38,148 降到 0，满强度擦除后中心还原。此处以固定笔触参考检验连续性，不计入人物塑形的正式通过数。[白羽家鹅](https://commons.wikimedia.org/wiki/File:Domestic_goose.png)
