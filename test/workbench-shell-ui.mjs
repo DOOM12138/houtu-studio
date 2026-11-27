@@ -77,8 +77,16 @@ try{
  assert.ok(await narrow.locator('html').evaluate(e=>e.scrollWidth<=innerWidth+1));
  assert.ok((await page.locator('#advancedFrame iframe').boundingBox()).height>=450);
  await page.locator('#closeAdvanced').click();
+ await page.locator('[data-section=steps]').click();
+ await page.locator('#group-changes [data-entry="1"].current').waitFor();
+ await page.reload();
+ assert.equal(new URL(page.url()).searchParams.get('panel'),'steps');
+ assert.equal(new URL(page.url()).searchParams.get('canvasPhoto'),id);
+ assert.equal(await page.locator('[data-section=steps]').getAttribute('aria-pressed'),'true');
+ assert.equal(await page.locator('#group-changes').evaluate(group=>group.open),true);
+ await page.locator('#group-changes [data-entry="1"].current').waitFor();
  assert.deepEqual(errors,[]);
  assert.equal(app.bridge.images.length,0);
  assert.equal(app.bridge.reads.length,0);
- console.log('PASS workbench: single canvas, embedded grading applied, 4K stays in the workbench, settings returns the exact photo and zoom, 320px');
+ console.log('PASS workbench: single canvas, embedded grading applied, 4K stays in the workbench, settings returns the exact photo and zoom, direct history reload at 320px');
 }finally{await browser.close();await app.close();}

@@ -22,7 +22,7 @@ const photos = [];
 const media = new Map();
 const checked = new Set();
 const sections = { color:'调色', portrait:'人物', layers:'图层', ai:'AI 修图', steps:'步骤' };
-const choices = { color:'light', portrait:'gray', layers:'caption', ai:'expand' };
+const choices = { color:'light', portrait:'gray', layers:'caption', ai:'expand', steps:'changes' };
 const ui = {
   section:'color', editing:'pan', brush:'gray-dodge', radius:.055, strength:.3,
   separation:8, target:'global', compare:false, original:false, split:50,
@@ -544,7 +544,6 @@ const toolIndex=[
 ];
 const brushNames={'gray-dodge':'中性灰减淡','gray-burn':'中性灰加深','gray-erase':'擦除灰层','low-smooth':'低频匀色','high-soften':'高频柔化'};
 function brushName(key){return brushNames[key]||'画笔';}
-const starts={color:'light',portrait:'gray',layers:'caption',ai:'expand',steps:'changes'};
 const scrollPositions=new Map();
 function showSection(section,group,focusId){
   if(!sections[section])return;
@@ -555,7 +554,6 @@ function showSection(section,group,focusId){
   ui.section=section;
   const panelURL=new URL(location.href);panelURL.searchParams.set('panel',section);if(section!=='ai')panelURL.searchParams.delete('deskRun');if(panelURL.href!==location.href)history.replaceState(null,'',panelURL);
   if(group!==undefined)choices[section]=group;
-  if(!(section in choices))choices[section]=starts[section];
   if(section==='portrait'&&ui.previewId===null){
     const isFrequency=choices.portrait==='frequency';
     if(isFrequency!==['low-smooth','high-soften'].includes(ui.brush))ui.brush=isFrequency?'low-smooth':'gray-dodge';
