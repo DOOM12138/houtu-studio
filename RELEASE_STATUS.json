@@ -88,7 +88,7 @@
       "assetCount": 0,
       "assets": [],
       "checksum": "not-published",
-      "replacement": "v1.40.1",
+      "replacement": "v1.40.2",
       "note": "新版首页使用可见导入按钮和隐藏文件输入，旧安卓验收等待文件输入可见而超时。已修正验收入口。",
       "workflow": {
         "runId": 45863945620,

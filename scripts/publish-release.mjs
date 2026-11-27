@@ -20,7 +20,7 @@ const installer=await buildInstaller({payload:path.join(extracted,'厚涂小站'
 execFileSync(process.execPath,[path.join(root,'test/windows-installer.mjs'),installer.file],{cwd:root,stdio:'inherit',windowsHide:true});
 await fs.writeFile(sum,[result.sha256+'  '+filename,installer.sha256+'  '+path.basename(installer.file),...android.map(a=>a.sha256+'  '+a.name)].join('\n')+'\n');
 const changelog=await fs.readFile('CHANGELOG.md','utf8'),notes=changelog.split('## '+version+'\n')[1]?.split('\n## ')[0]?.trim();if(!notes)throw Error('Missing release notes.');
-const notesFile=path.join(root,'tmp','release-notes.md');await fs.writeFile(notesFile,notes+'\n\nWindows x64：优先下载 Windows-x64-Setup.exe，按向导安装。ZIP 为便携版，解压后双击「runtime/HoutuStudio.exe」。已有 1.17+ 便携版可在「本机服务器 → 版本与更新」升级。\n\nAndroid 10+：普通64位手机选择 Android-arm64-v8a.apk；x86_64 是对应架构版本。安装后在手机独立运行，无需电脑；应用内「更多 → 检查安卓版更新」可校验并自行升级。\n');
+const notesFile=path.join(root,'tmp','release-notes.md');await fs.writeFile(notesFile,notes+'\n\nWindows x64：优先下载 Windows-x64-Setup.exe，按向导安装。ZIP 为便携版，解压后双击「runtime/HoutuStudio.exe」。已有 1.17+ 便携版可在「设置 → 版本更新」升级。\n\nAndroid 10+：普通64位手机选择 Android-arm64-v8a.apk；x86_64 是对应架构版本。安装后在手机独立运行，无需电脑；应用内「更多 → 检查安卓版更新」可校验并自行升级。\n');
 if(probe.status!==0)run(['release','create',tag,'--repo',repository,'--draft','--verify-tag','--title','厚涂小站 '+version,'--notes-file',notesFile]);
 run(['release','upload',tag,output,installer.file,sum,...android.map(a=>a.file),'--repo',repository,'--clobber']);
 const release=JSON.parse(run(['release','view',tag,'--repo',repository,'--json','isDraft,assets']));

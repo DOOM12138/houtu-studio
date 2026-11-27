@@ -9,7 +9,7 @@
 ## 发布失败／已中止
 
 - **v1.40.1 · 发布中止·已被替代**：安卓旧验收要求传统 AI 页预览元素；新版统一画布改按照片名、尺寸和导出状态验收。[运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45865429401)。由1.40.2交付。
-- **v1.40.0 · 发布中止·已被替代**：旧安卓验收在新版首页等待隐藏文件输入可见。已修正验收并由1.40.1交付。[运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45863945620)。
+- **v1.40.0 · 发布中止·已被替代**：旧安卓验收在新版首页等待隐藏文件输入可见。已修正验收入口；v1.40.1 仍未完成发布，最终由 v1.40.2 交付。[运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45863945620)。
 - **v1.39.0 · 发布中止·已被替代**：传统照片项目验收卡在参考平台初始化，已停止发布。[运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45854982639)。修复包含在 1.39.1。
 - **v1.32.1 · 发布中止·已被替代**：功能测试已PASS，常驻测试驱动收尾未退出，后续修复。 [运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45735671520)；[替代／恢复版 v1.32.2](https://github.com/DOOM12138/houtu-studio/releases/tag/v1.32.2)。
 - **v1.32.0 · 发布失败·已中止**：模拟器宿主缺少Playwright安卓触控驱动，已补齐。 [运行记录](https://github.com/DOOM12138/houtu-studio/actions/runs/45734215845)；[替代／恢复版 v1.32.2](https://github.com/DOOM12138/houtu-studio/releases/tag/v1.32.2)。
