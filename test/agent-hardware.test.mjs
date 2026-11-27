@@ -96,3 +96,16 @@ test('mask review overlay preserves unselected pixels and requires matching geom
  assert.deepEqual([...result],[10,20,30,38,104,83]);
  await assert.rejects(subjectMaskOverlay(image,await sharp(mask).resize(1,2,{fit:'fill'}).png().toBuffer()),/尺寸不一致/);
 });
+
+test('guided boundary refinement preserves flat foreground and background and rejects shape mismatches',async()=>{
+ const {guideMaskEdges}=await import('../backend/agent-mask-edges.mjs');
+ const width=40,height=24,alpha=Buffer.alloc(width*height),rgb=Buffer.alloc(width*height*3);
+ for(let i=0;i<alpha.length;i++){
+  const x=i%width;alpha[i]=x<18?255:x<22?128:0;
+  rgb.fill(x<20?35:210,i*3,i*3+3);
+ }
+ const out=guideMaskEdges(rgb,alpha,width,height);
+ assert.equal(out[0],255);assert.equal(out[width-1],0);
+ assert.ok(out[19]>out[20]);assert.notDeepEqual(out,alpha);
+ assert.throws(()=>guideMaskEdges(rgb,alpha,width+1,height),/尺寸不一致/);
+});
