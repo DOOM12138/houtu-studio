@@ -14,6 +14,26 @@ test('transforms remain bounded, text keeps natural font scale, and EXIF input s
 test('uploaded masks keep the same pixel coordinates in small previews and scaled or rotated layers',async()=>{
  const a='a'.repeat(64),m='b'.repeat(64),data=Buffer.alloc(40*40);for(let y=0;y<40;y++)for(let x=20;x<40;x++)data[y*40+x]=255;const assets={[a]:await png('#3388aa'),[m]:await sharp(data,{raw:{width:40,height:40,channels:1}}).png().toBuffer()},top=layer('masked',a,{mask:{assetId:m,strokes:[]}}),doc=document([top]);let result=await renderLayers(doc,id=>assets[id],{maxEdge:12}),pixels=await raw(result.bytes);assert.equal(pixel(pixels,2,6,12)[3],0);assert.equal(pixel(pixels,9,6,12)[3],255);for(const scale of [.5,1,2]){top.scale=scale;pixels=await raw((await renderLayers(doc,id=>assets[id])).bytes);const left=scale===.5?12:5,right=scale===.5?27:35;assert.equal(pixel(pixels,left,20)[3],0);assert.equal(pixel(pixels,right,20)[3],255);}top.scale=1;top.rotation=90;pixels=await raw((await renderLayers(doc,id=>assets[id])).bytes);assert.equal(pixel(pixels,20,5)[3],0);assert.equal(pixel(pixels,20,35)[3],255);top.rotation=0;top.flipX=true;pixels=await raw((await renderLayers(doc,id=>assets[id])).bytes);assert.equal(pixel(pixels,5,20)[3],255);assert.equal(pixel(pixels,35,20)[3],0);
 });
+test('layer masks prevent hidden colour bleeding into resampled alpha edges',async()=>{
+ const width=200,height=120,assetId='a'.repeat(64),maskId='b'.repeat(64);
+ const source=Buffer.alloc(width*height*4),reference=Buffer.alloc(source.length),alpha=Buffer.alloc(width*height);
+ for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+  const p=y*width+x,visible=x<103;
+  source.set(visible?[240,5,5,255]:[5,10,240,255],p*4);
+  if(visible){alpha[p]=255;reference.set([240,5,5,255],p*4);}
+ }
+ const encode=data=>sharp(data,{raw:{width,height,channels:4}}).png().toBuffer();
+ const assets={[assetId]:await encode(source),[maskId]:await sharp(alpha,{raw:{width,height,channels:1}}).png().toBuffer()};
+ const doc={...document([layer('cutout',assetId,{mask:{assetId:maskId}})]),width,height};
+ const preview=await renderLayers(doc,id=>assets[id],{maxEdge:30});
+ const expected=await sharp(await encode(reference)).resize(30,18).ensureAlpha().raw().toBuffer();
+ const actual=await raw(preview.bytes);
+ assert.deepEqual(actual,expected);
+ assert.ok(actual.some((v,i)=>i%4===3&&v>0&&v<255));
+ const empty={...doc,layers:[layer('inverted',assetId,{mask:{invert:true}})]};
+ assert.ok((await raw((await renderLayers(empty,id=>assets[id],{maxEdge:30})).bytes)).every(v=>v===0));
+});
+
 test('transparent and differently sized uploaded masks agree for adjustment previews and full exports',async()=>{
  const a='a'.repeat(64),m='b'.repeat(64),rgba=Buffer.alloc(8*8*4);for(let y=0;y<8;y++)for(let x=0;x<8;x++){const i=(y*8+x)*4;rgba[i]=rgba[i+1]=rgba[i+2]=255;rgba[i+3]=x<4?0:255;}const mask=await sharp(rgba,{raw:{width:8,height:8,channels:4}}).png().toBuffer(),before=Buffer.from(mask),assets={[a]:await png('#202020'),[m]:mask},adjust={...layer('grade',null),kind:'adjustment',settings:{exposure:1},mask:{assetId:m,strokes:[]}};delete adjust.assetId;const doc=document([layer('base',a),adjust]);for(const maxEdge of [0,12]){const result=await renderLayers(doc,id=>assets[id],{maxEdge}),pixels=await raw(result.bytes),w=result.width,y=Math.floor(result.height/2);assert.deepEqual(pixel(pixels,Math.floor(w*.15),y,w),[32,32,32,255]);assert.ok(pixel(pixels,Math.floor(w*.85),y,w)[0]>32);}assert.deepEqual(mask,before);
 });

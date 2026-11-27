@@ -1,5 +1,5 @@
 import {settings} from './engine.js';
-export const LAYER_ENGINE='houtu-layers-v2',MAX_LAYERS=24,BLEND_MODES=['over','multiply','screen','overlay','darken','lighten','difference','exclusion','add','soft-light','hard-light','colour-dodge','colour-burn'];
+export const LAYER_ENGINE='houtu-layers-v3',MAX_LAYERS=24,BLEND_MODES=['over','multiply','screen','overlay','darken','lighten','difference','exclusion','add','soft-light','hard-light','colour-dodge','colour-burn'];
 const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/,HASH=/^[a-f0-9]{64}$/,ID=/^[a-zA-Z0-9-]{1,64}$/,number=(v,min,max,fallback)=>{const n=Number(v??fallback);if(!Number.isFinite(n)||n<min||n>max)throw Error('图层参数超出范围。');return n;},color=(v,fallback)=>{v=v??fallback;if(v==='transparent'||/^#[a-f0-9]{6}(?:[a-f0-9]{2})?$/i.test(v))return v;throw Error('颜色格式无效。');};
 export function layerDocument(input,{mobile=false}={}){
  if(!input||input.schema!=='houtu-layers'||input.version!==1)throw Error('不是受支持的图层工程。');
