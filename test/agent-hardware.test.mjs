@@ -87,3 +87,12 @@ test('Vulkan GPU proof uses observed runtime IDs and rejects missing, mismatched
 test('local transport uses direct loopback and native curl preserves binary stdout descriptors without an external network',async t=>{
  const bytes=Buffer.from([0,10,13,255,128,10,1,2,3]),server=http.createServer((req,res)=>{res.writeHead(200,{'Content-Type':'application/octet-stream','Content-Length':bytes.length});res.end(bytes);});await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+server.address().port;t.after(()=>new Promise(r=>server.close(r)));const response=await localAgentFetch(origin+'/binary');assert.deepEqual(Buffer.from(await response.arrayBuffer()),bytes);await assert.rejects(localAgentFetch('https://example.invalid/api/chat',{method:'POST',body:'private'}),/回环/);if(process.platform!=='win32')return;const root=await mkdtemp(path.join(tmpdir(),'native-curl-fd-'));t.after(()=>rm(root,{recursive:true,force:true}));const client=new LocalRetouchAgent({root});await client.secureDirectories();const file=path.join(root,'binary'),handle=await open(file,'wx');try{await client.child(path.join(process.env.SystemRoot,'System32/curl.exe'),['--disable','--noproxy','127.0.0.1','--fail','--silent','--output','-',origin+'/binary'],{outputFd:handle.fd});}finally{await handle.close();await client.close();}assert.deepEqual(await readFile(file),bytes);
 });
+
+test('mask review overlay preserves unselected pixels and requires matching geometry',async()=>{
+ const {subjectMaskOverlay}=await import('../backend/agent-cloud.mjs');
+ const image=await sharp(Buffer.from([10,20,30,40,50,60]),{raw:{width:2,height:1,channels:3}}).png().toBuffer();
+ const mask=await sharp(Buffer.from([0,255]),{raw:{width:2,height:1,channels:1}}).png().toBuffer();
+ const result=await sharp(await subjectMaskOverlay(image,mask)).raw().toBuffer();
+ assert.deepEqual([...result],[10,20,30,38,104,83]);
+ await assert.rejects(subjectMaskOverlay(image,await sharp(mask).resize(1,2,{fit:'fill'}).png().toBuffer()),/尺寸不一致/);
+});

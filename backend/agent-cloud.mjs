@@ -9,15 +9,33 @@ export function cloudInternalPrompt(config,id){
  if(id==='upscale')return '仅对当前成片做细节增强与清晰度提升，尽可能输出原生4K长边。逐像素尊重原有构图、身份、眼型、妆容、发色、服装纹样、光向与颜色；不再次执行厚涂、瘦身、换背景或增加特效。皮肤、发丝与织物纹理清楚但不过锐，不产生新五官、文字或重复细节。保持当前媒介和宽高比。输出一张增强后的图片。';
  throw Error('此节点没有获得云端模型执行授权。');
 }
-export const maskCheckPrompt=()=> '图片1为原图，图片2为待验证的主体黑白蒙版。只分析，不能生成图或调用工具。逐项检查蒙版是否与原图像素构图对齐、完整包含主角的可见全身和头发服装道具、排除背景与路人、边缘没有明显缺口或大范围溢出。不要识别真人姓名。只返回JSON {aligned:boolean,complete:boolean,backgroundExcluded:boolean,edgesAcceptable:boolean,confidence:0..1,summary:中文具体依据}。不能确认的项目按false，不要把近似轮廓称作精确抠图。';
+export const maskCheckPrompt=()=> '图片1为原图，图片2为待验证的主体黑白蒙版，图片3为程序按同一坐标生成的绿色覆盖叠加图。用叠加图对照边界，重点核对持物手、细长道具、托盘以及手臂与躯干间的空隙。只分析，不能生成图或调用工具。逐项检查蒙版是否与原图像素构图对齐、完整包含主角的可见全身和头发服装道具、排除背景与路人、边缘没有明显缺口或大范围溢出。不要识别真人姓名。只返回JSON {aligned:boolean,complete:boolean,backgroundExcluded:boolean,edgesAcceptable:boolean,confidence:0..1,summary:中文具体依据}。不能确认的项目按false，不要把近似轮廓称作精确抠图。';
 export function validateCloudMask(value){if(!value||!['aligned','complete','backgroundExcluded','edgesAcceptable'].every(k=>typeof value[k]==='boolean')||!Number.isFinite(value.confidence)||value.confidence<0||value.confidence>1||typeof value.summary!=='string')throw Error('云端蒙版检查没有返回完整依据。');return {...Object.fromEntries(['aligned','complete','backgroundExcluded','edgesAcceptable'].map(k=>[k,value[k]])),confidence:value.confidence,summary:value.summary.slice(0,1800),pass:value.confidence>=.85&&['aligned','complete','backgroundExcluded','edgesAcceptable'].every(k=>value[k])};}
 const inputRequired=message=>Object.assign(Error(message),{code:'INPUT_REQUIRED'});
+export async function subjectMaskOverlay(original, mask) {
+ const image = await sharp(original).rotate().toColourspace('srgb').removeAlpha().raw().toBuffer({resolveWithObject:true});
+ const matte = await sharp(mask).greyscale().raw().toBuffer({resolveWithObject:true});
+ const alpha=matte.data;
+ const {width,height}=image.info;
+ if(matte.info.width!==width||matte.info.height!==height)throw Error('蒙版与原图叠加尺寸不一致。');
+ for(let p=0;p<alpha.length;p++){
+  const amount=alpha[p]/255*.38;
+  for(let c=0;c<3;c++)image.data[p*3+c]=Math.round(image.data[p*3+c]*(1-amount)+[36,193,120][c]*amount);
+ }
+ return sharp(image.data,{raw:{width,height,channels:3}}).png().toBuffer();
+}
+
 export async function cloudSubject(service,w,node,token,run,inputAsset){
  const rendered=await service.renderImage(w,node,token,run,inputAsset,{id:'subject',parameters:{}}),source=await service.workflows.asset(w.id,inputAsset),bytes=await service.bytes(w.id,rendered.imageAsset),mask=await sharp(bytes,{limitInputPixels:40000000}).flatten({background:'black'}).removeAlpha().greyscale().resize(source.width,source.height,{fit:'fill'}).png().toBuffer(),saved=await service.workflows.putAsset(w.id,mask,'image/png'),stats=await sharp(mask).stats();
  const pixels=await sharp(mask).raw().toBuffer();let white=0,black=0;for(const value of pixels){if(value>=245)white++;if(value<=10)black++;}const metrics={whiteFraction:white/pixels.length,blackFraction:black/pixels.length,softFraction:1-(white+black)/pixels.length};
  const candidate={...rendered,imageAsset:inputAsset,estimatedMask:saved.id,origin:'cloud-generated-mask',engine:'ChatGPT-image',localNeuralInference:false,maskMetrics:metrics};await service.partial(w.id,node.id,token,candidate);
  if(stats.channels[0].mean<1||stats.channels[0].mean>250||metrics.whiteFraction<.005||metrics.blackFraction<.005||metrics.softFraction>.25)throw inputRequired('云端蒙版覆盖或黑白分区异常，请确认或上传白色保留主体的蒙版，原请求不会重发。');
- const preview=await service.preview(w.id,mask),result=await service.analyzeCloud(w,node,token,run,[w.steps[0].output.previewAsset,preview],maskCheckPrompt()),review=validateCloudMask(result.value);await service.partial(w.id,node.id,token,{...candidate,maskReview:review,analysis:result.receipt});if(!review.pass)throw inputRequired('云端蒙版检查未通过，请确认／修正蒙版后继续；未调用本地模型。');
+ const overlay=await subjectMaskOverlay(await service.bytes(w.id,inputAsset),mask);
+ const [preview,overlayPreview]=await Promise.all([service.preview(w.id,mask),service.preview(w.id,overlay)]);
+ const result=await service.analyzeCloud(w,node,token,run,[w.steps[0].output.previewAsset,preview,overlayPreview],maskCheckPrompt()),review=validateCloudMask(result.value);
+ candidate.maskOverlay=overlayPreview;
+ await service.partial(w.id,node.id,token,{...candidate,maskReview:review,analysis:result.receipt});
+ if(!review.pass)throw inputRequired('云端蒙版检查未通过。'+(review.summary?' '+review.summary:''));
  return {...candidate,estimatedMask:null,maskAsset:saved.id,requiresReview:false,maskReview:review,analysis:result.receipt};
 }
 export async function cloudUpscale(service,w,node,token,run,inputAsset){
