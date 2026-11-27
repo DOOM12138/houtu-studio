@@ -12,6 +12,7 @@ export function normalizePreset(input) {
     id:randomUUID(),name:String(l.name||l.type).slice(0,60),type:l.type,enabled:l.enabled!==false,opacity:clamp(Number(l.opacity??1)||0),invert:Boolean(l.invert),
     low:clamp(Number(l.low??.4)||0),high:clamp(Number(l.high??1)||0),angle:clamp(Number(l.angle??90)||0,0,360),tolerance:clamp(Number(l.tolerance??.35)||.35,.01,1.74),
     color:Array.from({length:3},(_,i)=>clamp(Number(l.color?.[i]??.5)||0)),settings:settings(l.settings),
+    ...(['linear','radial'].includes(l.type)&&l.geometry==='pixel'?{geometry:'pixel'}:{}),
     // Brush paths/raster/photographs are image-specific and never included in shared presets.
     strokes:[],
   })).filter(l=>l.type!=='brush');

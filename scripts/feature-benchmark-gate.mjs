@@ -24,6 +24,7 @@ for (const id of MANUAL_TOOLS) {
 
 const local = [
   ['local.color-grade', '曲线、白平衡和局部调色', 'image', ['影调与冷暖符合参考，颜色过渡连续', '肤色、白衣与亮暗细节符合目标']],
+  ['local.gradient-mask', '线性与径向渐变蒙版', 'image', ['渐变角度、径向距离与羽化符合画布像素坐标', '使用同一调色参数时，可见像素符合蒙版参考']],
   ['local.color-match', '参考匹配和调色预设', 'image', ['相近材质的色彩关系符合参考', '保留原图结构与身份，色彩不溢出']],
   ['local.subject-mask', '主体与细长结构蒙版', 'image', ['主体重合度达到 98', '边缘一致度达到 98']],
   ['local.super-resolution', '本机神经超分', 'image', ['边缘纹理可信，未生成涂抹或伪纹理', '源色、主体结构、比例与透明度符合目标']],

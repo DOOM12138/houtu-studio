@@ -1,14 +1,16 @@
 // An independent signed 16-bit field around exact 50% gray; zero is neutral.
 export const NEUTRAL_TOOLS = new Set(['gray-dodge', 'gray-burn', 'gray-erase']);
 const MAX = 32767;
-export function strokeDistance(points,width,height) {
+export function strokeDistance(points,width,height,bounds) {
  const coordinates=points.map(([x,y])=>[x*width,y*height]);
- const segments=coordinates.slice(1).map(([x,y],index)=>{
+ const [firstX,firstY]=coordinates[0];
+ const segments=(coordinates.length===1?coordinates:coordinates.slice(1)).map(([x,y],index)=>{
   const [left,top]=coordinates[index],dx=x-left,dy=y-top;
+  if(bounds&&(Math.min(left,x)>bounds.right||Math.max(left,x)<bounds.left||Math.min(top,y)>bounds.bottom||Math.max(top,y)<bounds.top))return null;
   return {left,top,dx,dy,length:dx*dx+dy*dy};
- });
+ }).filter(Boolean);
+ if(!segments.length)return null;
  return (x,y)=>{
-  const [firstX,firstY]=coordinates[0];
   let closest=(x-firstX)**2+(y-firstY)**2;
   for(const {left,top,dx,dy,length} of segments){
    const t=length?Math.max(0,Math.min(1,((x-left)*dx+(y-top)*dy)/length)):0;

@@ -54,3 +54,8 @@ node scripts/project-node.mjs scripts/feature-benchmark-gate.mjs check data/priv
 - **照片配方无损 WebP 通过 98 分验收**。质量 100 使用与图层导出一致的无损编码。透明骰子、几维鸟和 PNG 反例的可见 RGB、所有透明度及尺寸均与参考一致，三例 100 分。旧版质量 100 未发生 alpha 失真，但可见 RGB 分别有 145,907 和 271,629 个像素变化。新版为零，文件分别比旧版大约 49% 和 76%，两张仍小于原 PNG。全透明处隐藏 RGB 无视觉贡献，未纳入可见色评分。质量 90 保留较小的有损输出。[透明骰子](https://commons.wikimedia.org/wiki/File:PNG_transparency_demonstration_1.png) · [几维鸟](https://commons.wikimedia.org/wiki/File:Kiwi_bird_transparent_background.png) · [羽片 PNG](https://commons.wikimedia.org/wiki/File:Feather_flight_Furnarius_rufus_OpenTaxa.png)
 - **局部调色蒙版**。新笔触计算一次线段覆盖，沿同一路径的 2 点和 21 点画法完全一致。旧版两组素材分别有 39,700 和 33,321 个蒙版像素受采样点密度影响，新版均为 0。保持已保存旧笔触的回放。像素验证限定于蒙版，调色审美仍待独立验收。
 - **中性灰加深／减淡／擦除**。稀疏点由连续线段覆盖，白羽和暗色羽毛两组的误差像素分别从 21,438 和 38,148 降到 0，满强度擦除后中心还原。此处以固定笔触参考检验连续性，不计入人物塑形的正式通过数。[白羽家鹅](https://commons.wikimedia.org/wiki/File:Domestic_goose.png)
+
+## 第六轮实图
+
+- **线性与径向渐变蒙版通过 98 分独立验收**。新增渐变以画布像素为坐标。径向蒙版在宽幅和竖幅仍为圆形，45° 线性渐变沿画面角度变化。宽幅和竖幅径向蒙版的平均灰阶误差由 58.763、49.722 降到 0。两组斜渐变最大差 1 个灰阶，平均差低于 0.003。两张不同正例和一张方幅反例均超过 99.99。旧工程和无几何版本的预设沿用原坐标规则，新增预设保存新规则。[帝王蝶](https://specimen.gallery/specimen_assets/14) · [月面照片](https://science.nasa.gov/photojournal/nearside-of-earths-moon-as-seen-by-the-clementine-spacecraft/)
+- **高低频四支笔**。新增高低频笔触连续跨越图块。两张不同实图各复测低频匀色、低频取样、高频取样和高频柔化。旧版同一笔画由 2 点改为 85 点时，有 11,691–43,080 个图像像素变化，新版八次均为 0。保护区、alpha 和笔触以外保持原样。半透明餐具另外验证了 16,111 个半透明像素和 150,428 个全透明像素的 alpha，均无变化。这是笔触实际行为检查，各项修图审美仍待独立验收。[透明餐具](https://commons.wikimedia.org/wiki/File:Plasticware_-_isolated.png)

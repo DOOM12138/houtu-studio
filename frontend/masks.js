@@ -39,14 +39,19 @@ function applyContinuousStroke(mask,width,height,stroke) {
 export function maskAlpha(mask,width,height,data,semantic) {
   const out=new Uint8ClampedArray(width*height),target=mask.color||[.8,.4,.3];
   const classes={background:[0],person:[1,2,3,4,5],hair:[1],skin:[2,3],face:[3],clothes:[4],accessories:[5]};
+  const angle=(mask.angle??90)*Math.PI/180,cos=Math.cos(angle),sin=Math.sin(angle);
+  const pixelGeometry=mask.geometry==='pixel';
+  const linearWidth=pixelGeometry?width:1,linearHeight=pixelGeometry?height:1;
+  const diagonalSpan=pixelGeometry?Math.abs(cos*width)+Math.abs(sin*height):1;
+  const radius=.42*Math.min(width,height);
   for(let p=0;p<out.length;p++){
     const x=(p%width+.5)/width,y=(Math.floor(p/width)+.5)/height;let a=0;
     if(classes[mask.type]&&semantic){const sx=Math.min(semantic.width-1,Math.floor(x*semantic.width)),sy=Math.min(semantic.height-1,Math.floor(y*semantic.height));const i=sy*semantic.width+sx;
       a=semantic.confidence?classes[mask.type].reduce((n,c)=>n+semantic.confidence[c][i],0):classes[mask.type].includes(semantic.categories[i])?1:0;
     } else if(mask.type==='luminance'){const v=(.2126*data[p*4]+.7152*data[p*4+1]+.0722*data[p*4+2])/255;const low=mask.low??.4,high=mask.high??1,soft=.08;a=clamp((v-low+soft)/soft)*clamp((high-v+soft)/soft);}
     else if(mask.type==='color'){const rgb=[data[p*4]/255,data[p*4+1]/255,data[p*4+2]/255];const d=Math.hypot(...rgb.map((v,c)=>v-target[c]));a=clamp(1-d/(mask.tolerance??.35));}
-    else if(mask.type==='linear'){const angle=(mask.angle??90)*Math.PI/180; a=clamp(.5+(x-.5)*Math.cos(angle)+(y-.5)*Math.sin(angle));}
-    else if(mask.type==='radial'){a=clamp((1-Math.hypot((x-.5)/.42,(y-.5)/.42))*3);}
+    else if(mask.type==='linear'){const projection=(x-.5)*cos*linearWidth+(y-.5)*sin*linearHeight;a=clamp(.5+projection/diagonalSpan);}
+    else if(mask.type==='radial'){const distance=pixelGeometry?Math.hypot((x-.5)*width,(y-.5)*height)/radius:Math.hypot((x-.5)/.42,(y-.5)/.42);a=clamp((1-distance)*3);}
     if(mask.invert)a=1-a;out[p]=clamp(a)*255;
   }
   // Normalized strokes share across preview/export. Feather is a soft falloff.

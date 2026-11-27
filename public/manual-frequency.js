@@ -1,6 +1,8 @@
 // Local frequency separation in the existing 8-bit sRGB editing space.
 // Low frequencies are alpha-weighted Gaussian approximations; signed residuals
 // stay in floating point until recombination. Tiles bound export memory use.
+import {strokeDistance} from './manual-neutral.js';
+
 export const FREQUENCY_TOOLS = new Set(['low-smooth', 'low-clone', 'high-clone', 'high-soften']);
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 const TILE = 256;
@@ -102,11 +104,14 @@ export function applyFrequencyStroke(source, pixels, width, height, op, protecti
   const cloning = op.tool.endsWith('-clone'), dx=cloning?(op.sample[0]-op.points[0][0])*width:0,dy=cloning?(op.sample[1]-op.points[0][1])*height:0;
   for(let top=bounds.top;top<=bounds.bottom;top+=TILE)for(let left=bounds.left;left<=bounds.right;left+=TILE){
     const rect={left,top,right:Math.min(bounds.right,left+TILE-1),bottom:Math.min(bounds.bottom,top+TILE-1)},tw=rect.right-left+1,th=rect.bottom-top+1;
-    if(!op.points.some(p=>{const x=p[0]*width,y=p[1]*height;return x>=rect.left-radius&&x<=rect.right+radius&&y>=rect.top-radius&&y<=rect.bottom+radius;}))continue;
+    const path=op.continuous?strokeDistance(op.points,width,height,{left:rect.left-radius,top:rect.top-radius,right:rect.right+radius,bottom:rect.bottom+radius}):null;
+    if(op.continuous&&!path)continue;
+    if(!op.continuous&&!op.points.some(p=>{const x=p[0]*width,y=p[1]*height;return x>=rect.left-radius&&x<=rect.right+radius&&y>=rect.top-radius&&y<=rect.bottom+radius;}))continue;
     const amounts=new Float32Array(tw*th);let any=false;
     for(let y=top;y<=rect.bottom;y++)for(let x=left;x<=rect.right;x++){
       const at=y*width+x;if(protection[at]===255||!source[at*4+3])continue;let weight=0;
-      for(const p of op.points){const d=(x-p[0]*width)**2+(y-p[1]*height)**2;if(d<radius*radius)weight=Math.max(weight,(1-d/(radius*radius))**3);}
+      if(path){const d=path(x,y);if(d<radius*radius)weight=(1-d/(radius*radius))**3;}
+      else for(const p of op.points){const d=(x-p[0]*width)**2+(y-p[1]*height)**2;if(d<radius*radius)weight=Math.max(weight,(1-d/(radius*radius))**3);}
       const amount=weight*op.strength*(1-protection[at]/255);amounts[(y-top)*tw+x-left]=amount;any ||= amount>0;
     }
     if(!any)continue;
