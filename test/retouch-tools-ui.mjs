@@ -54,6 +54,22 @@ try{
  assert.equal(cloneOp.tool,'clone');
  assert.equal(cloneOp.continuous,true);
  assert.equal(cloneOp.points.length,2);
- assert.deepEqual(errors,[]);console.log(JSON.stringify({result:'PASS',continuousClone:true,frequencyBrush:true,neutralGray:true,undoRedo:true,diagnosticsNeverExported:true,fullResolution:true,reopenedStrokes:2,crossWorkspace:true,outpaintCanvasPreview:true,settingsTriggerNoGeneration:true,syntheticOutpaintSubmissions:1,originalPixelsExact:true,firstRunRecipePreview:true,mobileToolMenu:true,mobile320:true,realAIImages:0}));
+
+ await page.locator('[data-group=face]').click();
+ for(const [index,tool] of ['shrink','expand'].entries()){
+  await page.locator('[data-tool='+tool+']').click();
+  await stroke(.12,.49);
+  await page.waitForFunction(count=>document.querySelector('#manual-stroke-count').textContent.startsWith(count+' '),index+4);
+ }
+ await page.locator('#manual-save').click();
+ await page.waitForFunction(()=>!document.querySelector('#manual-save').disabled&&document.querySelector('#manual-save-status').textContent.startsWith('\u5df2\u4fdd\u5b58 5 '));
+ const warped=(await get('/api/workflows/'+manualId)).steps.find(step=>step.id==='edit').output;
+ assert.deepEqual(warped.operations.slice(-2).map(op=>[op.tool,op.edgeSafe]),[['shrink',true],['expand',true]]);
+ const warpedPixels=await sharp(await asset(manualId,warped.imageAsset)).ensureAlpha().raw().toBuffer();
+ const replay=renderManualPortrait(new Uint8ClampedArray(savedSource),width,height,warped.operations).pixels;
+ assert.deepEqual(warpedPixels,Buffer.from(replay));
+ await page.goto(origin+'/portrait/?workflow='+manualId);
+ await page.waitForFunction(()=>!document.querySelector('#manual-save').disabled&&document.querySelector('#manual-stroke-count').textContent.startsWith('5 '));
+ assert.deepEqual(errors,[]);console.log(JSON.stringify({result:'PASS',continuousClone:true,frameSafeWarpReplay:true,frequencyBrush:true,neutralGray:true,undoRedo:true,diagnosticsNeverExported:true,fullResolution:true,reopenedStrokes:2,crossWorkspace:true,outpaintCanvasPreview:true,settingsTriggerNoGeneration:true,syntheticOutpaintSubmissions:1,originalPixelsExact:true,firstRunRecipePreview:true,mobileToolMenu:true,mobile320:true,realAIImages:0}));
 }catch(error){if(page){console.error({url:page.url(),manual:await page.locator('#manual-notice').textContent().catch(()=>null),ai:await page.locator('#feedback').textContent().catch(()=>null),errors});await page.screenshot({path:path.join(out,'failed.png'),fullPage:true}).catch(()=>{});}throw error;}
 finally{await browser?.close();await app?.close();assert.ok(directory.startsWith(path.resolve('tmp')+path.sep));await fs.rm(directory,{recursive:true,force:true});}

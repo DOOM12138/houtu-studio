@@ -44,3 +44,42 @@ test('continuous protection, unprotect and restoration fill sparse segments',()=
   assert.deepEqual(repaired.subarray(0,width*4),source.subarray(0,width*4));
  }
 });
+
+test('frame-safe warps stay inside the frame and round-trip while old stroke records keep their replay',()=>{
+ const width=128,height=100,source=new Uint8ClampedArray(width*height*4);
+ for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+  source.set([x*2,y*2,(x+y)%19*12,255],(y*width+x)*4);
+ }
+ const horizontal={tool:'push',r:.4,strength:1,points:[[.02,.5],[.27,.5]],continuous:true};
+ const vertical={...horizontal,points:[[.5,.98],[.5,.72]]};
+ const radial={tool:'shrink',r:.4,strength:1,points:[[.14,.52]]};
+ const full={...radial,tool:'expand',points:[[.87,.15]]};
+ const red=(pixels,x,y)=>pixels[(y*width+x)*4];
+ const green=(pixels,x,y)=>pixels[(y*width+x)*4+1];
+ const [oldPush,oldShrink]=[horizontal,radial].map(op=>renderManualPortrait(source,width,height,[op]).pixels);
+ assert.equal(red(oldPush,4,50),0);
+ assert.equal(red(oldShrink,1,52),0);
+ for(const op of [horizontal,vertical,radial,full]){
+  const brush={...op,edgeSafe:true};
+  const replay=manualOperations(JSON.parse(JSON.stringify([brush])));
+  assert.deepEqual(replay,[brush]);
+  assert.deepEqual(manualOperations([op]),[op]);
+  const pixels=renderManualPortrait(source,width,height,replay).pixels;
+  assert.notDeepEqual(pixels,source);
+  for(let y=0;y<height;y++){
+   for(const x of [0,width-1])assert.equal(red(pixels,x,y),red(source,x,y));
+  }
+  for(let x=0;x<width;x++){
+   for(const y of [0,height-1])assert.equal(green(pixels,x,y),green(source,x,y));
+  }
+ }
+ const pushed=renderManualPortrait(source,width,height,[{...horizontal,edgeSafe:true}]).pixels;
+ assert.ok(red(pushed,4,50)>0);
+ const shrunk=renderManualPortrait(source,width,height,[{...radial,edgeSafe:true}]).pixels;
+ assert.ok(red(shrunk,1,52)>0);
+ assert.equal(manualOperations([{...radial,tool:'smooth',edgeSafe:true}])[0].edgeSafe,undefined);
+ const center={...radial,r:.2,points:[[.5,.5]]};
+ assert.deepEqual(renderManualPortrait(source,width,height,[center]).pixels,renderManualPortrait(source,width,height,[{...center,edgeSafe:true}]).pixels);
+ const line=new Uint8ClampedArray([0,20,80,255,100,80,30,255,250,140,20,255]);
+ assert.deepEqual(renderManualPortrait(line,1,3,[{...horizontal,edgeSafe:true}]).pixels,line);
+});

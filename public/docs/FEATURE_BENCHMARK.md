@@ -79,3 +79,8 @@ node scripts/project-node.mjs scripts/feature-benchmark-gate.mjs check data/priv
 - **恢复原图**。新笔触连续恢复原像素，并同步擦除同区域的中性灰编辑。两种实图中线漏恢复的像素由 486、434 降到 0，新图与独立灰层参考一致。格纹布料用作无操作反例。[格纹布料](https://commons.wikimedia.org/wiki/File:Tartan_cloth_closeup.jpg)
 
 本轮四项各包含两个正例与一个反例，12 组均达 100 分。已保存并缺少连续标记的笔触继续使用原算法。分数衡量笔触覆盖、位移和像素恢复，面部及身材塑形的审美仍待同人像对照。
+
+## 第十轮实图
+
+- **局部收缩、局部膨胀和平滑推拉**。新笔触逐轴减弱靠近画框时的位移，保护笔和旧项目按原有规则重放。百叶窗左缘与楼梯下缘两张照片中，收缩的越界内侧采样数分别从 3,022、3,003 降至 0，推拉从 43,222、42,919 降至 0。膨胀的画框像素与参考不一致数从 437、434 降至 0。[阿灵顿百叶窗](https://commons.wikimedia.org/wiki/File:Window_shutters_-_Arlington%2C_MA_-_60.jpg) · [维多利亚州立图书馆楼梯](https://commons.wikimedia.org/wiki/File:Spiral_staircase_State_Library_of_Victoria_20180724-003.jpg)
+- **对照与验收**。内区用玄武岩柱核对，三种笔触均正常生效，优化前后逐像素一致。使用独立坐标与像素插值作为参考，推拉用数值积分。两张边缘正例及一张内区反例按三种工具共九组，均为 100 分。完全保护区、笔触范围外和保存重放均逐像素通过。这组实图衡量画框几何和纹理过渡，脸型和衣褶的审美仍需真人样张验收。[巨人堤道玄武岩柱](https://commons.wikimedia.org/wiki/File:Giant%27s_Causeway_Basalt_Columns.jpg)
