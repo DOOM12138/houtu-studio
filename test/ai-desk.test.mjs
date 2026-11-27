@@ -106,3 +106,16 @@ test('auto desk forwards an explicit search source and alias to the scene recipe
  assert.throws(()=>deskRecipe({mode:'auto',auto:{referenceProvider:'other'}}),/来源/);
  assert.throws(()=>deskRecipe({mode:'auto',auto:{character:'https://example.test'}}),/角色/);
 });
+
+test('full auto 4/10 retains the person result and pauses when texture review fails',async t=>{
+ const f=await deskFixture();t.after(()=>f.close());f.bridge.paintTexturePass=false;
+ const run=await f.ok('/api/studio/ai-runs',{mode:'auto',auto:{paint:true,paintStyle:'anime',paintLevel:4,referenceProvider:'none'},requestKey:randomUUID(),source:await f.source()});
+ await f.ok('/api/studio/ai-runs/'+run.id+'/next',{workflowId:run.workflowId,step:run.next,revision:run.revision});
+ const paused=await f.wait(run.id);
+ assert.equal(paused.queue,'paused');assert.equal(paused.done,false);assert.equal(f.bridge.images.length,2);
+ const agent=await f.ok('/api/retouch-agents/'+paused.agent.id);
+ const review=agent.steps.find(s=>s.id==='check');
+ assert.equal(review.output.pass,false);assert.equal(review.output.checks.find(item=>item.key==='texture').pass,false);
+ assert.ok(agent.steps.find(s=>s.id==='person').imageAsset);
+ assert.equal(agent.steps.find(s=>s.id==='deliver').status,'pending');
+});

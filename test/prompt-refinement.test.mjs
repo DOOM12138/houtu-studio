@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {PRESETS} from '../public/catalog.js';
 import {paintingPrompt} from '../lib/painting.mjs';
-import {agentOptions,AGENT_VERSION,AGENT_PROMPT_REVISION} from '../public/retouch-agent-options.js';
-import {compileAgentPrompt,inspectionPrompt} from '../backend/agent-planning.mjs';
+import {agentOptions,AGENT_VERSION,AGENT_LONG_SHOT_REVISION,AGENT_PROMPT_REVISION} from '../public/retouch-agent-options.js';
+import {compileAgentPrompt,inspectionPrompt,planPrompt,checkPrompt,validateAgentCheck} from '../backend/agent-planning.mjs';
 
 test('all default edit prompts preserve a concrete task and guided output',()=>{
  for(const tool of PRESETS){
@@ -47,4 +47,32 @@ test('new Agent prompts are scoped to the node and legacy recipes retain their i
  const cleanup=compileAgentPrompt(fresh,{id:'clean',prompt:'清理左侧画面边缘的灯架。'},[]);
  assert.match(cleanup,/原场地与发丝边缘/);
  assert.doesNotMatch(cleanup,/厚涂|原眼妆/);
+});
+
+test('4/10 protects photographic texture throughout planning, rendering and review',()=>{
+ const config=agentOptions({tasks:['portrait','paint','color'],style:'anime',paintLevel:4});
+ const action={id:'person',prompt:'顺原光向强化主发束和衣料暗面。'};
+ const old=agentOptions({...config,promptRevision:AGENT_LONG_SHOT_REVISION});
+ for(const style of ['anime','cos']){
+  const guided=paintingPrompt({operation:style==='anime'?'anime-paint':'cos-paint',style,paintLevel:4});
+  assert.match(guided,/保留摄影媒介.*保留原眼型、视线、唇线.*不放大虹膜/);
+  assert.match(compileAgentPrompt({...config,style},action,[]),/保留可见皮肤与粉底纹理.*若图1本身是插画/);
+ }
+ assert.match(planPrompt(config,{summary:'真人场照',observations:[],queries:[]},[]),/不能安排统一磨皮或重画妆面/);
+ assert.doesNotMatch(compileAgentPrompt(old,action,[]),/保留摄影媒介/);
+ assert.match(compileAgentPrompt(old,action,[]),/全身远景按原片可见细节/);
+ assert.doesNotMatch(checkPrompt(old),/texture/);
+ assert.doesNotMatch(checkPrompt({...config,paintLevel:6}),/texture/);
+ assert.doesNotMatch(paintingPrompt({operation:'lighting',style:'natural',paintLevel:4}),/保留摄影媒介/);
+ assert.doesNotMatch(paintingPrompt({operation:'anime-paint',style:'anime',paintLevel:4,promptMode:'custom',prompt:'我的完整指令'}),/保留摄影媒介/);
+ assert.match(checkPrompt(config),/重画五官、蜡面磨皮、塑料发束.*texture必须为false/);
+ const keys=['scope','identity','lighting','seams','color'];
+ const oldReply={pass:true,severity:'minor',summary:'检查',checks:keys.map(key=>({key,pass:true,note:'实际观察'})),repairable:true,repairStage:'person'};
+ assert.equal(validateAgentCheck(oldReply,old).pass,true);
+ assert.throws(()=>validateAgentCheck(oldReply,config),/完整依据/);
+ assert.throws(()=>validateAgentCheck({...oldReply,checks:[...oldReply.checks,{key:'texture',pass:true,note:' '}]},config),/可见依据/);
+ const failed=validateAgentCheck({...oldReply,checks:[...oldReply.checks,{key:'texture',pass:false,note:'眼线和唇缘被重新描画'}]},config);
+ assert.equal(failed.pass,false);
+ assert.equal(failed.repairable,false);
+ assert.equal(validateAgentCheck({...oldReply,checks:[...oldReply.checks,{key:'texture',pass:true,note:'可见发丝与眼型保留'}]},config).pass,true);
 });

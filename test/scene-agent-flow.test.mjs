@@ -29,7 +29,7 @@ class Bridge extends EventEmitter{
     actions:actions.map(id=>({id,prompt:id==='person'?'保留现有眼妆和服装。':'按原有场景调整。',parameters:id==='color'?{settings:{exposure:.22,temperature:25}}:id==='effects'?{effect:'rain',amount:.25}:{}}))};
   }
   if(prompt.includes('只返回JSON {aligned:boolean'))return {aligned:true,complete:true,backgroundExcluded:true,edgesAcceptable:true,confidence:.96,summary:'隔离蒙版检查'};
-  return {pass:true,severity:'minor',summary:'测试对照通过',checks:['scope','identity','lighting','seams','color'].map(key=>({key,pass:true,note:'fixture'})),repairable:false,repairStage:null,repairPrompt:''};
+  return {pass:true,severity:'minor',summary:'测试对照通过',checks:['scope','identity','lighting','seams','color',...(prompt.includes('texture为必检项')?['texture']:[])].map(key=>({key,pass:true,note:'fixture'})),repairable:false,repairStage:null,repairPrompt:''};
  }
  async begin(job,prompt,file,context,referenceFiles=[]){job.threadId='fixture-'+job.id;job.turnId='turn';this.images.push({prompt,refCount:referenceFiles.length});let result=output;
   if(prompt.includes('仅生成原图主体的像素级黑白保护蒙版'))result=await sharp({create:{width:96,height:128,channels:3,background:'black'}}).composite([{input:await picture('#ffffff',46,80),left:24,top:24}]).png().toBuffer();

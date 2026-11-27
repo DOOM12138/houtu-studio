@@ -8,7 +8,7 @@ import sharp from 'sharp';
 import {createApp} from '../../server.mjs';
 
 export class DeskBridge extends EventEmitter{
- images=[];reads=[];signed=true;subjects=0;pauseRender=null;
+ images=[];reads=[];signed=true;subjects=0;pauseRender=null;paintTexturePass=true;
  async account(){return this.signed?{email:'desk@example.invalid',plan:'test'}:null;}
  async models(){return [{id:'test-model',name:'test-model'}];}async stop(){}async cancel(){}
  async analyzeImages(files,prompt,control){
@@ -18,7 +18,8 @@ export class DeskBridge extends EventEmitter{
    const ids=JSON.parse(prompt.match(/只能安排这些实际节点(\[[^\]]*\])/)[1]);return {summary:'仅按授权任务编辑',selectedReferences:[],referenceReviews:[],actions:ids.map(id=>({id,prompt:'保留原图的角色造型和背景，整理当前部位。',parameters:id==='color'?{settings:{exposure:.15}}:{}}))};
   }
   if(prompt.includes('aligned:boolean'))return {aligned:true,complete:true,backgroundExcluded:true,edgesAcceptable:true,confidence:.96,summary:'fixture'};
-  return {pass:true,severity:'minor',summary:'测试完成',checks:['scope','identity','lighting','seams','color'].map(key=>({key,pass:true,note:'synthetic'}))};
+  const keys=['scope','identity','lighting','seams','color',...(prompt.includes('texture为必检项')?['texture']:[])];
+  return {pass:true,severity:'minor',summary:'测试完成',checks:keys.map(key=>({key,pass:key!=='texture'||this.paintTexturePass,note:key==='texture'?'合成测试：检查原有纹理和眼唇边缘。':'synthetic'}))};
  }
  async begin(job,prompt,file,context,refs){
   job.threadId='desk-'+job.id;job.turnId='turn';job.resolvedModel='test-model';await job.onModelSelected?.('test-model');
