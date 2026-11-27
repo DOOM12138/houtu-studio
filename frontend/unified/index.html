@@ -17,14 +17,14 @@
 </nav>
 <main id="desk">
  <div id="documentbar"><i data-icon="image"></i><strong id="docName">打开照片</strong><span id="docSize"></span><button class="push" id="sessionInfo" title="查看本机保存位置"><span id="ioState" role="status"></span></button></div>
- <div id="mat"><div id="unified-empty"><strong>打开一张照片，开始修图</strong><button type="button" id="empty-import" class="primary">导入照片</button></div><canvas id="stage" aria-label="修图画布，滚轮缩放，拖动平移；选择画笔后可在图上修整" tabindex="0"></canvas><span id="viewMode" hidden></span><label id="dividerWrap" hidden>原图<input type="range" min="1" max="99" value="50" id="splitPosition" aria-label="移动对比分界线">成片</label></div>
+ <div id="mat"><div id="unified-empty"><strong>打开一张照片，开始修图</strong><button type="button" id="empty-import" class="primary">导入照片</button></div><canvas id="stage" aria-label="修图画布，滚轮缩放，拖动平移；选择画笔后可在图上修整" tabindex="0"></canvas><span id="viewMode" hidden></span><div id="historyBar" hidden><p><strong>历史预览</strong><span id="historyLabel"></span></p><button id="returnCurrent" type="button">返回当前</button></div><label id="dividerWrap" hidden>原图<input type="range" min="1" max="99" value="50" id="splitPosition" aria-label="移动对比分界线">成片</label></div>
  <div id="viewbar">
   <button id="pan" class="icon-only" aria-label="平移画布" title="平移画布，按空格临时平移"><i data-icon="hand"></i></button>
   <button id="smaller" class="icon-only" aria-label="缩小"><i data-icon="minus"></i></button><output id="zoomLabel" title="相对于适应画面的缩放倍数">1.0×</output><button id="larger" class="icon-only" aria-label="放大"><i data-icon="plus"></i></button><button id="fit">适应</button>
   <span class="rule"></span><button id="compare" class="with-icon" aria-pressed="false"><i data-icon="compare"></i>对比</button><button id="original" aria-pressed="false" title="按住反斜杠临时查看原图">原图</button>
-  <span class="push"></span><button id="toggleFilm" class="with-icon" aria-label="展开或收起照片条"><i data-icon="film"></i><span id="filmCount">照片</span></button>
+  <span class="push"></span><button id="toggleFilm" class="with-icon" aria-label="照片条" aria-controls="film" aria-expanded="false"><i data-icon="film"></i><span id="filmCount">照片</span></button>
  </div>
- <section id="film" aria-label="当前项目的照片"><div id="filmHead"><span id="filmLabel">照片</span><span class="muted" id="filmSummary"></span><button class="push" id="batch">多选</button><button class="soft" id="sync" hidden>同步调色</button><button id="remove-photos" hidden>移除</button></div><div id="filmPhotos"></div></section>
+ <section id="film" aria-label="当前项目的照片"><div id="filmHead"><span id="filmLabel">照片</span><span class="muted" id="filmSummary" role="status"></span><button class="push" id="batch">多选</button><button class="soft" id="sync" hidden>同步调色</button><button id="remove-photos" hidden>移除</button></div><div id="filmPhotos"></div></section>
 </main>
 <aside id="inspector" aria-label="当前工具参数"><div id="panelHead"><h1 id="panelTitle">调色</h1><span class="push" id="sectionKind"></span><button id="sectionTool" class="outline" hidden></button><button id="mobilePanel" class="mobile-only push">收起参数</button></div><div id="parameterScroll"></div><div id="unified-ai" hidden></div></aside>
 <section id="advancedTools" class="advanced-tools" aria-label="修图工具" hidden>

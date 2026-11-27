@@ -3,7 +3,7 @@ let token='';
 async function request(url,input){
  if(input&&!token)token=(await(await fetch('/api/health')).json()).csrf;
  const r=await fetch(url,input?{method:'POST',headers:{'Content-Type':'application/json','X-Paint-CSRF':token},body:JSON.stringify(input)}:{});
- const v=await r.json();if(!r.ok)throw Error(v.error||'草稿暂未写入本机。');return v;
+ const v=await r.json();if(!r.ok)throw Object.assign(Error(v.error||'草稿暂未写入本机。'),{status:r.status});return v;
 }
 export async function loadDrafts(removed=false){return (await request('/api/studio/canvas-drafts'+(removed?'?removed=1':''))).photos;}
 export const loadDraft=id=>request('/api/studio/canvas-drafts/'+id);

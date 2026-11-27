@@ -16,6 +16,7 @@ try{
  if(theme==='dark'||theme==='light')document.documentElement.dataset.theme=theme;
 }catch{}
 const $ = id => document.getElementById(id);
+const compactView=matchMedia('(max-width:700px)');
 let desk=null,csrf='',signedIn=false,imageRuntimeReady=true,boundBase='',rootMedia=null;
 const isAndroid=Boolean(window.HoutuAndroid)||/Android/i.test(navigator.userAgent);
 const photos = [];
@@ -144,7 +145,7 @@ function moveHistory(direction) {
   photo.cursor=next;safeDraft(photo);refreshEdits();
 }
 function refreshEdits(){ui.draftStep=null;renderPanel();updateChrome();requestPixels();}
-let switchTicket=0,importTicket=0;
+let switchTicket=0,importTicket=0,syncing=false;
 async function obtainMedia(photo) {
   if(media.has(photo.id))return media.get(photo.id);
   const promise=(async()=>{
@@ -175,7 +176,7 @@ async function selectPhoto(id) {
   settleCanvasInput();finishPendingEdit();
   ui.active=id;ui.previewId=null;ui.draftStep=null;ui.selectionDraft=null;
   ui.original=false;ui.holdOriginal=false;ui.target='global';activeMedia=null;gestureReset();desk?.sourceChanged(null,photo.id);
-  ++renderSerial;queuedRender=null;status('正在打开…');paintCanvas();updateChrome();renderPanel();renderFilm();
+  ++renderSerial;queuedRender=null;status('正在打开…');paintCanvas();updateChrome();renderPanel();renderFilm({reveal:true});
   try{
     if(photo.metadataOnly){const saved=await loadDraft(photo.id);if(ticket!==switchTicket)return;Object.assign(photo,saved,{metadataOnly:false,diskRevision:saved.revision});}
     const data=await obtainMedia(photo);if(ticket!==switchTicket)return;
@@ -208,30 +209,51 @@ async function importPhotos(files){
   }
   if(rejected.length)announce(rejected.slice(0,2).join('；'));
 }
-function renderFilm(){
+function revealFilmTile(tile){
+ const strip=$('filmPhotos');
+ if(!tile||$('film').inert)return;
+ const viewport=strip.getBoundingClientRect(),rect=tile.getBoundingClientRect();
+ if(rect.left<viewport.left)strip.scrollLeft+=rect.left-viewport.left-6;
+ else if(rect.right>viewport.right)strip.scrollLeft+=rect.right-viewport.right+6;
+}
+function renderFilm({reveal=false}={}){
   const strip=$('filmPhotos'),left=strip.scrollLeft;
- const wrap=clear(strip);const current=currentPhoto();
-  photos.forEach((photo,index)=>{
+  const focused=strip.contains(document.activeElement)?document.activeElement.dataset.filmKey:null;
+  const wrap=clear(strip),current=currentPhoto();
+  const controls=new Map();
+  photos.forEach(photo=>{
     const b=action('',()=>selectPhoto(photo.id),'tile'+(current===photo?' current':''));
+    b.dataset.filmKey=photo.id;controls.set(photo.id,b);
     b.setAttribute('aria-label',photo.name);b.title=photo.name;
     if(ui.batch){b.setAttribute('role','checkbox');b.setAttribute('aria-checked',String(checked.has(photo.id)));}
     else if(photo===current)b.setAttribute('aria-current','true');
     const img=document.createElement('img');img.src=photo.thumbnail||photo.source;img.alt='';
     const desc=element('span');desc.append(element('b',photo.name),element('small',ui.batch?(checked.has(photo.id)?'已选为目标':'可选目标'):(photo.cursor?'已调整':'原始照片')));
-    if(ui.batch&&photo===current){b.disabled=true;desc.lastChild.textContent='同步来源';}
+    if(ui.batch&&photo===current){b.disabled=true;b.setAttribute('aria-label',photo.name+' · 同步来源');desc.lastChild.textContent='同步来源';}
     b.append(img,desc);
     if(ui.batch)wrap.append(b);
     else{
      const holder=element('div',undefined,'film-tile'),remove=action('×',()=>confirmRemove([photo]),'tile-remove');
+     remove.dataset.filmKey='remove-'+photo.id;controls.set(remove.dataset.filmKey,remove);
      remove.title='从工作台移除';remove.setAttribute('aria-label','移除照片 '+photo.name);
      holder.append(b,remove);wrap.append(holder);
     }
   });
-  const add=action('',()=>$('file').click(),'add-photo');add.setAttribute('aria-label','导入更多照片');add.append(icon('plus'));wrap.append(add);strip.scrollLeft=left;
-  $('filmCount').textContent='照片 '+photos.length;$('filmSummary').textContent=ui.batch?'选择接收调色的照片':(current?String(photos.indexOf(current)+1).padStart(2,'0')+' / '+String(photos.length).padStart(2,'0'):'');
+  const add=action('',()=>$('file').click(),'add-photo');
+  add.dataset.filmKey='import';controls.set('import',add);add.setAttribute('aria-label','导入更多照片');add.append(icon('plus'));wrap.append(add);strip.scrollLeft=left;
+  const position=current?photos.indexOf(current)+1:0;
+  $('filmCount').textContent=position?'照片 '+position+'/'+photos.length:'照片 '+photos.length;
+  $('film').classList.toggle('film-selecting',ui.batch);
+  $('filmSummary').textContent=ui.batch?'已选 '+checked.size+' 张':position?position+' / '+photos.length:'';
   $('remove-photos').hidden=!ui.batch;
-  $('remove-photos').disabled=!checked.size;
-  $('batch').textContent=ui.batch?'结束多选':'多选';$('sync').hidden=!ui.batch;$('sync').disabled=!checked.size;$('sync').textContent='同步调色（'+checked.size+'）';
+  $('remove-photos').disabled=syncing||!checked.size;
+  $('batch').textContent=ui.batch?'结束多选':'多选';$('batch').disabled=syncing||photos.length<2;
+  $('sync').hidden=!ui.batch;updateSyncControl();
+  if(reveal){
+   const tile=controls.get(current?.id);
+   revealFilmTile(tile?.closest('.film-tile')||tile);
+  }
+  if(focused)controls.get(focused)?.focus({preventScroll:true});
 }
 async function changeRemoved(items){
  if(!items.length)return;
@@ -290,18 +312,62 @@ async function showRemoved(){
  }catch(e){announce(e.message);}
 }
 $('remove-photos').onclick=()=>confirmRemove(photos.filter(p=>checked.has(p.id)));
-function toggleChecked(id){if(id===ui.active)return;checked.has(id)?checked.delete(id):checked.add(id);renderFilm();}
+function toggleChecked(id){
+ if(syncing||id===ui.active)return;
+ checked.has(id)?checked.delete(id):checked.add(id);renderFilm();
+}
 $('batch').onclick=()=>{ui.batch=!ui.batch;checked.clear();renderFilm();};
+function updateSyncControl(){
+ const b=$('sync'),preview=ui.previewId!==null;
+ b.disabled=syncing||!checked.size||preview||!activeMedia;
+ b.title=preview?'返回当前成片后可同步调色':'同步当前照片的整体调色';
+}
+async function applyToneSync(photo,targets,source,button){
+ syncing=true;button.disabled=true;$('closeDialog').disabled=true;
+ const failed=[];
+ let applied=0,unchanged=0;
+ try{
+  for(const [index,target] of targets.entries()){
+   button.textContent='保存 '+(index+1)+' / '+targets.length;
+   try{
+    if(target.removing||target.removedAt||!photos.includes(target))throw Error('照片已移除。');
+    await unproject(target);
+    if(target.removedAt)throw Error('该照片已移除，请先恢复。');
+    const tone=editsAt(target,target.cursor).global;
+    if(Object.keys({...tone,...source}).every(key=>tone[key]===source[key])){unchanged++;continue;}
+    const length=target.nodes.length,cursor=target.cursor,redo={...target.redo};
+    append(target,'同步调色 · '+photo.name,{type:'replace-tone',values:source},{persist:false});
+    try{await saveDraft(target);applied++;}
+    catch(error){
+     target.nodes.length=length;target.cursor=cursor;target.redo=redo;
+     if(error.status===409){
+      target.metadataOnly=true;
+      throw Error('草稿已变化，再次同步时会先读取最新记录。');
+     }
+     throw error;
+    }
+   }catch(error){failed.push({target,error});}
+  }
+ }finally{
+  syncing=false;$('closeDialog').disabled=false;checked.clear();
+  for(const {target} of failed)checked.add(target.id);
+  ui.batch=failed.length>0;$('dialog').close();renderFilm();
+ }
+ const report=[applied?'已同步 '+applied+' 张':'',unchanged?unchanged+' 张调色相同':'',failed.length?failed.length+' 张保存失败，仍在选中':null].filter(Boolean);
+ if(failed.length)report.push(failed[0].target.name+'：'+failed[0].error.message);
+ announce(report.join(' · '));
+}
 $('sync').onclick=()=>{
-  const photo=currentPhoto(),targets=photos.filter(p=>checked.has(p.id)&&p!==photo);if(!targets.length)return;
-  const source=editsAt(photo,photo.cursor).global;
-  openDialog('同步调色',body=>{
-    body.append(element('p','将「'+photo.name+'」的整体调色应用到 '+targets.length+' 张照片。每张照片保留自己的局部蒙版和人物笔触。'));
-    body.append(action('应用到这 '+targets.length+' 张',()=>{
-      for(const target of targets)append(target,'同步调色 · '+photo.name,{type:'replace-tone',values:source});
-      ui.batch=false;checked.clear();$('dialog').close();renderFilm();announce('已同步整体调色');
-    },'primary wide'));
-  });
+ if(syncing||ui.previewId!==null||!activeMedia)return;
+ settleCanvasInput();finishPendingEdit();
+ const photo=currentPhoto(),targets=photos.filter(p=>checked.has(p.id)&&p!==photo);
+ if(!photo||!targets.length)return;
+ const source=editsAt(photo,photo.cursor).global;
+ openDialog('同步调色',body=>{
+    body.append(element('p','把「'+photo.name+'」的整体调色应用到 '+targets.length+' 张照片。目标照片各自保留原有蒙版与人物笔触。'));
+    const apply=action('同步 '+targets.length+' 张',()=>void applyToneSync(photo,targets,source,apply),'primary wide','confirm-tone-sync');
+    body.append(apply);
+ });
 };
 $('open').onclick=()=>$('file').click();
 $('file').onchange=event=>{const files=[...event.target.files];event.target.value='';if(files.length){resetWorkspaceImage();trackWorkspaceInput(importPhotos(files)).catch(e=>announce(e.message));}};
@@ -393,10 +459,10 @@ function paintCanvas(){
     ctx.save();ctx.strokeStyle='#fffefa';ctx.lineWidth=1;ctx.shadowColor='#25231f';ctx.shadowBlur=2;ctx.beginPath();
     ctx.arc(brushCursor.x,brushCursor.y,Math.max(3,ui.radius*Math.min(w,h)),0,Math.PI*2);ctx.stroke();ctx.restore();
   }
-  let label=original?'原图':ui.previewId!==null?'历史预览 · '+currentPhoto().nodes[ui.previewId].label:ui.compare?'左侧原图 · 右侧成片':'';
+  let label=original?'原图':ui.compare?'左侧原图 · 右侧成片':'';
   if(!label&&ui.editing==='mask')label='拖动框选局部调色范围';
   if(!label&&ui.editing==='brush')label='人物笔刷 · '+brushName(ui.brush);
-  $('viewMode').hidden=!label;$('viewMode').textContent=label;$('dividerWrap').hidden=!ui.compare||original;
+  $('viewMode').hidden=!label||ui.previewId!==null;$('viewMode').textContent=label;$('dividerWrap').hidden=!ui.compare||original;
   surface.classList.toggle('brush',ui.editing!=='pan'&&!ui.panKey);
 }
 new ResizeObserver(paintCanvas).observe($('mat'));
@@ -484,20 +550,29 @@ $('fit').onclick=()=>{if(currentPhoto()){currentPhoto().viewport={zoom:1,panX:0,
 $('compare').onclick=()=>{ui.compare=!ui.compare;ui.original=false;updateChrome();paintCanvas();};
 $('original').onclick=()=>{ui.original=!ui.original;updateChrome();paintCanvas();};
 $('splitPosition').oninput=e=>{ui.split=Number(e.target.value);paintCanvas();};
+function filmOpen(){
+ const desk=$('desk');
+ return compactView.matches?desk.classList.contains('mobile-film'):!desk.classList.contains('film-closed');
+}
 $('toggleFilm').onclick=()=>{
-  const small=matchMedia('(max-width:700px)').matches,cls=small?'mobile-film':'film-closed';
-  $('desk').classList.toggle(cls);updateChrome();
+ const opening=!filmOpen();
+ $('desk').classList.toggle(compactView.matches?'mobile-film':'film-closed',compactView.matches?opening:!opening);
+ updateChrome();
+ if(opening)revealFilmTile($('filmPhotos').querySelector('.tile.current')?.closest('.film-tile')||$('filmPhotos').querySelector('.tile.current'));
 };
+compactView.addEventListener('change',()=>updateChrome());
 function openDialog(title,fill) {
   const dialog=$('dialog');if(dialog.open)dialog.close();
   $('dialogTitle').textContent=title;const content=clear($('dialogBody'));fill(content);dialog.showModal();
 }
 $('closeDialog').onclick=()=>$('dialog').close();
-$('dialog').addEventListener('click',e=>{if(e.target===$('dialog')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.target.close();}});
+$('dialog').addEventListener('cancel',e=>{if(syncing)e.preventDefault();});
+$('dialog').addEventListener('click',e=>{if(!syncing&&e.target===$('dialog')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.target.close();}});
 function exportDialog(){
   const p=currentPhoto(),data=activeMedia;if(!p||!data||ui.exporting)return;
   settleCanvasInput();finishPendingEdit();
   const version=ui.previewId??p.cursor,snapshot=editsAt(p,version),label=p.nodes[version].label;
+  const suffix=ui.previewId===null?'-成片':'-步骤'+String(version).padStart(2,'0');
   openDialog(ui.previewId===null?'导出当前成片':'导出历史快照',body=>{
     body.append(element('p',p.name),hint('原尺寸导出 · '+label));
     const format=element('select');format.id='exportFormat';format.add(new Option('PNG · 保留透明度','image/png'));format.add(new Option('JPEG · 白色底','image/jpeg'));
@@ -516,7 +591,7 @@ function exportDialog(){
         caption(c,snapshot.caption,0,0,canvas.width,canvas.height);
         if(mime==='image/jpeg'){c.globalCompositeOperation='destination-over';c.fillStyle='white';c.fillRect(0,0,canvas.width,canvas.height);}
         const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('图片编码失败。')),mime,.94));
-        const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=p.name.replace(/\.[^.]+$/,'')+'-成片.'+(mime==='image/jpeg'?'jpg':'png');
+        const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=p.name.replace(/\.[^.]+$/,'')+suffix+'.'+(mime==='image/jpeg'?'jpg':'png');
         document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
         if(button.isConnected)$('dialog').close();announce(window.houtuDesktopExports?'正在保存成片…':'成片已交给浏览器下载');
       }catch(error){announce(error.message);}finally{ui.exporting=false;button.disabled=false;button.textContent='导出图片';updateChrome();}
@@ -559,7 +634,9 @@ function showSection(section,group,focusId){
     if(isFrequency!==['low-smooth','high-soften'].includes(ui.brush))ui.brush=isFrequency?'low-smooth':'gray-dodge';
     ui.editing='brush';
   }else ui.editing='pan';
-  $('app').classList.remove('focus-view');renderPanel();updateChrome();paintCanvas();
+  $('app').classList.remove('focus-view');
+  if(compactView.matches)$('desk').classList.remove('mobile-film');
+  renderPanel();updateChrome();paintCanvas();
   $('parameterScroll').scrollTop=group?0:(scrollPositions.get(section)||0);
   if(group){
     const groupNode=$('group-'+group);if(groupNode)groupNode.scrollIntoView({block:'nearest'});
@@ -580,7 +657,13 @@ function updateChrome(){
   $('original').setAttribute('aria-pressed',String(ui.original||ui.holdOriginal));
   $('compare').setAttribute('aria-pressed',String(ui.compare));
   $('pan').setAttribute('aria-pressed',String(ui.editing==='pan'));
-  $('toggleFilm').setAttribute('aria-expanded',String(matchMedia('(max-width:700px)').matches?$('desk').classList.contains('mobile-film'):!$('desk').classList.contains('film-closed')));
+  const stripOpen=filmOpen();
+  $('toggleFilm').setAttribute('aria-expanded',String(stripOpen));
+  $('film').inert=!stripOpen;
+  const step=ui.previewId===null?null:p?.nodes[ui.previewId];
+  $('historyBar').hidden=!step;
+  $('historyLabel').textContent=step?.label||'';
+  updateSyncControl();
   $('zoomLabel').value=(p?.viewport.zoom||1).toFixed(1)+'×';
   document.querySelector('[data-section=steps]').title=p?'编辑历史与工作流 · '+(chain(p,p.cursor).length-1)+' 项调整':'编辑历史与工作流';
   const tile=document.querySelector('.tile.current small');if(tile&&p&&!ui.batch)tile.textContent=p.cursor?'已调整':'原始照片';
@@ -767,8 +850,14 @@ function renderLayers(){
     for(const [name,detail]of lines){const row=element('div',undefined,'step-row');row.append(element('span',name),element('small',detail,'push muted'));box.append(row);}
   });
 }
-function inspectHistory(index){finishPendingEdit();ui.previewId=index;ui.original=false;ui.holdOriginal=false;ui.editing='pan';refreshEdits();}
+function inspectHistory(index){
+ const photo=currentPhoto();if(!photo)return;
+ finishPendingEdit();
+ if(index===photo.cursor){if(ui.previewId!==null)exitHistory();return;}
+ ui.previewId=index;ui.original=false;ui.holdOriginal=false;ui.editing='pan';refreshEdits();
+}
 function exitHistory(){ui.previewId=null;refreshEdits();}
+$('returnCurrent').onclick=()=>{exitHistory();surface.focus({preventScroll:true});};
 function branchFromPreview(){
   const p=currentPhoto();if(ui.previewId===null)return;
   p.cursor=ui.previewId;ui.previewId=null;safeDraft(p);refreshEdits();announce('已回到所选步骤，其他版本仍在记录中');
@@ -780,7 +869,8 @@ function renderSteps(){
     const ancestors=new Set(chain(p,p.cursor));
     for(let i=p.nodes.length-1;i>=0;i--){
       const entry=p.nodes[i],row=action('',()=>inspectHistory(i),'step-row'+(i===p.cursor?' current':'')+(ui.previewId===i?' previewed':''));
-      row.dataset.entry=i;const label=element('span',String(i).padStart(2,'0')+' · '+entry.label);
+      row.dataset.entry=i;if(i===p.cursor)row.setAttribute('aria-current','step');
+      const label=element('span',String(i).padStart(2,'0')+' · '+entry.label);
       row.append(element('span','','step-dot'),label);if(i===p.cursor||!ancestors.has(i))row.append(element('time',i===p.cursor?'当前':'分支'));box.append(row);
     }
   });
@@ -808,7 +898,7 @@ function renderPanel(){
   }
   if(ui.previewId!==null){
     const note=element('div',undefined,'step-summary');note.append(element('h3','正在查看历史快照'),hint(currentPhoto().nodes[ui.previewId].label));
-    buttons(note,[['returnCurrent','返回当前成片',exitHistory],['branchHere','从此处继续',branchFromPreview]]);holder.append(note);
+    buttons(note,[['branchHere','从此处继续',branchFromPreview]]);holder.append(note);
     if(ui.section!=='steps')return;
   }
   ({color:renderColor,portrait:renderPortrait,layers:renderLayers,steps:renderSteps}[ui.section])();
@@ -904,9 +994,20 @@ document.addEventListener('click',event=>{
   event.preventDefault();openAdvanced(url.href);
  }
 },true);
+$('filmPhotos').addEventListener('keydown',event=>{
+ const button=event.target.closest('.tile');
+ if(!button||!['ArrowLeft','ArrowRight'].includes(event.key))return;
+ const entries=[...$('filmPhotos').querySelectorAll('.tile:not(:disabled)')],offset=event.key==='ArrowRight'?1:-1;
+ const next=entries[entries.indexOf(button)+offset];if(!next)return;
+ event.preventDefault();
+ const id=next.dataset.filmKey;
+ if(!ui.batch)void selectPhoto(id);
+ const current=[...$('filmPhotos').querySelectorAll('.tile')].find(tile=>tile.dataset.filmKey===id);
+ current?.focus({preventScroll:true});revealFilmTile(current?.closest('.film-tile')||current);
+});
 document.addEventListener('keydown',e=>{
   const typing=e.target.matches('textarea,input:not([type=range]):not([type=button])')||e.target.isContentEditable;
-  if(e.isComposing||$('dialog').open||tools.isOpen())return;
+  if(e.defaultPrevented||e.isComposing||$('dialog').open||tools.isOpen())return;
   const mod=e.ctrlKey||e.metaKey,key=e.key.toLowerCase();
   if(mod&&key==='k'){e.preventDefault();toolSearch();return;}
   if(typing)return;
