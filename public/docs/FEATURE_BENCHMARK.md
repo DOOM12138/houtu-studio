@@ -64,3 +64,10 @@ node scripts/project-node.mjs scripts/feature-benchmark-gate.mjs check data/priv
 
 - **跨模块图片交接通过 98 分验收**。横幅方向 6 的 JPEG 显示尺寸从旧回执的 1200 × 1800 修正为 1800 × 1200。竖幅方向 7 的 JPEG 从 1800 × 1200 修正为 1200 × 1800。新建及历史交接回执均使用正向显示尺寸。目标编辑器的图片字节、独立 EXIF 坐标映射与来源步骤一致。两张实拍和一张无方向标记反例均为 100 分。对照所示旧预览为按旧宽高模拟。[EXIF 样片与许可](https://github.com/recurser/exif-orientation-examples) · [无旋转对照](https://science.nasa.gov/photojournal/east-limb-view-of-earths-moon-as-seen-by-the-clementine-spacecraft/)
 - **批量 ZIP 交付通过 98 分验收**。针对长中文名、重复选择、旧扩展名与实际格式不同、Windows 保留名进行实包解压检查。超长名保留正确后缀，JPEG 和 WebP 条目按实际 MIME 命名。重复选择的对照由 3 张改为 2 张，两个预期成片均保持原 SHA-256。正常 PNG 反例保留名称和字节。两组正例和反例均为 100 分。该轮与第五轮共用导出类目，分别验证合包和画质。[Windows 文件命名规则](https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file)
+
+## 第八轮实图
+
+- **本机超分保色与透明度**。v2 不再让全透明像素的隐藏 RGB 进入模型；在保色模式下对每个像素的三个通道应用同一个有界明度偏移。卡西尼和叶片实测中，隐藏色影响的可见像素分别从 210,371 和 107,341 降到 0。卡西尼单通道截断导致的通道差从 2,601 降到 0，透明度逐像素一致。保留 0% 细节的不透明图反例。土星可见区域没有增强，仅作诊断。v1 配方继续执行原算法，两个版本的图块缓存各自校验。[卡西尼](https://commons.wikimedia.org/wiki/File:Cassini_Transparent.png) · [叶片](https://commons.wikimedia.org/wiki/File:Sonchus_oleraceus_leaf.png) · [不透明反例](https://developers.google.com/speed/webp/gallery1)
+- **创作合成的透明主体蒙版**。蒙版先以黑色为底将透明度折算成灰度覆盖，再对齐画幅。换背景、特效保护和自动摆放共用读取规则。卡西尼、土星两张实图的换背景误差分别从 268,887、385,700 像素降到 0，特效保护误差分别从 1,545、2,044 降到 0。不透明灰度蒙版反例保持原样。[土星透明素材](https://commons.wikimedia.org/wiki/File:Saturn_transparent.png)
+
+两项均通过各自的 98 分门槛。超分重建的纹理观感继续按实拍高清参考另行验收。

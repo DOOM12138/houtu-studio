@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';import {fileURLToPath} from 'node:url';import sharp from 'sharp';import {execFile} from 'node:child_process';
-import {superresOptions,superresDimensions,SR_MODELS} from '../public/superres-options.js';import {superresProcess,superresModels} from '../backend/super-resolution.mjs';
+import {superresOptions,superresDimensions,SR_MODELS,SR_VERSION} from '../public/superres-options.js';import {superresProcess,superresModels} from '../backend/super-resolution.mjs';
 async function temporary(t){const dir=await fs.mkdtemp(path.join(os.tmpdir(),'superres-test-'));t.after(async()=>{assert.ok(path.resolve(dir).startsWith(path.resolve(os.tmpdir())+path.sep));await fs.rm(dir,{recursive:true,force:true,maxRetries:10,retryDelay:100});});return dir;}
 test('4K dimensions retain aspect, UHD is explicit, small sources are marked, large sources never shrink',()=>{assert.deepEqual(superresDimensions(1500,2000),{width:3072,height:4096,factor:2.048,skipped:false,beyondNative:false});assert.equal(superresDimensions(1200,1600,{longEdge:3840}).height,3840);assert.equal(superresDimensions(100,100).beyondNative,true);assert.equal(superresDimensions(6000,4000).width,6000);assert.equal(superresDimensions(6000,4000).skipped,true);assert.throws(()=>superresDimensions(1000,1000,{longEdge:8192}),/4000万/);assert.throws(()=>superresOptions({model:'arbitrary-path'}));assert.throws(()=>superresOptions({longEdge:4001}));});
 test('converted models match an independent NumPy reference for official checkpoint operations',async()=>{const stdout=await new Promise((resolve,reject)=>execFile(process.execPath,[fileURLToPath(new URL('./helpers/sr-parity-runner.mjs',import.meta.url))],{windowsHide:true,timeout:20000},(error,stdout,stderr)=>error?reject(Error(stderr||error.message)):resolve(stdout)));assert.equal(JSON.parse(stdout).verified,SR_MODELS.length);});
@@ -10,3 +10,39 @@ test('pause stops the owned native process and a retry resumes completed tiles',
 test('already-4K and zero-strength paths are explicit; transparent pixels retain the resized alpha',async t=>{const dir=await temporary(t),large=await sharp({create:{width:4096,height:32,channels:4,background:'#88aaccff'}}).png().toBuffer(),skipped=await superresProcess(large,{}, {directory:path.join(dir,'large')});assert.equal(skipped.report.skipped,true);assert.equal(skipped.report.engineUsed,null);assert.equal(skipped.report.output.width,4096);const source=await sharp({create:{width:32,height:40,channels:4,background:'#12345600'}}).composite([{input:await sharp({create:{width:16,height:20,channels:4,background:'#55aa88ff'}}).png().toBuffer(),left:8,top:10}]).png().toBuffer(),scaled=await superresProcess(source,{model:'animevideov3',longEdge:2048},{directory:path.join(dir,'alpha')}),actual=await sharp(scaled.bytes).ensureAlpha().raw().toBuffer(),baseline=await sharp(source).resize(1638,2048,{fit:'fill',kernel:'lanczos3'}).ensureAlpha().raw().toBuffer();for(let i=3;i<actual.length;i+=4)assert.equal(actual[i],baseline[i]);assert.equal(actual[3],0);});
 test('saved engine identity survives normalization; incompatible replay fails instead of silently switching',async t=>{const dir=await temporary(t),legacy={model:'animevideov3',modelSha256:'a'.repeat(64),engineVersion:'legacy-sr-v0'},normalized=superresOptions(legacy);assert.equal(normalized.modelSha256,legacy.modelSha256);assert.equal(normalized.engineVersion,'legacy-sr-v0');const source=await sharp({create:{width:8,height:8,channels:3,background:'gray'}}).png().toBuffer();await assert.rejects(superresProcess(source,legacy,{directory:dir}),/其他模型或引擎/);assert.deepEqual(await fs.readdir(dir),[]);});
 test('native timeout is distinct from user pause and temporary input copies are removed',async t=>{const dir=await temporary(t),source=await sharp({create:{width:80,height:100,channels:3,background:'gray'}}).png().toBuffer();await assert.rejects(superresProcess(source,{model:'animevideov3',longEdge:2048},{directory:dir,timeoutMs:1}),e=>e.code==='SR_TIMEOUT'&&e.message.includes('超时'));assert.deepEqual(await fs.readdir(path.join(dir,'runs')),[]);const plain=await superresProcess(source,{model:'animevideov3',longEdge:2048,amount:0},{directory:dir});assert.equal(plain.report.engineUsed,null);assert.match(plain.report.skipReason,/强度为0/);assert.equal(plain.report.tileCount,0);assert.equal(plain.report.output.height,2048);assert.deepEqual(await fs.readdir(path.join(dir,'runs')),[]);});
+
+test('v2 preserves channel differences and ignores hidden RGB; v1 remains replayable',async t=>{
+ const directory=await temporary(t),w=112,h=90;
+ const a=Buffer.alloc(w*h*4),b=Buffer.alloc(a.length);
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+  const i=(y*w+x)*4,alpha=x<14?0:x===14?180:255;
+  const pixel=alpha?[(x%4<2)?255:12, (y%4<2)?240:0, (x+y)%5<2?253:3,alpha]:[0,0,0,0];
+  a.set(pixel,i);
+  b.set(alpha?pixel:[255,5,210,0],i);
+ }
+ const encode=data=>sharp(data,{raw:{width:w,height:h,channels:4}}).png().toBuffer();
+ const [first,second]=await Promise.all([encode(a),encode(b)]);
+ const base={model:'animevideov3',longEdge:2048,amount:100,preserveColor:true};
+ const v1=await superresProcess(second,{...base,engineVersion:'real-esrgan-onnx-v1'},{directory});
+ assert.equal(v1.report.engine,'real-esrgan-onnx-v1');
+ const candidate=await superresProcess(first,base,{directory}), alternate=await superresProcess(second,base,{directory});
+ assert.equal(candidate.report.engine,SR_VERSION);
+ assert.deepEqual(candidate.bytes,alternate.bytes);
+ assert.notEqual(v1.report.cacheSignature,alternate.report.cacheSignature);
+ const {width,height}=candidate.report.output;
+ const read=bytes=>sharp(bytes).ensureAlpha().raw().toBuffer();
+ const [actual,legacy,reference]=await Promise.all([read(candidate.bytes),read(v1.bytes),
+  sharp(a,{raw:{width:w,height:h,channels:4}}).resize(width,height,{fit:'fill',kernel:'lanczos3'}).raw().toBuffer()]);
+ let fixedColours=0,details=0;
+ for(let p=0;p<actual.length;p+=4){
+  const alpha=reference[p+3];
+  if(actual[p+3]!==alpha)assert.fail('alpha changed at '+p/4);
+  if(!alpha)continue;
+  const r=actual[p]-reference[p],g=actual[p+1]-reference[p+1],b=actual[p+2]-reference[p+2];
+  if(r!==g||r!==b)assert.fail('chroma drift at '+p/4);
+  details+=+(r!==0);
+  fixedColours+=+(legacy[p]-reference[p]!==legacy[p+1]-reference[p+1]||legacy[p]-reference[p]!==legacy[p+2]-reference[p+2]);
+ }
+ assert.ok(details>0);
+ assert.ok(fixedColours>0);
+});

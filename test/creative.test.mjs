@@ -22,3 +22,24 @@ async function wait(fn){for(let i=0;i<200;i++){const r=await fn();if(r)return r;
 async function create(input,ctx){const {data:w}=await ctx.post('/api/creative',{config:input}),source=await ctx.upload(w.id,await image()),character=await ctx.upload(w.id,await image('#aabbcc'));await ctx.post(`/api/creative/${w.id}/inputs`,{source,characters:[character]});const revision=(await ctx.state(w.id)).workflow.revision,{data:a}=await ctx.post(`/api/creative/${w.id}/subject`,{action:'begin',revision});await ctx.post(`/api/creative/${w.id}/subject`,{action:'complete',token:a.token});return (await ctx.state(w.id)).workflow;}
 test('automatic local effects save each stage and final image without AI; one step can resume',async t=>{const c=await setup(t),w=await create({mode:'effects',execution:'auto'},c);await c.post(`/api/creative/${w.id}/run`,{revision:w.revision});const result=await wait(async()=>{const r=await c.state(w.id);return !r.running&&r.workflow.steps.at(-1).status==='done'&&r.workflow;});assert.equal(c.bridge.count,0);assert.ok(result.steps.every(n=>n.status==='done'));const final=result.steps.at(-1).output;assert.equal(final.is3dMesh,false);assert.equal((await fetch(`${c.origin}/api/workflows/${w.id}/assets/${final.imageAsset}`)).status,200);await c.post(`/api/creative/${w.id}/run`,{revision:result.revision,from:'deliver'});const replay=await wait(async()=>{const r=await c.state(w.id);return !r.running&&r.workflow.steps.at(-1).attempts.length===2&&r.workflow;});assert.equal(replay.steps.find(n=>n.id==='render').attempts.length,1);});
 test('semi-auto pauses, sends character references, and deliver resume never regenerates AI',async t=>{const c=await setup(t);let w=await create({mode:'figurine',effect:'none',execution:'semi'},c);for(const name of ['materials','layout','render','deliver']){const r=await c.post(`/api/creative/${w.id}/run`,{revision:w.revision});assert.equal(r.status,200);w=await wait(async()=>{const r=await c.state(w.id);return !r.running&&r.workflow.steps.find(n=>n.id===name).status==='done'&&r.workflow;});}assert.equal(c.bridge.count,1);assert.equal(c.bridge.references.length,1);assert.match(c.bridge.prompt,/人设/);assert.ok(w.steps.find(n=>n.id==='render').output.rawAsset);await c.post(`/api/creative/${w.id}/run`,{revision:w.revision,from:'render'});w=await wait(async()=>{const r=await c.state(w.id);return !r.running&&r.workflow.steps.find(n=>n.id==='render').attempts.length===2&&r.workflow;});assert.equal(c.bridge.count,1);assert.equal(w.steps.find(n=>n.id==='render').status,'done');const revision=w.revision;const concurrent=await Promise.all([c.post(`/api/creative/${w.id}/run`,{revision}),c.post(`/api/creative/${w.id}/run`,{revision})]);assert.equal(concurrent.filter(r=>r.status===200).length,1);});
+
+test('creative masks multiply grayscale by alpha before both background and protected effects',async()=>{
+ const width=30,height=20,grid=Buffer.alloc(width*height*4),opaque=Buffer.alloc(width*height);
+ for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+  const i=y*width+x,a=x<10?0:x<20?127:255;
+  grid.set([255,255,255,a],i*4);opaque[i]=a;
+ }
+ const mask=await sharp(grid,{raw:{width,height,channels:4}}).png().toBuffer();
+ const reference=await sharp(opaque,{raw:{width,height,channels:1}}).png().toBuffer();
+ const source=await image('#e02833',width*2,height*2),background=await image('#184ec5',width*2,height*2);
+ for(const options of [creativeConfig({mode:'background',effect:'none'}),creativeConfig({mode:'effects',effect:'snow',protectSubject:true,amount:1})]){
+  const got=await composite(source,background,mask,options),expected=await composite(source,background,reference,options);
+  assert.deepEqual(await sharp(got).raw().toBuffer(),await sharp(expected).raw().toBuffer());
+ }
+ const result=await sharp(await composite(source,background,mask,creativeConfig({mode:'background',effect:'none'}))).ensureAlpha().raw().toBuffer();
+ const at=x=>Array.from(result.subarray(x*4,x*4+4));
+ assert.deepEqual(at(2),[24,78,197,255]);
+ assert.deepEqual(at(57),[224,40,51,255]);
+ const mid=at(30);
+ assert.ok(mid[0]>24&&mid[0]<224);
+});

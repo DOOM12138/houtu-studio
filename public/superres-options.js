@@ -1,4 +1,6 @@
-export const SR_VERSION='real-esrgan-onnx-v1';
+export const SR_VERSION='real-esrgan-onnx-v2';
+export const SR_LEGACY_VERSION='real-esrgan-onnx-v1';
+export const supportedSuperresVersion=version=>version===SR_VERSION||version===SR_LEGACY_VERSION;
 export const SR_MODELS=[
  {id:'general-x4v3-dn50',name:'真人／COS · 通用细节',description:'Real-ESRGAN General x4v3，强／弱降噪权重各50%。',file:'general-x4v3-dn50.onnx',sha256:'4843177d075bf9be09c19da44c9d5da9c3327e13512cd503e726a36b51e71596',padding:40,nativeScale:4},
  {id:'animevideov3',name:'二次元 · 线条与色块',description:'Real-ESRGAN AnimeVideo v3，适合二次元素材。',file:'animevideov3.onnx',sha256:'59a9f65af7de62b3f8851590d4fe56cf72f23cda816156049a32aa823c194568',padding:24,nativeScale:4},
