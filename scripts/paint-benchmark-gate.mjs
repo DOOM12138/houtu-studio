@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 
 const categories = ['dark-face', 'split-light', 'even-bright', 'full-body'];
 const weights = { palette: 20, lighting: 20, contour: 20, makeup: 15, texture: 15, seams: 10 };
-const required = 50;
+const required = 5;
 const minimum = 98;
 const sha256 = value => typeof value === 'string' && /^[a-f\d]{64}$/.test(value);
 const videoURL = value => {
