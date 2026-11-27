@@ -92,7 +92,7 @@ try {
   const html = await (await fetch(origin)).text();
   assert.ok(html.includes('prompt-workshop') && html.includes('build-package'));
   assert.ok(html.includes('id="paint-level"') && html.includes('自然摄影精修（非厚涂）'));
-  const styleCheck=await run(runtime,['--input-type=module','-e',"import {paintingPrompt} from './lib/painting.mjs'; const high=paintingPrompt({style:'cos',paintLevel:10}); const natural=paintingPrompt({style:'photo',paintLevel:10}); if(!high.includes('厚涂程度6/10')||natural.includes('厚涂程度10/10'))throw Error('Portable style control failed');console.log('style-controls-ok');"],{cwd:installed});
+  const styleCheck=await run(runtime,['--input-type=module','-e',"import {paintingPrompt} from './lib/painting.mjs'; const high=paintingPrompt({style:'cos',paintLevel:10}); const natural=paintingPrompt({style:'photo',paintLevel:10}); if(!high.includes('厚涂程度8/10')||natural.includes('厚涂程度10/10'))throw Error('Portable style control failed');console.log('style-controls-ok');"],{cwd:installed});
   assert.match(styleCheck,/style-controls-ok/);
   const codeModeHelper=path.join(installed,'runtime/codex-code-mode-host.exe'),desktopBuild=JSON.parse(await readFile(path.join(installed,'runtime/desktop-build.json'),'utf8'));assert.ok(desktopBuild.files['codex-code-mode-host.exe']);assert.ok((await stat(codeModeHelper)).size>1000000);assert.match(await run(codeModeHelper,['--help'],{cwd:installed}),/gRPC endpoint/);
 

@@ -81,3 +81,12 @@ test('4/10 protects photographic texture throughout planning, rendering and revi
  assert.equal(failed.repairable,false);
  assert.equal(validateAgentCheck({...oldReply,checks:[...oldReply.checks,{key:'texture',pass:true,note:'可见发丝与眼型保留'}]},config).pass,true);
 });
+
+test('new 8/10 has a distinct reference-calibrated scope and requires texture review',()=>{
+ const c=agentOptions({tasks:['paint'],style:'anime',paintLevel:8});
+ assert.equal(c.paintLevel,8);
+ assert.match(compileAgentPrompt(c,{id:'person',prompt:'顺原片光线整理面部。'},[]),/8\/10 强厚涂.*颊下柔影/);
+ assert.match(checkPrompt(c),/8\/10的scope须有明显而连续的颊鼻塑形/);
+ assert.match(checkPrompt(c),/texture为必检项/);
+ assert.match(paintingPrompt({operation:'anime-paint',style:'anime',paintLevel:8}),/厚涂程度8\/10/);
+});

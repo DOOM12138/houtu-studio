@@ -59,7 +59,7 @@ function parameters(parent,id,p,onDirty){
  }
  const group=details('本步参数',parent);
  if(id==='smooth-belly'||['anime','cos'].includes(tool.style)||tool.extended)
-  numberField(group,['anime','cos'].includes(tool.style)?'厚涂程度 1–6':'调整程度 1–10',1,['anime','cos'].includes(tool.style)?PAINT_LEVEL_MAX:10,p.level??2,v=>set('level',v));
+  numberField(group,['anime','cos'].includes(tool.style)?`厚涂程度 1–${PAINT_LEVEL_MAX}`:'调整程度 1–10',1,['anime','cos'].includes(tool.style)?PAINT_LEVEL_MAX:10,p.level??2,v=>set('level',v));
  if(tool.output==='outpaint'){
   numberField(group,'扩展比例 %',5,50,p.padding??20,v=>set('padding',v));
   select('扩展方向',[['all','四周'],['left','左侧'],['right','右侧'],['top','上方'],['bottom','下方']],p.direction||'all',v=>set('direction',v),group);
@@ -150,7 +150,7 @@ export function createAiDesk(host){
  function inputProblem(){
   if(mode==='auto'&&!chosen()){
    const p=draft.auto;
-   if(p.paint&&(!Number.isInteger(p.paintLevel)||p.paintLevel<1||p.paintLevel>PAINT_LEVEL_MAX))return '厚涂程度需要 1–6 的整数。';
+   if(p.paint&&(!Number.isInteger(p.paintLevel)||p.paintLevel<1||p.paintLevel>PAINT_LEVEL_MAX))return `厚涂程度需要 1–${PAINT_LEVEL_MAX} 的整数。`;
    if(p.referenceProvider!=='none'){
     try{sceneGuideOptions({character:p.character?.trim(),work:p.work?.trim()});}
     catch(error){return error.message;}
@@ -247,7 +247,7 @@ export function createAiDesk(host){
   check('加入厚涂',p.paint,v=>{p.paint=v;persist();render();},dataArea).id='desk-auto-paint';
   if(p.paint){
    select('厚涂画风',[['cos','COS 质感厚涂'],['anime','二次元质感厚涂']],p.paintStyle,value=>{p.paintStyle=value;persist();},dataArea).id='desk-paint-style';
-   numberField(dataArea,'厚涂程度 1–6',1,PAINT_LEVEL_MAX,p.paintLevel,v=>{p.paintLevel=v;persist();sync();});
+   numberField(dataArea,`厚涂程度 1–${PAINT_LEVEL_MAX}`,1,PAINT_LEVEL_MAX,p.paintLevel,v=>{p.paintLevel=v;persist();sync();});
   }
   check('加入小特效',p.effects,v=>{p.effects=v;persist();render();},dataArea).id='desk-auto-effects';
   if(p.effects)select('特效',[['sparkles','微光粒子'],['rim','暖色轮廓光'],['mist','薄雾'],['snow','飘雪'],['rain','雨丝'],['bokeh','光斑'],['petals','花瓣']],p.effect,v=>{p.effect=v;persist();},dataArea);

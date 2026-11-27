@@ -6,7 +6,9 @@ export const strictSocialReferences = config => socialReferenceProvider(config.r
 export const AGENT_VERSION='retouch-agent-v1';
 export const AGENT_LONG_SHOT_REVISION='agent-prompts-2026-11-27-r3';
 export const AGENT_TEXTURE_REVISION='agent-prompts-2026-11-27-r4';
-export const AGENT_PROMPT_REVISION='agent-prompts-2026-11-27-r5';
+export const AGENT_SCULPT_REVISION='agent-prompts-2026-11-27-r5';
+export const AGENT_PROMPT_REVISION='agent-prompts-2026-11-27-r6';
+export const agentPaintLevel=config=>Math.min(config.paintLevel,config.promptRevision===AGENT_PROMPT_REVISION?PAINT_LEVEL_MAX:6);
 export const AGENT_TASKS=[['portrait','人物细化'],['outfit','衣料整理'],['belly','平滑瘦腹'],['clean','场照净场'],['paint','厚涂'],['color','调色'],['effects','小特效'],['small','小合成'],['large','大合成'],['figure','3D质感／手办'],['upscale','4K超分']];
 export const PERSON_TASKS=['portrait','outfit','paint'];
 const allowed=new Set(AGENT_TASKS.map(([id])=>id));
@@ -21,8 +23,8 @@ export function agentOptions(input={}){
  const quality=input.quality!==false,repair=quality&&input.autoRepair===true;
  const hardware={};if(input.hardwarePolicy!==undefined){if(!['auto','cloud','hybrid'].includes(input.hardwarePolicy)||!['auto','qwen3-vl:4b','qwen3-vl:8b'].includes(input.localAgentModel||'auto'))throw Error('硬件路由或本地视觉Agent选择无效。');hardware.hardwarePolicy=input.hardwarePolicy;hardware.localAgentModel=input.localAgentModel||'auto';}
  const promptRevision=input.promptRevision??(input.version===AGENT_VERSION?null:AGENT_PROMPT_REVISION);
- if(promptRevision!==null&&![AGENT_PROMPT_REVISION,AGENT_TEXTURE_REVISION,AGENT_LONG_SHOT_REVISION,'agent-prompts-2026-11-27-r2'].includes(promptRevision))throw Error('Agent提示词版本无效。');
- return {version:AGENT_VERSION,...(promptRevision?{promptRevision}:{}),mode,provider,...hardware,...(input.sceneGuide==null?{}:{sceneGuide:sceneGuideOptions(input.sceneGuide)}),tasks,style,paintLevel:Math.min(paintLevel,PAINT_LEVEL_MAX),bellyLevel,tone,effect,goal:String(input.goal||'').trim().slice(0,2000),planningModel:normalizeModel(input.planningModel),generationModel:normalizeModel(input.generationModel),autoSearch:input.autoSearch!==false,referenceProvider:['commons','xiaohongshu','douyin'].includes(input.referenceProvider)?input.referenceProvider:'commons',allowPublicFallback:input.allowPublicFallback!==false,materialFallback:input.materialFallback==='pause'?'pause':'original',referenceCount:Math.max(1,Math.min(5,Math.round(Number(input.referenceCount)||5))),quality,autoRepair:repair,maxImageSteps};
+ if(promptRevision!==null&&![AGENT_PROMPT_REVISION,AGENT_SCULPT_REVISION,AGENT_TEXTURE_REVISION,AGENT_LONG_SHOT_REVISION,'agent-prompts-2026-11-27-r2'].includes(promptRevision))throw Error('Agent提示词版本无效。');
+ return {version:AGENT_VERSION,...(promptRevision?{promptRevision}:{}),mode,provider,...hardware,...(input.sceneGuide==null?{}:{sceneGuide:sceneGuideOptions(input.sceneGuide)}),tasks,style,paintLevel:agentPaintLevel({paintLevel,promptRevision}),bellyLevel,tone,effect,goal:String(input.goal||'').trim().slice(0,2000),planningModel:normalizeModel(input.planningModel),generationModel:normalizeModel(input.generationModel),autoSearch:input.autoSearch!==false,referenceProvider:['commons','xiaohongshu','douyin'].includes(input.referenceProvider)?input.referenceProvider:'commons',allowPublicFallback:input.allowPublicFallback!==false,materialFallback:input.materialFallback==='pause'?'pause':'original',referenceCount:Math.max(1,Math.min(5,Math.round(Number(input.referenceCount)||5))),quality,autoRepair:repair,maxImageSteps};
 }
 export function agentActions(config){
  const tasks=new Set(config.tasks),ids=[];if(tasks.has('clean'))ids.push('clean');if(PERSON_TASKS.some(id=>tasks.has(id)))ids.push('person');for(const id of ['belly','small','large','figure','color','effects','upscale'])if(tasks.has(id))ids.push(id);return ids;

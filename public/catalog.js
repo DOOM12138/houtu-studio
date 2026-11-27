@@ -56,9 +56,11 @@ export const PAINT_LEVELS = [
  {level:4,name:'柔和厚涂',description:'深浅层次清楚，边缘细腻。',instruction:'厚涂程度4/10：增强中间调与局部阴影的层次，暗面保留反光，边缘按原结构收束。'},
  {level:5,name:'细腻厚涂',description:'塑形更明确，材质清晰。',instruction:'厚涂程度5/10：统一选区受光，清楚区分肤质、发束与衣料，靠明暗转折形成厚涂体积。'},
  {level:6,name:'深层厚涂',description:'体积更深，细节和边缘干净。',instruction:'厚涂程度6/10：用更深的中间调、核心阴影与环境反光塑造面部、发束和衣料体积。强化眼妆和原有材质的层次，保持关键五官、纹样、接缝和现场光向。'},
+ {level:7,name:'鲜明塑形',description:'面部体积与主发束层次鲜明。',instruction:'厚涂程度7/10：沿原光向强化眼窝、鼻颊和主发束的转折，保留原眼型、眼妆设计与细纹。'},
+ {level:8,name:'强质感厚涂',description:'明显颊鼻体积、眼神和分束高光。',instruction:'厚涂程度8/10：层次清楚的颊鼻塑形、清晰眼神与收束的发束反光，原有材质和光影仍可辨。'},
 ];
 export function normalizePaintLevel(value, strength = 'light') {
-  const level = value === undefined ? ({light:2,balanced:5,rich:PAINT_LEVEL_MAX}[strength] ?? 2) : value;
+  const level = value === undefined ? ({light:2,balanced:5,rich:6}[strength] ?? 2) : value;
   if (!Number.isInteger(level) || level < 1 || level > 10) throw new Error('厚涂程度需为1–10的整数。');
   return Math.min(level,PAINT_LEVEL_MAX);
 }
