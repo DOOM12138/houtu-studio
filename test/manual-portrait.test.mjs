@@ -83,3 +83,63 @@ test('frame-safe warps stay inside the frame and round-trip while old stroke rec
  const line=new Uint8ClampedArray([0,20,80,255,100,80,30,255,250,140,20,255]);
  assert.deepEqual(renderManualPortrait(line,1,3,[{...horizontal,edgeSafe:true}]).pixels,line);
 });
+
+test('local soften, dodge and burn cover sparse paths and preserve older stroke records',()=>{
+ const width=180,height=112,source=new Uint8ClampedArray(width*height*4);
+ for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+  source.set([92+x%3*23,91+y%3*16,124+(x+y)%3*14,255],(y*width+x)*4);
+ }
+ const points=[[.125,.5],[.875,.5]],dense=Array.from({length:97},(_,i)=>[.125+i/128,.5]);
+ const protect={tool:'protect',r:.05,strength:1,points:[[.625,.5]]};
+ const index=(56*width+90)*4;
+ for(const tool of ['smooth','dodge','burn']){
+  const op={tool,r:.11,strength:.9,points};
+  const original=renderManualPortrait(source,width,height,[protect,op]).pixels;
+  assert.deepEqual(original.subarray(index,index+4),source.subarray(index,index+4));
+  const record=manualOperations(JSON.parse(JSON.stringify([{...op,continuous:true}])))[0];
+  assert.equal(record.continuous,true);
+  assert.deepEqual(manualOperations([op]),[op]);
+  const {pixels,protection}=renderManualPortrait(source,width,height,[protect,record]);
+  assert.notDeepEqual(pixels.subarray(index,index+4),source.subarray(index,index+4));
+  assert.deepEqual(pixels,renderManualPortrait(source,width,height,[protect,{...record,points:dense}]).pixels);
+  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+   const at=y*width+x,i=at*4;
+   if(protection[at]===255||Math.abs(y-height/2)>=.11*height){
+    assert.deepEqual(pixels.subarray(i,i+4),source.subarray(i,i+4));
+   }
+  }
+  const dab={...op,points:[[.5,.5]]};
+  assert.deepEqual(renderManualPortrait(source,width,height,[dab]).pixels,renderManualPortrait(source,width,height,[{...dab,continuous:true}]).pixels);
+ }
+});
+
+test('local soften excludes hidden pixels and preserves original alpha and hidden RGB',()=>{
+ const width=32,height=28,source=new Uint8ClampedArray(width*height*4);
+ for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+  source.set(x<16?[120+x%2*5,95+y%3*12,100,255]:[124,90,95,x===16?90:0],(y*width+x)*4);
+ }
+ const alternate=source.slice();
+ for(let i=0;i<alternate.length;i+=4){
+  if(!alternate[i+3])alternate.set([153,109,128,0],i);
+ }
+ const brush={tool:'smooth',r:.25,strength:1,points:[[.52,.5]]};
+ const old=renderManualPortrait(source,width,height,[brush]).pixels;
+ const retinted=renderManualPortrait(alternate,width,height,[brush]).pixels;
+ const i=(14*width+16)*4;
+ assert.notDeepEqual(old.subarray(i,i+4),retinted.subarray(i,i+4));
+ for(const tool of ['smooth','dodge','burn']){
+  const op={...brush,tool,continuous:true};
+  const one=renderManualPortrait(source,width,height,[op]).pixels;
+  const two=renderManualPortrait(alternate,width,height,[op]).pixels;
+  for(let i=0;i<one.length;i+=4){
+   assert.equal(one[i+3],source[i+3]);
+   assert.equal(two[i+3],alternate[i+3]);
+   if(source[i+3]){
+    assert.deepEqual(one.subarray(i,i+4),two.subarray(i,i+4));
+   }else{
+    assert.deepEqual(one.subarray(i,i+4),source.subarray(i,i+4));
+    assert.deepEqual(two.subarray(i,i+4),alternate.subarray(i,i+4));
+   }
+  }
+ }
+});

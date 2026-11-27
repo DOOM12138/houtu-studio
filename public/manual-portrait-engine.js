@@ -5,7 +5,9 @@ import {NEUTRAL_TOOLS,paintNeutral,compositeNeutral,strokeDistance} from './manu
 export const MANUAL_ENGINE='manual-portrait-v2';
 export const MANUAL_TOOLS=new Set(['push','shrink','expand','smooth','clone','dodge','burn','restore','protect','unprotect','clear-protection','reset',...FREQUENCY_TOOLS,...NEUTRAL_TOOLS]);
 export const WARP_TOOLS=new Set(['push','shrink','expand']);
-const CONTINUOUS_TOOLS=new Set(['push','protect','unprotect','restore','clone',...NEUTRAL_TOOLS,...FREQUENCY_TOOLS]);
+const LOCAL_BRUSH_TOOLS=new Set(['smooth','dodge','burn']);
+const PATH_TOOLS=new Set(['restore','clone',...LOCAL_BRUSH_TOOLS]);
+export const CONTINUOUS_TOOLS=new Set(['push','protect','unprotect',...PATH_TOOLS,...NEUTRAL_TOOLS,...FREQUENCY_TOOLS]);
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 export function manualOperations(value){
  if(!Array.isArray(value)||value.length>300)throw Error('手动操作最多保存300笔，请保存当前版本后继续。');let total=0;
@@ -60,14 +62,29 @@ function cloneSampleWeight(x,y,width,height,radius) {
  const t=clamp(margin/Math.max(1,Math.min(8,radius*.2)),0,1);
  return t*t*(3-2*t);
 }
+const SMOOTH_NEIGHBORS=[[0,0],[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]];
+function softenPixel(source,width,height,x,y,step,weightByAlpha){
+ const center=(y*width+x)*4,total=[0,0,0];
+ let totalWeight=0;
+ for(const [dx,dy] of SMOOTH_NEIGHBORS){
+  const px=clamp(x+dx*step,0,width-1),py=clamp(y+dy*step,0,height-1),i=(py*width+px)*4;
+  let contrast=0;
+  for(let c=0;c<3;c++)contrast+=Math.abs(source[i+c]-source[center+c]);
+  const weight=Math.exp(-contrast/38)*(weightByAlpha?source[i+3]/255:1);
+  for(let c=0;c<3;c++)total[c]+=source[i+c]*weight;
+  totalWeight+=weight;
+ }
+ return [total[0]/totalWeight,total[1]/totalWeight,total[2]/totalWeight,source[center+3]];
+}
 export function renderManualPortrait(input,width,height,operations,settings={}){
  if(!(input instanceof Uint8ClampedArray)||!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1||width*height>DESKTOP_PHOTO_PIXELS||input.length!==width*height*4)throw Error('人物图片尺寸无效，最多6400万像素。');
  if(!settings||typeof settings!=='object'||!['composite','low','high','gray'].includes(settings.view||'composite'))throw Error('人物检查视图无效。');
  const all=manualOperations(operations),ops=all.slice(all.findLastIndex(o=>o.tool==='reset')+1),protection=new Uint8Array(width*height),short=Math.min(width,height);let pixels=input.slice(),neutral=null;
  for(const op of ops.filter(o=>['protect','unprotect','clear-protection'].includes(o.tool))){if(op.tool==='clear-protection'){protection.fill(0);continue;}const radius=Math.max(2,op.r*short),box=region(width,height,op.points,radius),path=op.continuous?strokeDistance(op.points,width,height):null;for(let y=box.top;y<=box.bottom;y++)for(let x=box.left;x<=box.right;x++){let w=0;if(path) w=maskWeight(path(x,y),radius);else for(const p of op.points)w=Math.max(w,maskWeight((x-p[0]*width)**2+(y-p[1]*height)**2,radius));const i=y*width+x;protection[i]=op.tool==='protect'?Math.max(protection[i],Math.round(255*w*op.strength)):Math.max(0,protection[i]-Math.round(255*w*op.strength));}}
- for(const op of ops.filter(o=>!['protect','unprotect','clear-protection'].includes(o.tool))){if(!op.strength)continue;if(NEUTRAL_TOOLS.has(op.tool)){neutral??=new Int16Array(width*height);paintNeutral(neutral,width,height,op,protection);continue;}if(FREQUENCY_TOOLS.has(op.tool)){applyFrequencyStroke(pixels.slice(),pixels,width,height,op,protection);continue;}if(neutral&&op.tool==='restore')paintNeutral(neutral,width,height,{...op,tool:'gray-erase'},protection);const radius=Math.max(2,op.r*short),box=region(width,height,op.points,radius),source=pixels.slice(),strokePath=op.continuous&&(op.tool==='clone'||op.tool==='restore')?strokeDistance(op.points,width,height):null,push=op.continuous&&op.tool==='push'?pushField(op.points,width,height,radius):null;
+ for(const op of ops.filter(o=>!['protect','unprotect','clear-protection'].includes(o.tool))){if(!op.strength)continue;if(NEUTRAL_TOOLS.has(op.tool)){neutral??=new Int16Array(width*height);paintNeutral(neutral,width,height,op,protection);continue;}if(FREQUENCY_TOOLS.has(op.tool)){applyFrequencyStroke(pixels.slice(),pixels,width,height,op,protection);continue;}if(neutral&&op.tool==='restore')paintNeutral(neutral,width,height,{...op,tool:'gray-erase'},protection);const radius=Math.max(2,op.r*short),box=region(width,height,op.points,radius),source=pixels.slice(),strokePath=op.continuous&&PATH_TOOLS.has(op.tool)?strokeDistance(op.points,width,height):null,push=op.continuous&&op.tool==='push'?pushField(op.points,width,height,radius):null;
   const edgeBand=op.edgeSafe?radius*(op.tool==='push'?1.5:.55):0;
-  for(let y=box.top;y<=box.bottom;y++)for(let x=box.left;x<=box.right;x++){const at=y*width+x,index=at*4,available=1-protection[at]/255;if(available<=1e-7)continue;let amount=0,nearest=op.points[0],best=Infinity;
+  const localBrush=op.continuous&&LOCAL_BRUSH_TOOLS.has(op.tool),smoothStep=Math.max(1,Math.round(short*.0025));
+  for(let y=box.top;y<=box.bottom;y++)for(let x=box.left;x<=box.right;x++){const at=y*width+x,index=at*4,available=1-protection[at]/255;if(available<=1e-7||(localBrush&&!source[index+3]))continue;let amount=0,nearest=op.points[0],best=Infinity;
    if(push){
     const [dx,dy]=push(x,y);
     let sx=x-dx*op.strength*available,sy=y-dy*op.strength*available;
@@ -94,7 +111,7 @@ export function renderManualPortrait(input,width,height,operations,settings={}){
     if(strokePath){amount*=cloneSampleWeight(sx,sy,width,height,radius);if(!amount)continue;}
     value=sample(source,width,height,sx,sy);
    }
-   else if(op.tool==='smooth'){const sum=[0,0,0];let count=0;const distance=Math.max(1,Math.round(short*.0025));for(const [dx,dy]of [[0,0],[-distance,0],[distance,0],[0,-distance],[0,distance],[-distance,-distance],[distance,-distance],[-distance,distance],[distance,distance]]){const px=clamp(x+dx,0,width-1),py=clamp(y+dy,0,height-1),i=(py*width+px)*4;const contrast=Math.abs(source[i]-source[index])+Math.abs(source[i+1]-source[index+1])+Math.abs(source[i+2]-source[index+2]),w=Math.exp(-contrast/38);for(let c=0;c<3;c++)sum[c]+=source[i+c]*w;count+=w;}value=[sum[0]/count,sum[1]/count,sum[2]/count,source[index+3]];}
+   else if(op.tool==='smooth')value=softenPixel(source,width,height,x,y,smoothStep,localBrush);
    else{const multiplier=2**((op.tool==='dodge'?1:-1)*.8);value=[0,1,2].map(c=>255*clamp((source[index+c]/255)**2.2*multiplier,0,1)**(1/2.2));value.push(source[index+3]);}
    // Premultiplied blending preserves transparent edges during texture replacement.
    const a=source[index+3]/255,b=value[3]/255,alpha=a*(1-amount)+b*amount;for(let c=0;c<3;c++)pixels[index+c]=alpha?Math.round((source[index+c]*a*(1-amount)+value[c]*b*amount)/alpha):0;pixels[index+3]=Math.round(alpha*255);

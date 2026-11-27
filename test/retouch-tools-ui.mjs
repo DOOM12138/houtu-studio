@@ -70,6 +70,24 @@ try{
  assert.deepEqual(warpedPixels,Buffer.from(replay));
  await page.goto(origin+'/portrait/?workflow='+manualId);
  await page.waitForFunction(()=>!document.querySelector('#manual-save').disabled&&document.querySelector('#manual-stroke-count').textContent.startsWith('5 '));
- assert.deepEqual(errors,[]);console.log(JSON.stringify({result:'PASS',continuousClone:true,frameSafeWarpReplay:true,frequencyBrush:true,neutralGray:true,undoRedo:true,diagnosticsNeverExported:true,fullResolution:true,reopenedStrokes:2,crossWorkspace:true,outpaintCanvasPreview:true,settingsTriggerNoGeneration:true,syntheticOutpaintSubmissions:1,originalPixelsExact:true,firstRunRecipePreview:true,mobileToolMenu:true,mobile320:true,realAIImages:0}));
+
+ await page.locator('[data-group=skin]').click();
+ for(const [index,tool] of ['smooth','dodge','burn'].entries()){
+  await page.locator('[data-tool='+tool+']').click();
+  const overlay=await page.locator('#manual-overlay').boundingBox();
+  await page.mouse.move(overlay.x+overlay.width*.25,overlay.y+overlay.height*.58);
+  await page.mouse.down();
+  await page.mouse.move(overlay.x+overlay.width*.74,overlay.y+overlay.height*.58);
+  await page.mouse.up();
+  await page.waitForFunction(count=>document.querySelector('#manual-stroke-count').textContent.startsWith(count+' '),index+6);
+ }
+ await page.locator('#manual-save').click();
+ await page.waitForFunction(()=>!document.querySelector('#manual-save').disabled&&document.querySelector('#manual-save-status').textContent.startsWith('\u5df2\u4fdd\u5b58 8 '));
+ const toneEdit=(await get('/api/workflows/'+manualId)).steps.find(step=>step.id==='edit').output;
+ assert.deepEqual(toneEdit.operations.slice(-3).map(op=>[op.tool,op.continuous,op.points.length]),[['smooth',true,2],['dodge',true,2],['burn',true,2]]);
+ const tonePixels=await sharp(await asset(manualId,toneEdit.imageAsset)).ensureAlpha().raw().toBuffer();
+ const toneReplay=renderManualPortrait(new Uint8ClampedArray(savedSource),width,height,toneEdit.operations).pixels;
+ assert.deepEqual(tonePixels,Buffer.from(toneReplay));
+ assert.deepEqual(errors,[]);console.log(JSON.stringify({result:'PASS',continuousClone:true,frameSafeWarpReplay:true,continuousToneBrushes:true,frequencyBrush:true,neutralGray:true,undoRedo:true,diagnosticsNeverExported:true,fullResolution:true,reopenedStrokes:2,crossWorkspace:true,outpaintCanvasPreview:true,settingsTriggerNoGeneration:true,syntheticOutpaintSubmissions:1,originalPixelsExact:true,firstRunRecipePreview:true,mobileToolMenu:true,mobile320:true,realAIImages:0}));
 }catch(error){if(page){console.error({url:page.url(),manual:await page.locator('#manual-notice').textContent().catch(()=>null),ai:await page.locator('#feedback').textContent().catch(()=>null),errors});await page.screenshot({path:path.join(out,'failed.png'),fullPage:true}).catch(()=>{});}throw error;}
 finally{await browser?.close();await app?.close();assert.ok(directory.startsWith(path.resolve('tmp')+path.sep));await fs.rm(directory,{recursive:true,force:true});}
