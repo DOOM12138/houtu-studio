@@ -57,12 +57,103 @@ export function analyze(data) {
   for(let i=0;i<data.length;i+=4*stride){if(data[i+3]<16)continue;const rgb=[data[i],data[i+1],data[i+2]];rgb.forEach((v,c)=>{histogram[c][v]++;sum[c]+=v;});const [h,s,l]=rgbToHsl(...rgb.map(v=>v/255)); hues[Math.round(h*8)%8]+=s;saturation+=s;luma+=l;clippedDark+=Math.max(...rgb)<5?1:0;clippedLight+=Math.min(...rgb)>250?1:0;n++;}
   n=Math.max(n,1);const mean=sum.map(v=>v/n/255);return {histogram,hues,mean,saturation:saturation/n,lightness:luma/n,warmth:mean[0]-mean[2],clippedDark:clippedDark/n,clippedLight:clippedLight/n};
 }
+export function referenceColorAnalysis(data, width, height) {
+  const stats = analyze(data);
+  const grid = [];
+  // Average a few locations per cell so the comparison tolerates resampling.
+  for (let y = 0; y < 12; y++) {
+    for (let x = 0; x < 12; x++) {
+      const sums = [0, 0, 0];
+      let n = 0;
+      for (const yy of [.18, .5, .82]) for (const xx of [.18, .5, .82]) {
+        const xxPixel = Math.floor((x + xx) * width / 12);
+        const yyPixel = Math.floor((y + yy) * height / 12);
+        const at = (yyPixel * width + xxPixel) * 4;
+        if (data[at + 3] < 240) continue;
+        for (let c = 0; c < 3; c++) sums[c] += data[at + c];
+        n++;
+      }
+      grid.push(n >= 7 ? sums.map(sum => Math.round(sum / n)) : null);
+    }
+  }
+  return { ...stats, layout: { ratio: width / height, grid } };
+}
+
+const sampleLuma = rgb => (rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722) / 255;
+function sameLayout(source, reference) {
+  const a = source.layout, b = reference.layout;
+  if (!a || !b || a.grid?.length !== 144 || b.grid?.length !== 144
+    || !Number.isFinite(a.ratio) || !Number.isFinite(b.ratio) || Math.abs(a.ratio / b.ratio - 1) > .015) return null;
+
+  const pairs = a.grid.flatMap((value, i) => value && b.grid[i] ? [[value, b.grid[i]]] : []);
+  if (pairs.length < 105) return null;
+  const mean = [0, 0];
+  for (const pair of pairs) for (let c = 0; c < 2; c++) mean[c] += sampleLuma(pair[c]) / pairs.length;
+  let xx = 0, yy = 0, xy = 0;
+  for (const [p, q] of pairs) {
+    const x = sampleLuma(p) - mean[0], y = sampleLuma(q) - mean[1];
+    xx += x * x; yy += y * y; xy += x * y;
+  }
+  return Math.min(xx, yy) / pairs.length >= .0064 && xy / Math.sqrt(xx * yy) >= .96 ? pairs : null;
+}
+
+function distributions(stats) {
+  return stats.histogram.map(row => {
+    const cumulative = [];
+    let total = 0;
+    for (const count of row) cumulative.push(total += count);
+    return {
+      percentile: x => total ? (cumulative[x] - row[x] / 2) / total : .5,
+      sample: p => {
+        let lo = 0, hi = 255;
+        while (lo < hi) {
+          const i = Math.floor((lo + hi) / 2);
+          if (cumulative[i] >= total * p) hi = i;
+          else lo = i + 1;
+        }
+        return lo;
+      },
+    };
+  });
+}
+function matchedCurves(source, reference, pairs, strength) {
+  const input = distributions(source);
+  const goal = distributions(reference);
+  const result = settings();
+  for (let c = 0; c < 3; c++) {
+    const values = result.curves['rgb'[c]];
+    for (let k = 1; k < 4; k++) {
+      const center = Math.round(k * 255 / 4);
+      const transfer = pairs.flatMap(([a, b]) => {
+        const distance = Math.abs(a[c] - center);
+        return distance < 42 ? [b[c] - a[c]] : [];
+      }).sort((a, b) => a - b);
+      const p = input[c].percentile(center);
+      const supported = p >= .07 && p <= .93;
+      const distributionShift = goal[c].sample(p) - center;
+      const localShift = transfer[Math.floor(transfer.length / 2)] ?? 0;
+      const shift = supported ? (transfer.length >= 8 ? .58 * distributionShift + .42 * localShift : distributionShift) : localShift;
+      values[k] = Math.max(values[k-1] + .032, k / 4 + strength * clamp(shift / 255, -.15, .15));
+    }
+  }
+  return result;
+}
+
 export function matchReference(source,reference,amount=.7) {
-  amount=clamp(amount);const s=settings();s.exposure=clamp(Math.log2((reference.lightness+.05)/(source.lightness+.05))*amount,-1.5,1.5);
+  amount=clamp(amount);
+  const sameStats = source.lightness === reference.lightness && source.saturation === reference.saturation
+    && source.histogram && reference.histogram
+    && source.histogram.every((row,c)=>row.every((n,i)=>n===reference.histogram[c]?.[i]));
+  if (!amount || sameStats) return settings();
+  const pairs = sameLayout(source, reference);
+  if (pairs) return matchedCurves(source, reference, pairs, amount);
+
+  const s=settings();s.exposure=clamp(Math.log2((reference.lightness+.05)/(source.lightness+.05))*amount,-1.5,1.5);
   s.temperature=clamp((reference.warmth-source.warmth)*160*amount,-45,45);
   s.tint=clamp(((reference.mean[0]+reference.mean[2])/2-reference.mean[1]-(source.mean[0]+source.mean[2])/2+source.mean[1])*150*amount,-35,35);
   s.saturation=clamp((reference.saturation-source.saturation)*110*amount,-35,35);
-  s.highlights=-15*amount;s.shadows=8*amount;return settings(s);
+  const lightness=clamp(Math.abs(reference.lightness-source.lightness)*5);
+  s.highlights=-15*amount*lightness;s.shadows=8*amount*lightness;return settings(s);
 }
 export const BUILTINS=[
   {id:'clear',name:'清透日光',description:'温和提亮，保留肤色与干净白色',settings:settings({exposure:.12,temperature:4,highlights:-20,shadows:14,vibrance:8}),target:[.66,.28,.03]},

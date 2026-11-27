@@ -29,3 +29,11 @@ node scripts/project-node.mjs scripts/feature-benchmark-gate.mjs check data/priv
 - **高低频与中性灰结合**。近景示例的大笔触版本使明度差升至 11.55，回收笔触后为 3.39。原图在选区内与教程修后的差只有 0.27，适合检查过修。单项效果与 98 分仍待独立素材。[肤质原图与修后](https://phlearn.com/tutorial/skin-retouching-basics-photoshop/)
 
 真实样本、评分清单、对照图和回执均放在 F 盘本机私有目录。源码提交只公开方法、出处和去标识摘要。
+
+## 第二轮实图
+
+- **参考色匹配已更新**。单独运行匹配时，若尺寸比例和明暗布局都能对应，使用三通道曲线匹配同一画面，压住两端并保留黑白锚点。不同构图回到全局统计匹配。相同统计或强度为 0 时输出原像素。已有预设保存的参数可照旧重放。
+- **同图前后复测**。按匹配强度 70% 使用作者发布的网页前后图。六张不同的照片均降低 RGB 平均绝对误差。混光人像由 5.061 降到 2.751，街景由 13.993 降到 10.705，新取的 Camera Raw 人像由 10.381 降到 5.921，日落由 6.000 降到 3.552。混光人像与夜景的明度误差分别从 1.014 到 1.533、8.510 到 9.152，存在回退。不同裁切版本和网页重复照片不增加独立验收计数。作者参考包含独立白平衡、曲线或局部曝光，本轮仅验证参考色工具的效果。[混光人像](https://phlearn.com/tutorial/correct-white-balance-in-photoshop/) · [街景](https://phlearn.com/tutorial/white-balance-photoshop/) · [Camera Raw 调色](https://phlearn.com/tutorial/how-to-color-grade-in-photoshop-using-camera-raw/) · [日落](https://phlearn.com/tutorial/sunset-coloring-light-lr/)
+- **扩图回贴**。重放两个既有生成回执，用 12、24、40 像素羽化比较接缝。比例正常样例的梯度误差分别为 1.143、1.098、1.093，三档对原图区均零改动。保留 24 像素，避免把几乎相同的测量当成可见改进。另一例生成画幅偏差 37.4%，继续要求复核。该试验无独立同图修后。
+
+上述误差仅供版本对照。各项正式 98 分验收仍待独立案例。
